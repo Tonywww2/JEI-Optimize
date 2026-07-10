@@ -86,7 +86,7 @@ public final class JeiOptConfig {
             .define("catalystPreheat", false);
         ASYNC_WORKER_THREADS = builder
             .comment("Worker thread count. Ignored when all async features are disabled.")
-            .defineInRange("workerThreads", 2, 1, 8);
+            .defineInRange("workerThreads", 4, 1, 8);
         ASYNC_SNAPSHOT_BUDGET_MS = builder
             .comment("Per-client-tick snapshot extraction budget in milliseconds. Ignored when snapshotChunking is disabled.")
             .defineInRange("snapshotBudgetMs", 2, 1, 10);

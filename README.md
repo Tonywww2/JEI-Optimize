@@ -18,6 +18,19 @@ In large modpacks, JEI spends several seconds building its ingredient search ind
 
 Every optimization sits behind a config flag and degrades safely to JEI's stock behavior. If anything looks wrong, set `enabled = false` to turn the whole mod off.
 
+## Results
+
+Measured in a large modpack (roughly 21,000 items and fluids and 34,000 vanilla-type recipes), entering the same world on the same machine with the optimizations off vs on:
+
+| JEI startup timer | Optimizations off | Optimizations on |
+|-------------------|-------------------|------------------|
+| Building runtime | 5.18 s | 0.55 s |
+| Starting JEI (total) | 10.7 s | 6.4 s |
+
+The ingredient search index (the biggest single cost) moves off the main thread: JEI's on-thread "Building ingredient filter" step drops from several seconds to about 0.1 s, and the real index build (about 8 s here) runs on worker threads after you are already in the world.
+
+Results vary with hardware and pack size. Measure your own with `scripts/measure-optimizations.ps1` (see [docs/optimization-measurement.md](docs/optimization-measurement.md)).
+
 ## Requirements
 
 | Component | Version |
