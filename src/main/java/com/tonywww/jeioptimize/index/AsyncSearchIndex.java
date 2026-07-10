@@ -4,6 +4,11 @@ import com.tonywww.jeioptimize.config.JeiOptFeatureFlags;
 import com.tonywww.jeioptimize.runtime.JeiOptRuntimeState;
 import com.tonywww.jeioptimize.runtime.JeiOptTaskRegistry;
 import com.tonywww.jeioptimize.snapshot.IngredientSearchSnapshot;
+import com.tonywww.jeioptimize.snapshot.IngredientSearchSnapshotBuilder;
+import mezz.jei.api.helpers.IColorHelper;
+import mezz.jei.api.runtime.IIngredientManager;
+import mezz.jei.common.config.IIngredientFilterConfig;
+import mezz.jei.gui.ingredients.IListElementInfo;
 
 import java.util.Collection;
 import java.util.List;
@@ -38,6 +43,30 @@ public final class AsyncSearchIndex implements AsyncIndex<SearchIndexBuilder.Bui
             taskId,
             JeiOptFeatureFlags::searchPreheat,
             () -> SearchIndexBuilder.build(safeSnapshots),
+            ignored -> {
+            }
+        ).map(future -> new AsyncSearchIndex(generation, future));
+    }
+
+    public static Optional<AsyncSearchIndex> buildAsyncFromElementInfos(
+        List<? extends IListElementInfo<?>> elementInfos,
+        IIngredientManager ingredientManager,
+        IIngredientFilterConfig ingredientFilterConfig,
+        IColorHelper colorHelper
+    ) {
+        if (!JeiOptFeatureFlags.searchPreheat()) {
+            return Optional.empty();
+        }
+        if (elementInfos == null || elementInfos.isEmpty()) {
+            return Optional.empty();
+        }
+        List<? extends IListElementInfo<?>> safeElementInfos = List.copyOf(elementInfos);
+        long generation = JeiOptRuntimeState.currentGeneration();
+        return JeiOptTaskRegistry.submitIfEnabled(
+            DEFAULT_TASK_ID,
+            JeiOptFeatureFlags::searchPreheat,
+            () -> SearchIndexBuilder.build(IngredientSearchSnapshotBuilder.fromElementInfos(
+                safeElementInfos, ingredientManager, ingredientFilterConfig, colorHelper)),
             ignored -> {
             }
         ).map(future -> new AsyncSearchIndex(generation, future));

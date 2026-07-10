@@ -1,11 +1,18 @@
 package com.tonywww.jeioptimize.config;
 
 public final class JeiOptFeatureFlags {
+    private static final int DEFAULT_WORKER_THREADS = 2;
+    private static final int DEFAULT_SNAPSHOT_BUDGET_MS = 2;
+
     private JeiOptFeatureFlags() {
     }
 
+    private static boolean configReady() {
+        return JeiOptConfig.SPEC.isLoaded();
+    }
+
     public static boolean enabled() {
-        return JeiOptConfig.GENERAL_ENABLED.get();
+        return configReady() && JeiOptConfig.GENERAL_ENABLED.get();
     }
 
     public static boolean pluginTiming() {
@@ -53,10 +60,26 @@ public final class JeiOptFeatureFlags {
     }
 
     public static int workerThreads() {
-        return JeiOptConfig.ASYNC_WORKER_THREADS.get();
+        return configReady() ? JeiOptConfig.ASYNC_WORKER_THREADS.get() : DEFAULT_WORKER_THREADS;
     }
 
     public static int snapshotBudgetMs() {
-        return JeiOptConfig.ASYNC_SNAPSHOT_BUDGET_MS.get();
+        return configReady() ? JeiOptConfig.ASYNC_SNAPSHOT_BUDGET_MS.get() : DEFAULT_SNAPSHOT_BUDGET_MS;
+    }
+
+    public static boolean deferredIngredientFilter() {
+        return enabled() && JeiOptConfig.ASYNC_DEFERRED_INGREDIENT_FILTER.get();
+    }
+
+    public static boolean asyncIngredientFilter() {
+        return enabled() && JeiOptConfig.ASYNC_PARALLEL_INGREDIENT_FILTER.get();
+    }
+
+    public static int ingredientFilterBudgetMs() {
+        return configReady() ? JeiOptConfig.ASYNC_INGREDIENT_FILTER_BUDGET_MS.get() : 10;
+    }
+
+    public static int ingredientFilterChunkSize() {
+        return configReady() ? JeiOptConfig.ASYNC_INGREDIENT_FILTER_CHUNK_SIZE.get() : 500;
     }
 }

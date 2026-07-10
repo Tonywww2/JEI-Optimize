@@ -31,6 +31,9 @@ loom {
     mixin {
         defaultRefmapName = "$modId.refmap.json"
     }
+    forge {
+        mixinConfig("$modId.mixins.json")
+    }
     if (stonecutter.current.isActive) {
         runConfigs.all {
             ideConfigGenerated(true)

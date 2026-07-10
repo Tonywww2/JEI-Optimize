@@ -2,6 +2,7 @@ package com.tonywww.jeioptimize.mixin;
 
 import com.tonywww.jeioptimize.config.JeiOptFeatureFlags;
 import com.tonywww.jeioptimize.index.AsyncSearchIndex;
+import com.tonywww.jeioptimize.index.AsyncSearchIndexRegistry;
 import com.tonywww.jeioptimize.index.SearchIndexBuilder;
 import com.tonywww.jeioptimize.snapshot.IngredientSearchSnapshot;
 import mezz.jei.core.search.PrefixInfo;
@@ -17,36 +18,19 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.WeakHashMap;
 import java.util.function.Supplier;
 
 @Pseudo
 @Mixin(targets = "mezz.jei.gui.search.ElementSearch", remap = false)
 public abstract class ElementSearchMixin {
-    private static final Map<Object, AsyncSearchIndex> ASYNC_INDEXES = Collections.synchronizedMap(new WeakHashMap<>());
-
     @Shadow
     @Final
     private Map<Object, IListElement<?>> allElements;
-
-    public static void jeiopt$attachAsyncIndex(Object elementSearch, AsyncSearchIndex asyncSearchIndex) {
-        if (elementSearch == null || asyncSearchIndex == null) {
-            return;
-        }
-        ASYNC_INDEXES.put(elementSearch, asyncSearchIndex);
-    }
-
-    public static void jeiopt$detachAsyncIndex(Object elementSearch) {
-        if (elementSearch != null) {
-            ASYNC_INDEXES.remove(elementSearch);
-        }
-    }
 
     @Inject(method = "getSearchResults", at = @At("HEAD"), cancellable = true)
     private void jeiopt$getAsyncSearchResults(ElementPrefixParser.TokenInfo tokenInfo, CallbackInfoReturnable<Set<IListElement<?>>> callbackInfo) {
@@ -54,7 +38,7 @@ public abstract class ElementSearchMixin {
             return;
         }
 
-        AsyncSearchIndex asyncSearchIndex = ASYNC_INDEXES.get(this);
+        AsyncSearchIndex asyncSearchIndex = AsyncSearchIndexRegistry.get(this);
         if (asyncSearchIndex == null) {
             return;
         }
