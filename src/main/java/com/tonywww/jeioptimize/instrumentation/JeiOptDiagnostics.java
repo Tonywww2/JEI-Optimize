@@ -5,7 +5,9 @@ import com.tonywww.jeioptimize.config.JeiOptFeatureFlags;
 import mezz.jei.api.IModPlugin;
 import net.minecraft.resources.ResourceLocation;
 
+import java.util.Comparator;
 import java.util.Locale;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 public final class JeiOptDiagnostics {
@@ -30,6 +32,39 @@ public final class JeiOptDiagnostics {
                 JeiOptimize.LOGGER.info("JEI plugin phase '{}' for {} took {}", title, pluginUid, formatDuration(elapsedNanos));
             }
         }
+    }
+
+    public static void reportRegistrationCounts() {
+        if (!JeiOptFeatureFlags.registrationCounts()) {
+            return;
+        }
+        Map<ResourceLocation, Map<JeiPluginCallContext.RegistrationMetric, Long>> counts =
+            JeiPluginCallContext.snapshotCounts();
+        if (counts.isEmpty()) {
+            JeiOptimize.LOGGER.info("JEI Optimize registration counts: none recorded");
+            return;
+        }
+        counts.entrySet().stream()
+            .sorted(Comparator.comparingLong(
+                (Map.Entry<ResourceLocation, Map<JeiPluginCallContext.RegistrationMetric, Long>> entry) ->
+                    entry.getValue().getOrDefault(JeiPluginCallContext.RegistrationMetric.RECIPES, 0L)).reversed())
+            .forEach(entry -> JeiOptimize.LOGGER.info(
+                "JEI Optimize registration counts for {}: {}", entry.getKey(), formatCounts(entry.getValue())));
+        JeiPluginCallContext.clearCounts();
+    }
+
+    private static String formatCounts(Map<JeiPluginCallContext.RegistrationMetric, Long> counts) {
+        StringBuilder builder = new StringBuilder();
+        for (JeiPluginCallContext.RegistrationMetric metric : JeiPluginCallContext.RegistrationMetric.values()) {
+            Long value = counts.get(metric);
+            if (value != null && value > 0) {
+                if (builder.length() > 0) {
+                    builder.append(", ");
+                }
+                builder.append(metric).append('=').append(value);
+            }
+        }
+        return builder.toString();
     }
 
     private static ResourceLocation safePluginUid(IModPlugin plugin) {

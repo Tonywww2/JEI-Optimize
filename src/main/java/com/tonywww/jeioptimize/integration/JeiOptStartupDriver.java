@@ -4,6 +4,7 @@ import com.tonywww.jeioptimize.JeiOptimize;
 import com.tonywww.jeioptimize.config.JeiOptFeatureFlags;
 import com.tonywww.jeioptimize.index.AsyncSearchIndex;
 import com.tonywww.jeioptimize.index.AsyncSearchIndexRegistry;
+import com.tonywww.jeioptimize.instrumentation.JeiOptDiagnostics;
 import com.tonywww.jeioptimize.runtime.JeiOptExecutors;
 import com.tonywww.jeioptimize.runtime.JeiOptRuntimeState;
 import com.tonywww.jeioptimize.runtime.JeiOptStartupContext;
@@ -29,6 +30,7 @@ public final class JeiOptStartupDriver {
             return;
         }
         try {
+            JeiOptDiagnostics.reportRegistrationCounts();
             JeiOptExecutors.configureWorkerThreads(JeiOptFeatureFlags.workerThreads());
             JeiOptRuntimeState.beginStart();
             driveSearchPreheat();

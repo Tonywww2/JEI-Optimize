@@ -31,6 +31,7 @@ public final class JeiOptConfig {
     static final ForgeConfigSpec.IntValue ASYNC_INGREDIENT_FILTER_BUDGET_MS;
     static final ForgeConfigSpec.IntValue ASYNC_INGREDIENT_FILTER_CHUNK_SIZE;
     static final ForgeConfigSpec.BooleanValue ASYNC_PARALLEL_INGREDIENT_FILTER;
+    static final ForgeConfigSpec.BooleanValue ASYNC_PARALLEL_VANILLA_RECIPES;
 
     private static boolean registered;
 
@@ -99,8 +100,18 @@ public final class JeiOptConfig {
             .comment("Number of ingredients added per work unit during the deferred ingredient filter build.")
             .defineInRange("ingredientFilterChunkSize", 500, 50, 4000);
         ASYNC_PARALLEL_INGREDIENT_FILTER = builder
-            .comment("Build the JEI ingredient search filter entirely on worker threads after entering the world, then atomically swap it in. Eliminates the main-thread cost. Takes precedence over deferredIngredientFilter. Extraction runs off-thread.")
-            .define("asyncIngredientFilter", false);
+            .comment(
+                "Build the JEI ingredient search filter on worker threads after entering the world, then atomically swap it in.",
+                "This removes the multi-second 'Building ingredient filter' cost from the loading screen. The JEI item list",
+                "appears a few seconds after you enter the world. Falls back to a synchronous build if the off-thread build fails.",
+                "Enabled by default.")
+            .define("asyncIngredientFilter", true);
+        ASYNC_PARALLEL_VANILLA_RECIPES = builder
+            .comment(
+                "Validate JEI's built-in (vanilla) recipes in parallel across CPU cores during startup.",
+                "The result is identical to JEI's sequential output; it falls back to sequential validation on any error.",
+                "Enabled by default.")
+            .define("parallelVanillaRecipes", true);
         builder.pop();
 
         SPEC = builder.build();

@@ -1,6 +1,7 @@
 package com.tonywww.jeioptimize.mixin;
 
 import com.tonywww.jeioptimize.instrumentation.JeiOptDiagnostics;
+import com.tonywww.jeioptimize.instrumentation.JeiPluginCallContext;
 import mezz.jei.api.IModPlugin;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
@@ -28,6 +29,7 @@ public abstract class PluginCallerMixin {
         Consumer<IModPlugin> func
     ) {
         IModPlugin modPlugin = (IModPlugin) plugin;
-        JeiOptDiagnostics.callPluginWithTiming(title, modPlugin, () -> consumer.accept(modPlugin));
+        JeiOptDiagnostics.callPluginWithTiming(title, modPlugin, () ->
+            JeiPluginCallContext.runWithPlugin(modPlugin, () -> consumer.accept(modPlugin)));
     }
 }

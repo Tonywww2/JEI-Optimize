@@ -75,6 +75,10 @@ public final class JeiOptFeatureFlags {
         return enabled() && JeiOptConfig.ASYNC_PARALLEL_INGREDIENT_FILTER.get();
     }
 
+    public static boolean parallelVanillaRecipes() {
+        return enabled() && JeiOptConfig.ASYNC_PARALLEL_VANILLA_RECIPES.get();
+    }
+
     public static int ingredientFilterBudgetMs() {
         return configReady() ? JeiOptConfig.ASYNC_INGREDIENT_FILTER_BUDGET_MS.get() : 10;
     }
