@@ -1,0 +1,26 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.tonywww.jeioptimize.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "refmap": "jei_optimize.refmap.json",
+  "mixins": [
+    "PluginCallerMixin",
+    "registration.IngredientManagerBuilderRegistrationCountMixin",
+    "registration.RecipeCatalystRegistrationCountMixin",
+    "registration.RecipeCategoryRegistrationCountMixin",
+    "registration.RecipeRegistrationCountMixin",
+    "IngredientFilterMixin",
+    "IngredientSorterMixin",
+    "RecipeManagerInternalCompactMixin",
+    "ElementSearchMixin",
+    "AsyncIngredientSorterMixin",
+    "RecipeMapCatalystMixin"
+  ],
+  "client": [
+    "ClientTickHookMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

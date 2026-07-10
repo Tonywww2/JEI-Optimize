@@ -1,0 +1,56 @@
+# Gradle
+.gradle/
+build/
+**/build/
+**/.gradle/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Minecraft / Forge run output
+run/
+runs/
+logs/
+crash-reports/
+saves/
+screenshots/
+shaderpacks/
+resourcepacks/
+options.txt
+optionsof.txt
+servers.dat
+usercache.json
+usernamecache.json
+*.log
+
+# Stonecutter generated / linked node output
+versions/*/build/
+versions/*/.gradle/
+
+# IDE / editor
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+.classpath
+.project
+.settings/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Local / temporary artifacts
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+*.orig
+
+# Local dependency drops; keep directory placeholders if needed
+libs/dev/*
+!libs/dev/.gitkeep
+
+# Accidental generated loader output from local experiments
+Fabric/build/
