@@ -98,7 +98,11 @@ public final class JeiPluginCallContext {
         try {
             return plugin.getPluginUid();
         } catch (RuntimeException | LinkageError e) {
+            //? if forge {
             return new ResourceLocation("jei_optimize", "unknown_plugin");
+            //?} else {
+            /*return ResourceLocation.fromNamespaceAndPath("jei_optimize", "unknown_plugin");
+            *///?}
         }
     }
 }

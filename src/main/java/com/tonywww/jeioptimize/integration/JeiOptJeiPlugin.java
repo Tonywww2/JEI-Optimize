@@ -14,7 +14,11 @@ import net.minecraft.resources.ResourceLocation;
  */
 @JeiPlugin
 public final class JeiOptJeiPlugin implements IModPlugin {
+    //? if forge {
     private static final ResourceLocation PLUGIN_UID = new ResourceLocation(JeiOptimize.MOD_ID, "core");
+    //?} else {
+    /*private static final ResourceLocation PLUGIN_UID = ResourceLocation.fromNamespaceAndPath(JeiOptimize.MOD_ID, "core");
+    *///?}
 
     @Override
     public ResourceLocation getPluginUid() {

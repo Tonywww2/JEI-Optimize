@@ -1,47 +1,79 @@
 package com.tonywww.jeioptimize.config;
 
 import com.tonywww.jeioptimize.JeiOptimize;
+//? if forge {
 import net.minecraftforge.common.ForgeConfigSpec;
+import net.minecraftforge.common.ForgeConfigSpec.BooleanValue;
+import net.minecraftforge.common.ForgeConfigSpec.Builder;
+import net.minecraftforge.common.ForgeConfigSpec.IntValue;
 import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.config.ModConfig;
+//?} else {
+/*import net.neoforged.fml.ModContainer;
+import net.neoforged.fml.config.ModConfig;
+import net.neoforged.neoforge.common.ModConfigSpec;
+import net.neoforged.neoforge.common.ModConfigSpec.BooleanValue;
+import net.neoforged.neoforge.common.ModConfigSpec.Builder;
+import net.neoforged.neoforge.common.ModConfigSpec.IntValue;
+*///?}
 
 public final class JeiOptConfig {
+    //? if forge {
     public static final ForgeConfigSpec SPEC;
+    //?} else {
+    /*public static final ModConfigSpec SPEC;
+    *///?}
 
-    static final ForgeConfigSpec.BooleanValue GENERAL_ENABLED;
+    static final BooleanValue GENERAL_ENABLED;
 
-    static final ForgeConfigSpec.BooleanValue DIAGNOSTICS_PLUGIN_TIMING;
-    static final ForgeConfigSpec.BooleanValue DIAGNOSTICS_REGISTRATION_COUNTS;
+    static final BooleanValue CONTENT_DISABLE_ANVIL_REPAIR;
+    static final BooleanValue CONTENT_DISABLE_ANVIL_ENCHANT;
 
-    static final ForgeConfigSpec.BooleanValue SYNC_CACHE_SCOPE;
-    static final ForgeConfigSpec.BooleanValue SYNC_BATCH_INGREDIENT_FILTER_INIT;
-    static final ForgeConfigSpec.BooleanValue SYNC_SORT_KEY_CACHE;
-    static final ForgeConfigSpec.BooleanValue SYNC_DELAY_COMPACT;
+    static final BooleanValue DIAGNOSTICS_PLUGIN_TIMING;
+    static final BooleanValue DIAGNOSTICS_REGISTRATION_COUNTS;
 
-    static final ForgeConfigSpec.BooleanValue ASYNC_SEARCH_PREHEAT;
-    static final ForgeConfigSpec.BooleanValue ASYNC_SNAPSHOT_CHUNKING;
-    static final ForgeConfigSpec.BooleanValue ASYNC_SORT_PREHEAT;
-    static final ForgeConfigSpec.BooleanValue ASYNC_RECIPE_FOCUS_PREHEAT;
-    static final ForgeConfigSpec.BooleanValue ASYNC_CATALYST_PREHEAT;
+    static final BooleanValue SYNC_CACHE_SCOPE;
+    static final BooleanValue SYNC_BATCH_INGREDIENT_FILTER_INIT;
+    static final BooleanValue SYNC_SORT_KEY_CACHE;
+    static final BooleanValue SYNC_DELAY_COMPACT;
 
-    static final ForgeConfigSpec.IntValue ASYNC_WORKER_THREADS;
-    static final ForgeConfigSpec.IntValue ASYNC_SNAPSHOT_BUDGET_MS;
+    static final BooleanValue ASYNC_SEARCH_PREHEAT;
+    static final BooleanValue ASYNC_SNAPSHOT_CHUNKING;
+    static final BooleanValue ASYNC_SORT_PREHEAT;
+    static final BooleanValue ASYNC_RECIPE_FOCUS_PREHEAT;
+    static final BooleanValue ASYNC_CATALYST_PREHEAT;
 
-    static final ForgeConfigSpec.BooleanValue ASYNC_DEFERRED_INGREDIENT_FILTER;
-    static final ForgeConfigSpec.IntValue ASYNC_INGREDIENT_FILTER_BUDGET_MS;
-    static final ForgeConfigSpec.IntValue ASYNC_INGREDIENT_FILTER_CHUNK_SIZE;
-    static final ForgeConfigSpec.BooleanValue ASYNC_PARALLEL_INGREDIENT_FILTER;
-    static final ForgeConfigSpec.BooleanValue ASYNC_PARALLEL_VANILLA_RECIPES;
+    static final IntValue ASYNC_WORKER_THREADS;
+    static final IntValue ASYNC_SNAPSHOT_BUDGET_MS;
+
+    static final BooleanValue ASYNC_DEFERRED_INGREDIENT_FILTER;
+    static final IntValue ASYNC_INGREDIENT_FILTER_BUDGET_MS;
+    static final IntValue ASYNC_INGREDIENT_FILTER_CHUNK_SIZE;
+    static final BooleanValue ASYNC_PARALLEL_INGREDIENT_FILTER;
+    static final BooleanValue ASYNC_PARALLEL_VANILLA_RECIPES;
 
     private static boolean registered;
 
     static {
-        ForgeConfigSpec.Builder builder = new ForgeConfigSpec.Builder();
+        Builder builder = new Builder();
 
         builder.push("general");
         GENERAL_ENABLED = builder
             .comment("Master switch. If false, all JEI Optimize mixin behavior no-ops or falls back to JEI baseline.")
             .define("enabled", true);
+        builder.pop();
+
+        builder.push("jeiContent");
+        CONTENT_DISABLE_ANVIL_REPAIR = builder
+            .comment(
+                "Hide JEI's generated anvil repair recipes (repairing an item with its crafting material).",
+                "Also skips generating them during startup, which saves time. Default false.")
+            .define("disableAnvilRepairRecipes", false);
+        CONTENT_DISABLE_ANVIL_ENCHANT = builder
+            .comment(
+                "Hide JEI's generated anvil enchanting recipes (combining enchanted books on an anvil).",
+                "Also skips generating them during startup, which saves time. Default false.")
+            .define("disableAnvilEnchantRecipes", false);
         builder.pop();
 
         builder.push("diagnostics");
@@ -120,6 +152,7 @@ public final class JeiOptConfig {
     private JeiOptConfig() {
     }
 
+    //? if forge {
     public static void register() {
         if (registered) {
             return;
@@ -127,4 +160,13 @@ public final class JeiOptConfig {
         ModLoadingContext.get().registerConfig(ModConfig.Type.CLIENT, SPEC, JeiOptimize.MOD_ID + "-client.toml");
         registered = true;
     }
+    //?} else {
+    /*public static void register(ModContainer container) {
+        if (registered) {
+            return;
+        }
+        container.registerConfig(ModConfig.Type.CLIENT, SPEC);
+        registered = true;
+    }
+    *///?}
 }

@@ -5,6 +5,9 @@ import mezz.jei.api.recipe.category.IRecipeCategory;
 import mezz.jei.api.runtime.IIngredientManager;
 import mezz.jei.library.plugins.vanilla.crafting.CategoryRecipeValidator;
 import net.minecraft.world.item.crafting.CraftingRecipe;
+//? if neoforge {
+/*import net.minecraft.world.item.crafting.RecipeHolder;
+*///?}
 import net.minecraft.world.item.crafting.RecipeManager;
 import net.minecraft.world.item.crafting.RecipeType;
 
@@ -26,17 +29,33 @@ public final class VanillaRecipeParallelBuilder {
     private VanillaRecipeParallelBuilder() {
     }
 
+    //? if forge {
     public static Map<Boolean, List<CraftingRecipe>> buildCraftingRecipes(
         RecipeManager recipeManager,
         IIngredientManager ingredientManager,
         IRecipeCategory<CraftingRecipe> craftingCategory
     ) {
+    //?} else {
+    /*public static Map<Boolean, List<RecipeHolder<CraftingRecipe>>> buildCraftingRecipes(
+        RecipeManager recipeManager,
+        IIngredientManager ingredientManager,
+        IRecipeCategory<RecipeHolder<CraftingRecipe>> craftingCategory
+    ) {
+    *///?}
         CategoryRecipeValidator<CraftingRecipe> validator =
             new CategoryRecipeValidator<>(craftingCategory, ingredientManager, CRAFTING_MAX_INPUTS);
+        //? if forge {
         List<CraftingRecipe> allRecipes = recipeManager.getAllRecipesFor(RecipeType.CRAFTING);
+        //?} else {
+        /*List<RecipeHolder<CraftingRecipe>> allRecipes = recipeManager.getAllRecipesFor(RecipeType.CRAFTING);
+        *///?}
 
         long start = System.nanoTime();
+        //? if forge {
         Map<Boolean, List<CraftingRecipe>> partitioned;
+        //?} else {
+        /*Map<Boolean, List<RecipeHolder<CraftingRecipe>>> partitioned;
+        *///?}
         try {
             partitioned = allRecipes.parallelStream()
                 .filter(validator::isRecipeValid)

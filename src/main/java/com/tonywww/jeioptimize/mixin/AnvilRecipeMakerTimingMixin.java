@@ -22,7 +22,7 @@ public abstract class AnvilRecipeMakerTimingMixin {
     @Unique
     private static long jeiopt$anvilStartNanos;
 
-    @Inject(method = "getAnvilRecipes", at = @At("HEAD"))
+    @Inject(method = "getAnvilRecipes(Lmezz/jei/api/recipe/vanilla/IVanillaRecipeFactory;Lmezz/jei/api/runtime/IIngredientManager;)Ljava/util/List;", at = @At("HEAD"))
     private static void jeiopt$anvilStart(
         IVanillaRecipeFactory vanillaRecipeFactory,
         IIngredientManager ingredientManager,
@@ -33,7 +33,7 @@ public abstract class AnvilRecipeMakerTimingMixin {
         }
     }
 
-    @Inject(method = "getAnvilRecipes", at = @At("RETURN"))
+    @Inject(method = "getAnvilRecipes(Lmezz/jei/api/recipe/vanilla/IVanillaRecipeFactory;Lmezz/jei/api/runtime/IIngredientManager;)Ljava/util/List;", at = @At("RETURN"))
     private static void jeiopt$anvilEnd(
         IVanillaRecipeFactory vanillaRecipeFactory,
         IIngredientManager ingredientManager,

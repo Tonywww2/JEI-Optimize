@@ -5,6 +5,9 @@ import com.tonywww.jeioptimize.recipe.VanillaRecipeParallelBuilder;
 import mezz.jei.api.recipe.category.IRecipeCategory;
 import mezz.jei.api.runtime.IIngredientManager;
 import net.minecraft.world.item.crafting.CraftingRecipe;
+//? if neoforge {
+/*import net.minecraft.world.item.crafting.RecipeHolder;
+*///?}
 import net.minecraft.world.item.crafting.RecipeManager;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -31,10 +34,17 @@ public abstract class VanillaRecipesMixin {
     private IIngredientManager ingredientManager;
 
     @Inject(method = "getCraftingRecipes", at = @At("HEAD"), cancellable = true)
+    //? if forge {
     private void jeiopt$parallelCraftingRecipes(
         IRecipeCategory<CraftingRecipe> craftingCategory,
         CallbackInfoReturnable<Map<Boolean, List<CraftingRecipe>>> callbackInfo
     ) {
+    //?} else {
+    /*private void jeiopt$parallelCraftingRecipes(
+        IRecipeCategory<RecipeHolder<CraftingRecipe>> craftingCategory,
+        CallbackInfoReturnable<Map<Boolean, List<RecipeHolder<CraftingRecipe>>>> callbackInfo
+    ) {
+    *///?}
         if (!JeiOptFeatureFlags.parallelVanillaRecipes()) {
             return;
         }

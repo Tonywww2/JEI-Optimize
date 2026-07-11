@@ -2,7 +2,7 @@
   "required": true,
   "minVersion": "0.8",
   "package": "com.tonywww.jeioptimize.mixin",
-  "compatibilityLevel": "JAVA_17",
+  "compatibilityLevel": "${mixinCompat}",
   "refmap": "jei_optimize.refmap.json",
   "mixins": [
     "PluginCallerMixin",
@@ -16,6 +16,7 @@
     "VanillaRecipesMixin",
     "RecipeAddTimingMixin",
     "AnvilRecipeMakerTimingMixin",
+    "AnvilRecipeControlMixin",
     "BrewingRecipeMakerTimingMixin",
     "ElementSearchMixin",
     "RecipeMapCatalystMixin"

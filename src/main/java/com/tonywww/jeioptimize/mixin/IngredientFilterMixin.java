@@ -77,7 +77,7 @@ public abstract class IngredientFilterMixin {
         CallbackInfo callbackInfo
     ) {
         if (JeiOptFeatureFlags.asyncIngredientFilter()) {
-            jeiopt$scheduleAsyncBuild(ingredients, config, colorHelper, ingredientVisibility);
+            jeiopt$scheduleAsyncBuild(ingredients, config, colorHelper, modIdHelper, ingredientVisibility);
         } else if (JeiOptFeatureFlags.deferredIngredientFilter()) {
             jeiopt$scheduleDeferredBuild(ingredients, ingredientVisibility);
         } else if (JeiOptFeatureFlags.batchIngredientFilterInit()) {
@@ -137,11 +137,12 @@ public abstract class IngredientFilterMixin {
         List<IListElementInfo<?>> ingredients,
         IIngredientFilterConfig config,
         IColorHelper colorHelper,
+        IModIdHelper modIdHelper,
         IIngredientVisibility ingredientVisibility
     ) {
         int total = ingredients.size();
         CompletableFuture<IElementSearch> future = AsyncIngredientFilterBuilder.buildAsync(
-            ingredients, this.ingredientManager, config, colorHelper, ingredientVisibility);
+            ingredients, this.ingredientManager, config, colorHelper, modIdHelper, ingredientVisibility);
         long startNanos = System.nanoTime();
         JeiOptClientTickQueue.enqueue(() ->
             jeiopt$finalizeAsyncBuild(future, ingredients, ingredientVisibility, total, startNanos));

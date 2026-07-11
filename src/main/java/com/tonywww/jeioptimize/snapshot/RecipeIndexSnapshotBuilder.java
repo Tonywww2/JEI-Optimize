@@ -7,7 +7,11 @@ import mezz.jei.api.ingredients.subtypes.UidContext;
 import mezz.jei.api.recipe.RecipeIngredientRole;
 import mezz.jei.api.recipe.category.IRecipeCategory;
 import mezz.jei.api.runtime.IIngredientManager;
+//? if forge {
 import mezz.jei.library.ingredients.IIngredientSupplier;
+//?} else {
+/*import mezz.jei.api.ingredients.IIngredientSupplier;
+*///?}
 import mezz.jei.library.util.IngredientSupplierHelper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

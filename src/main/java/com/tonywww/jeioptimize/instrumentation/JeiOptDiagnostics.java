@@ -71,7 +71,11 @@ public final class JeiOptDiagnostics {
         try {
             return plugin.getPluginUid();
         } catch (RuntimeException | LinkageError e) {
+            //? if forge {
             return new ResourceLocation(JeiOptimize.MOD_ID, "unknown_plugin");
+            //?} else {
+            /*return ResourceLocation.fromNamespaceAndPath(JeiOptimize.MOD_ID, "unknown_plugin");
+            *///?}
         }
     }
 

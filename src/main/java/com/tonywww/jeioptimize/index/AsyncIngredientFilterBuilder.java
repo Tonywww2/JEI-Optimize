@@ -2,6 +2,7 @@ package com.tonywww.jeioptimize.index;
 
 import com.tonywww.jeioptimize.runtime.JeiOptExecutors;
 import mezz.jei.api.helpers.IColorHelper;
+import mezz.jei.api.helpers.IModIdHelper;
 import mezz.jei.api.ingredients.ITypedIngredient;
 import mezz.jei.api.runtime.IIngredientManager;
 import mezz.jei.api.runtime.IIngredientVisibility;
@@ -31,6 +32,7 @@ public final class AsyncIngredientFilterBuilder {
         IIngredientManager ingredientManager,
         IIngredientFilterConfig ingredientFilterConfig,
         IColorHelper colorHelper,
+        IModIdHelper modIdHelper,
         IIngredientVisibility ingredientVisibility
     ) {
         List<IListElementInfo<?>> safeElements = List.copyOf(elements);
@@ -38,8 +40,13 @@ public final class AsyncIngredientFilterBuilder {
             for (IListElementInfo<?> info : safeElements) {
                 updateHiddenState(info.getElement(), ingredientVisibility);
             }
+            //? if forge {
             ElementPrefixParser prefixParser =
                 new ElementPrefixParser(ingredientManager, ingredientFilterConfig, colorHelper);
+            //?} else {
+            /*ElementPrefixParser prefixParser =
+                new ElementPrefixParser(ingredientManager, ingredientFilterConfig, colorHelper, modIdHelper);
+            *///?}
             ElementSearch elementSearch = new ElementSearch(prefixParser);
             elementSearch.addAll(safeElements, ingredientManager);
             return elementSearch;

@@ -23,6 +23,14 @@ public final class JeiOptFeatureFlags {
         return enabled() && JeiOptConfig.DIAGNOSTICS_REGISTRATION_COUNTS.get();
     }
 
+    public static boolean disableAnvilRepairRecipes() {
+        return enabled() && JeiOptConfig.CONTENT_DISABLE_ANVIL_REPAIR.get();
+    }
+
+    public static boolean disableAnvilEnchantRecipes() {
+        return enabled() && JeiOptConfig.CONTENT_DISABLE_ANVIL_ENCHANT.get();
+    }
+
     public static boolean cacheScope() {
         return enabled() && JeiOptConfig.SYNC_CACHE_SCOPE.get();
     }
