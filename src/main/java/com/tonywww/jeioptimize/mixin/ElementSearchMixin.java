@@ -56,7 +56,9 @@ public abstract class ElementSearchMixin {
         }
         List<IngredientSearchSnapshot> snapshots = index.search(prefix, token);
         if (snapshots.isEmpty()) {
-            callbackInfo.setReturnValue(Set.of());
+            // The async preheat index is not guaranteed complete (its @ mod / $ tag entries can be
+            // missing), so an empty result must NOT be treated as authoritative. Fall through without
+            // cancelling and let JEI's own search answer, instead of masking it with an empty result.
             return;
         }
 

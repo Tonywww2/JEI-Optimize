@@ -17,6 +17,7 @@ import mezz.jei.gui.filter.IFilterTextSource;
 import mezz.jei.gui.ingredients.IngredientFilter;
 import mezz.jei.gui.ingredients.IListElement;
 import mezz.jei.gui.ingredients.IListElementInfo;
+import mezz.jei.gui.search.ElementPrefixParser;
 import mezz.jei.gui.search.IElementSearch;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -36,6 +37,10 @@ import java.util.concurrent.CompletableFuture;
 public abstract class IngredientFilterMixin {
     @Shadow
     private IElementSearch elementSearch;
+
+    @Shadow
+    @Final
+    private ElementPrefixParser elementPrefixParser;
 
     @Shadow
     @Final
@@ -77,7 +82,7 @@ public abstract class IngredientFilterMixin {
         CallbackInfo callbackInfo
     ) {
         if (JeiOptFeatureFlags.asyncIngredientFilter()) {
-            jeiopt$scheduleAsyncBuild(ingredients, config, colorHelper, modIdHelper, ingredientVisibility);
+            jeiopt$scheduleAsyncBuild(ingredients, ingredientVisibility);
         } else if (JeiOptFeatureFlags.deferredIngredientFilter()) {
             jeiopt$scheduleDeferredBuild(ingredients, ingredientVisibility);
         } else if (JeiOptFeatureFlags.batchIngredientFilterInit()) {
@@ -135,14 +140,11 @@ public abstract class IngredientFilterMixin {
 
     private void jeiopt$scheduleAsyncBuild(
         List<IListElementInfo<?>> ingredients,
-        IIngredientFilterConfig config,
-        IColorHelper colorHelper,
-        IModIdHelper modIdHelper,
         IIngredientVisibility ingredientVisibility
     ) {
         int total = ingredients.size();
         CompletableFuture<IElementSearch> future = AsyncIngredientFilterBuilder.buildAsync(
-            ingredients, this.ingredientManager, config, colorHelper, modIdHelper, ingredientVisibility);
+            ingredients, this.ingredientManager, this.elementPrefixParser, ingredientVisibility);
         long startNanos = System.nanoTime();
         JeiOptClientTickQueue.enqueue(() ->
             jeiopt$finalizeAsyncBuild(future, ingredients, ingredientVisibility, total, startNanos));
