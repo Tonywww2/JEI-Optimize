@@ -102,8 +102,15 @@ public final class JeiOptConfig {
 
         builder.push("async");
         ASYNC_SEARCH_PREHEAT = builder
-            .comment("Enable async search prefix index preheat.")
-            .define("searchPreheat", true);
+            .comment(
+                "Async search prefix index preheat. Default OFF (disabled).",
+                "Reason: this builds a separate, approximate search index that can override JEI's",
+                "own results for prefixed queries (@ mod, # tooltip, $ tag, % tab, ^ color, & id).",
+                "It is redundant with asyncIngredientFilter, which already rebuilds JEI's real",
+                "ElementSearch off-thread; the shadow index can return incomplete results and may",
+                "block the render thread if a prefixed search runs before it finishes building.",
+                "Enable only if you specifically need it and accept these trade-offs.")
+            .define("searchPreheat", false);
         ASYNC_SNAPSHOT_CHUNKING = builder
             .comment("Enable client-tick chunked snapshot extraction.")
             .define("snapshotChunking", true);

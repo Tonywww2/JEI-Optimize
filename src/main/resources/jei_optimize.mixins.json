@@ -18,6 +18,7 @@
     "AnvilRecipeMakerTimingMixin",
     "AnvilRecipeControlMixin",
     "BrewingRecipeMakerTimingMixin",
+    "compat.AliGenericUtilsMixin",
     "ElementSearchMixin",
     "RecipeMapCatalystMixin"
   ],
