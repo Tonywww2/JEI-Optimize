@@ -77,6 +77,7 @@ public final class JeiOptStartupDriver {
     public static void onRuntimeUnavailable() {
         try {
             JeiOptRuntimeState.invalidate();
+            JeiOptRuntimeState.markRuntimeUnloaded();
             Object elementSearch = JeiOptStartupContext.elementSearch();
             if (elementSearch != null) {
                 AsyncSearchIndexRegistry.detach(elementSearch);

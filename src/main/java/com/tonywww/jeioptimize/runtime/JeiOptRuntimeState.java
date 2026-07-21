@@ -3,6 +3,7 @@ package com.tonywww.jeioptimize.runtime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 public final class JeiOptRuntimeState {
@@ -11,8 +12,24 @@ public final class JeiOptRuntimeState {
 
     private static long currentGeneration;
     private static final List<CompletableFuture<?>> pendingTasks = new ArrayList<>();
+    private static final AtomicBoolean RUNTIME_UNLOADED_ONCE = new AtomicBoolean(false);
 
     private JeiOptRuntimeState() {
+    }
+
+    /**
+     * Marks that JEI's runtime has been torn down at least once (a reload/rebuild has occurred).
+     * Used to restrict main-thread parallel passes to the initial, exclusive startup only.
+     */
+    public static void markRuntimeUnloaded() {
+        RUNTIME_UNLOADED_ONCE.set(true);
+    }
+
+    /**
+     * @return whether JEI's runtime has been unloaded at least once (any rebuild after first start).
+     */
+    public static boolean hasRuntimeUnloadedOnce() {
+        return RUNTIME_UNLOADED_ONCE.get();
     }
 
     public static long beginStart() {

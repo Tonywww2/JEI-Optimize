@@ -1,6 +1,7 @@
 package com.tonywww.jeioptimize.recipe;
 
 import com.tonywww.jeioptimize.JeiOptimize;
+import com.tonywww.jeioptimize.runtime.JeiOptRuntimeState;
 import mezz.jei.api.recipe.category.IRecipeCategory;
 import mezz.jei.api.runtime.IIngredientManager;
 import mezz.jei.library.plugins.vanilla.crafting.CategoryRecipeValidator;
@@ -56,8 +57,15 @@ public final class VanillaRecipeParallelBuilder {
         //?} else {
         /*Map<Boolean, List<RecipeHolder<CraftingRecipe>>> partitioned;
         *///?}
+        // parallelStream() runs on the shared ForkJoinPool and blocks the main thread until every
+        // task completes. During an in-world JEI rebuild (for example a recipe hot-reload) the
+        // recipe/registry/tag data is being rebuilt on the main thread, so a validation task on a
+        // pool thread can need the main thread (or a registry lock) and stall, and the main thread
+        // then joins forever, i.e. a deadlock. Parallel is only safe on the initial, exclusive
+        // startup pass; every rebuild after the first runtime unload uses a sequential pass.
+        boolean parallelSafe = !JeiOptRuntimeState.hasRuntimeUnloadedOnce();
         try {
-            partitioned = allRecipes.parallelStream()
+            partitioned = (parallelSafe ? allRecipes.parallelStream() : allRecipes.stream())
                 .filter(validator::isRecipeValid)
                 .collect(Collectors.partitioningBy(validator::isRecipeHandled));
         } catch (RuntimeException e) {

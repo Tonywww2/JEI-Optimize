@@ -2,6 +2,7 @@ package com.tonywww.jeioptimize.mixin;
 
 import com.tonywww.jeioptimize.config.JeiOptFeatureFlags;
 import com.tonywww.jeioptimize.recipe.VanillaRecipeParallelBuilder;
+import com.tonywww.jeioptimize.runtime.JeiOptRuntimeState;
 import mezz.jei.api.recipe.category.IRecipeCategory;
 import mezz.jei.api.runtime.IIngredientManager;
 import net.minecraft.world.item.crafting.CraftingRecipe;
@@ -57,6 +58,11 @@ public abstract class VanillaRecipesMixin {
         at = @At(value = "INVOKE", target = "Ljava/util/List;stream()Ljava/util/stream/Stream;")
     )
     private static Stream<?> jeiopt$parallelValidationStream(List<?> recipes) {
-        return JeiOptFeatureFlags.parallelVanillaRecipes() ? recipes.parallelStream() : recipes.stream();
+        // Parallel only on the initial exclusive startup; after any runtime unload (rebuild/reload)
+        // fall back to sequential, so the main thread never joins a pool task that may itself need
+        // the main thread during an in-world recipe rebuild (deadlock). See VanillaRecipeParallelBuilder.
+        return JeiOptFeatureFlags.parallelVanillaRecipes() && !JeiOptRuntimeState.hasRuntimeUnloadedOnce()
+            ? recipes.parallelStream()
+            : recipes.stream();
     }
 }
