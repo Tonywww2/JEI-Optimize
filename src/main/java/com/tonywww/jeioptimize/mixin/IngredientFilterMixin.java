@@ -191,10 +191,11 @@ public abstract class IngredientFilterMixin {
         if (built != null) {
             this.elementSearch = built;
             this.invalidateCache();
+            // getAllIngredients() is JEI's uid-keyed map, so it is normally smaller than the input.
             JeiOptimize.LOGGER.info(
-                "JEI Optimize async ingredient filter build completed: {} indexed (input {}) in {} ms after world entry",
-                built.getAllIngredients().size(),
+                "JEI Optimize async ingredient filter build completed: {} ingredients ({} distinct uids) in {} ms after world entry",
                 total,
+                built.getAllIngredients().size(),
                 (System.nanoTime() - startNanos) / 1_000_000L
             );
         } else {

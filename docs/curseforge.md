@@ -39,10 +39,10 @@ If you ever run into a problem on world entry, turn off the individual options, 
 
 | Minecraft |Loader          |JEI                     |
 | --------- |--------------- |----------------------- |
-| 1.20.1    |Forge 47.4.4+   |15.20.0.120+            |
+| 1.20.1    |Forge 47.4.4+   |15.20.0.120 - 15.48.x   |
 | 1.21.1    |NeoForge 21.1.x |19.27.0.340             |
 
-Client-side only. JEI is required.
+Client-side only. JEI is required. On a JEI version that is not supported yet, the affected optimization switches itself off and JEI keeps its normal behavior.
 
 ## Notes
 
@@ -87,12 +87,12 @@ JEI 在检查内置配方(合成、熔炼、切石等)之前,需要先把每一�
 
 ## 需求
 
-| Minecraft |Loader          |JEI            |
-| --------- |--------------- |-------------- |
-| 1.20.1    |Forge 47.4.4+   |15.20.0.120+   |
-| 1.21.1    |NeoForge 21.1.x |19.27.0.340    |
+| Minecraft |Loader          |JEI                    |
+| --------- |--------------- |---------------------- |
+| 1.20.1    |Forge 47.4.4+   |15.20.0.120 - 15.48.x  |
+| 1.21.1    |NeoForge 21.1.x |19.27.0.340            |
 
-仅客户端需要安装,并且必须装有 JEI。
+仅客户端需要安装,并且必须装有 JEI。遇到尚未适配的 JEI 版本时,受影响的那一项优化会自动关闭,JEI 保持原生行为。
 
 ## 注意事项
 

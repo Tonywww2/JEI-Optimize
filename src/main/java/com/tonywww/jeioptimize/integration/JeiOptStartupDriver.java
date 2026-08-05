@@ -8,6 +8,7 @@ import com.tonywww.jeioptimize.index.AsyncSearchIndexRegistry;
 import com.tonywww.jeioptimize.instrumentation.JeiOptDiagnostics;
 import com.tonywww.jeioptimize.runtime.JeiOptClientTickQueue;
 import com.tonywww.jeioptimize.runtime.JeiOptExecutors;
+import com.tonywww.jeioptimize.runtime.JeiOptFilterBootstrap;
 import com.tonywww.jeioptimize.runtime.JeiOptRuntimeState;
 import com.tonywww.jeioptimize.runtime.JeiOptStartupContext;
 import mezz.jei.api.helpers.IColorHelper;
@@ -82,6 +83,7 @@ public final class JeiOptStartupDriver {
             JeiOptRuntimeState.markRuntimeUnloaded();
             // Work queued for the runtime that is going away must never touch the next one.
             AsyncIngredientFilterBuilder.cancelInFlight();
+            JeiOptFilterBootstrap.clear();
             JeiOptClientTickQueue.clear();
             Object elementSearch = JeiOptStartupContext.elementSearch();
             if (elementSearch != null) {

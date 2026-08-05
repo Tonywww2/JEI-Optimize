@@ -4,6 +4,32 @@ All notable changes to Just Enough Threads are documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.7.0
+
+A compatibility release. Just Enough Threads now adapts to the JEI build it finds instead of
+assuming one particular shape, so a JEI update either keeps working or quietly steps aside.
+
+### Added
+
+- **Support for the reworked ingredient filter in newer JEI builds.** The off-thread search index
+  has a second implementation that hooks JEI's own search factory instead of its constructor, and
+  the matching one is chosen from what the installed JEI actually declares. Verified in game on JEI
+  15.20.0.120 and 15.48.0.179 for 1.20.1, and on 19.27.0.340 for 1.21.1.
+
+### Fixed
+
+- **An unsupported JEI build no longer crashes the game.** Every patch is checked against the JEI
+  that is actually installed, and any optimization whose target has changed shape is switched off
+  with an explanation in the log instead of failing during startup. Reported for JEI 15.48.0.179 on
+  1.20.1 and JEI 19.37.0.363 on 1.21.1.
+  ([#1](https://github.com/Tonywww2/JEI-Optimize/issues/1))
+
+### Changed
+
+- The ingredient filter now reports the ingredient count next to the number of distinct ingredient
+  uids. JEI keys its search index by uid, so the two differ whenever a pack contains ingredients
+  that share one, and the old wording made that look like ingredients had been lost.
+
 ## 0.6.0
 
 A correctness release. Two defects could make JEI drop recipes or serve data from a previous

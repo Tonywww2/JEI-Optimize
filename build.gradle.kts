@@ -18,6 +18,9 @@ val forgeVersionRange = (findProperty("vers.forge.versionRange") ?: "").toString
 val neoforgeLoaderRange = (findProperty("vers.neoforge.loaderRange") ?: "").toString()
 val neoforgeVersionRange = (findProperty("vers.neoforge.versionRange") ?: "").toString()
 val jeiVersion = property("deps.jei").toString()
+// Runtime-only override so a build compiled against deps.jei can be smoke-tested against another
+// JEI release: ./gradlew runClient -Pjei.runtime.1.20.1=15.48.0.179
+val jeiRuntimeVersion = (findProperty("jei.runtime.$mcVersion") ?: jeiVersion).toString()
 val mekanismVersion = (findProperty("deps.mekanism") ?: "").toString()
 val cofhCoreVersion = (findProperty("deps.cofhCore") ?: "").toString()
 val thermalCoreVersion = (findProperty("deps.thermalCore") ?: "").toString()
@@ -70,7 +73,7 @@ dependencies {
         compileOnly("mezz.jei:jei-$mcVersion-common:$jeiVersion")
         compileOnly("mezz.jei:jei-$mcVersion-lib:$jeiVersion")
         compileOnly("mezz.jei:jei-$mcVersion-gui:$jeiVersion")
-        modRuntimeOnly("mezz.jei:jei-$mcVersion-forge:$jeiVersion")
+        modRuntimeOnly("mezz.jei:jei-$mcVersion-forge:$jeiRuntimeVersion")
 
         modRuntimeOnly("maven.modrinth:mekanism:$mekanismVersion")
         modRuntimeOnly("maven.modrinth:cofh-core:$cofhCoreVersion")
@@ -89,7 +92,7 @@ dependencies {
         compileOnly("mezz.jei:jei-$mcVersion-common:$jeiVersion")
         compileOnly("mezz.jei:jei-$mcVersion-lib:$jeiVersion")
         compileOnly("mezz.jei:jei-$mcVersion-gui:$jeiVersion")
-        modRuntimeOnly("mezz.jei:jei-$mcVersion-neoforge:$jeiVersion")
+        modRuntimeOnly("mezz.jei:jei-$mcVersion-neoforge:$jeiRuntimeVersion")
     }
 }
 

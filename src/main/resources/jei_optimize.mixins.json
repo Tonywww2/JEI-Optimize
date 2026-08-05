@@ -2,6 +2,7 @@
   "required": true,
   "minVersion": "0.8",
   "package": "com.tonywww.jeioptimize.mixin",
+  "plugin": "com.tonywww.jeioptimize.JeiOptMixinPlugin",
   "compatibilityLevel": "${mixinCompat}",
   "refmap": "jei_optimize.refmap.json",
   "mixins": [
@@ -11,6 +12,7 @@
     "registration.RecipeCategoryRegistrationCountMixin",
     "registration.RecipeRegistrationCountMixin",
     "IngredientFilterMixin",
+    "IngredientFilterModernMixin",
     "IngredientSorterMixin",
     "RecipeManagerInternalCompactMixin",
     "VanillaRecipesMixin",
@@ -26,6 +28,6 @@
     "ClientTickHookMixin"
   ],
   "injectors": {
-    "defaultRequire": 1
+    "defaultRequire": 0
   }
 }

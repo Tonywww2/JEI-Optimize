@@ -13,6 +13,7 @@ import mezz.jei.gui.search.IElementSearch;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 
 /**
  * Builds a fully populated JEI {@link IElementSearch} on worker threads using JEI's own
@@ -39,15 +40,26 @@ public final class AsyncIngredientFilterBuilder {
         ElementPrefixParser prefixParser,
         IIngredientVisibility ingredientVisibility
     ) {
+        return buildAsync(elements, ingredientVisibility, infos -> {
+            // Reuse the filter's own parser so PrefixInfo identities match its live queries.
+            ElementSearch elementSearch = new ElementSearch(prefixParser);
+            elementSearch.addAll(infos, ingredientManager);
+            return elementSearch;
+        });
+    }
+
+    /** Builds through JEI's own search factory, for JEI versions that expose one. */
+    public static CompletableFuture<IElementSearch> buildAsync(
+        List<IListElementInfo<?>> elements,
+        IIngredientVisibility ingredientVisibility,
+        Function<List<IListElementInfo<?>>, IElementSearch> searchFactory
+    ) {
         List<IListElementInfo<?>> safeElements = List.copyOf(elements);
         CompletableFuture<IElementSearch> future = JeiOptExecutors.supplyAsync(() -> {
             for (IListElementInfo<?> info : safeElements) {
                 updateHiddenState(info.getElement(), ingredientVisibility);
             }
-            // Reuse the filter's own parser so PrefixInfo identities match its live queries.
-            ElementSearch elementSearch = new ElementSearch(prefixParser);
-            elementSearch.addAll(safeElements, ingredientManager);
-            return elementSearch;
+            return searchFactory.apply(safeElements);
         });
         CompletableFuture<IElementSearch> previous = IN_FLIGHT.getAndSet(future);
         if (previous != null) {
