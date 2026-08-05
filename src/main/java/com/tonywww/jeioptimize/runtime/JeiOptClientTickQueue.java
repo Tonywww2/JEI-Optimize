@@ -44,21 +44,19 @@ public final class JeiOptClientTickQueue {
     }
 
     public static void drainForCurrentTick() {
-        boolean deferredFilter = JeiOptFeatureFlags.deferredIngredientFilter();
-        boolean asyncFilter = JeiOptFeatureFlags.asyncIngredientFilter();
-        boolean chunking = JeiOptFeatureFlags.snapshotChunking();
-        if (!deferredFilter && !asyncFilter && !chunking) {
+        if (!JeiOptFeatureFlags.enabled()) {
             clear();
             return;
         }
 
-        int budgetMs = (deferredFilter || asyncFilter)
-            ? Math.max(JeiOptFeatureFlags.ingredientFilterBudgetMs(), JeiOptFeatureFlags.snapshotBudgetMs())
-            : JeiOptFeatureFlags.snapshotBudgetMs();
-        long budgetNanos = TimeUnit.MILLISECONDS.toNanos(budgetMs);
-        long deadline = System.nanoTime() + budgetNanos;
-
         int remaining = size();
+        if (remaining == 0) {
+            return;
+        }
+
+        int budgetMs = Math.max(JeiOptFeatureFlags.ingredientFilterBudgetMs(), JeiOptFeatureFlags.snapshotBudgetMs());
+        long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(budgetMs);
+
         while (remaining > 0 && System.nanoTime() < deadline) {
             BooleanSupplier work = poll();
             if (work == null) {

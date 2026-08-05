@@ -4,6 +4,7 @@ import com.tonywww.jeioptimize.JeiOptimize;
 import com.tonywww.jeioptimize.config.JeiOptFeatureFlags;
 import com.tonywww.jeioptimize.index.AsyncIngredientFilterBuilder;
 import com.tonywww.jeioptimize.runtime.JeiOptClientTickQueue;
+import com.tonywww.jeioptimize.runtime.JeiOptRuntimeState;
 import com.tonywww.jeioptimize.runtime.JeiOptStartupContext;
 import mezz.jei.api.helpers.IColorHelper;
 import mezz.jei.api.helpers.IModIdHelper;
@@ -111,11 +112,15 @@ public abstract class IngredientFilterMixin {
         IIngredientManager manager = this.ingredientManager;
         int chunkCount = (total + chunkSize - 1) / Math.max(1, chunkSize);
         java.util.concurrent.atomic.AtomicInteger remaining = new java.util.concurrent.atomic.AtomicInteger(chunkCount);
+        long generation = JeiOptRuntimeState.currentGeneration();
         long startNanos = System.nanoTime();
         for (int start = 0; start < total; start += chunkSize) {
             int end = Math.min(start + chunkSize, total);
             List<IListElementInfo<?>> chunk = List.copyOf(ingredients.subList(start, end));
             JeiOptClientTickQueue.enqueue(() -> {
+                if (!JeiOptRuntimeState.isCurrent(generation)) {
+                    return true;
+                }
                 for (IListElementInfo<?> info : chunk) {
                     updateHiddenStateEquivalent(info.getElement(), ingredientVisibility);
                 }
@@ -143,11 +148,12 @@ public abstract class IngredientFilterMixin {
         IIngredientVisibility ingredientVisibility
     ) {
         int total = ingredients.size();
+        long generation = JeiOptRuntimeState.currentGeneration();
         CompletableFuture<IElementSearch> future = AsyncIngredientFilterBuilder.buildAsync(
             ingredients, this.ingredientManager, this.elementPrefixParser, ingredientVisibility);
         long startNanos = System.nanoTime();
         JeiOptClientTickQueue.enqueue(() ->
-            jeiopt$finalizeAsyncBuild(future, ingredients, ingredientVisibility, total, startNanos));
+            jeiopt$finalizeAsyncBuild(future, ingredients, ingredientVisibility, total, startNanos, generation));
         JeiOptimize.LOGGER.info(
             "JEI Optimize async ingredient filter build submitted off-thread: {} ingredients",
             total
@@ -159,10 +165,21 @@ public abstract class IngredientFilterMixin {
         List<IListElementInfo<?>> ingredients,
         IIngredientVisibility ingredientVisibility,
         int total,
-        long startNanos
+        long startNanos,
+        long generation
     ) {
+        // This filter belongs to a JEI runtime that has already been torn down; publishing into it
+        // would resurrect the previous world's item list.
+        if (!JeiOptRuntimeState.isCurrent(generation)) {
+            future.cancel(false);
+            JeiOptimize.LOGGER.debug("JEI Optimize discarded a stale async ingredient filter build");
+            return true;
+        }
         if (!future.isDone()) {
             return false;
+        }
+        if (future.isCancelled()) {
+            return true;
         }
         IElementSearch built = null;
         try {

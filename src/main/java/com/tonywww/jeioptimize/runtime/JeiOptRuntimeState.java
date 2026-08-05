@@ -32,10 +32,14 @@ public final class JeiOptRuntimeState {
         return RUNTIME_UNLOADED_ONCE.get();
     }
 
+    /**
+     * Starts a JEI runtime lifecycle. The generation only advances on teardown, so work scheduled
+     * during {@code JeiStarter.start()} - before the runtime reports itself available - still
+     * publishes into the runtime it was built for.
+     */
     public static long beginStart() {
         synchronized (LOCK) {
             cancelPendingTasksLocked();
-            currentGeneration = NEXT_GENERATION.incrementAndGet();
             return currentGeneration;
         }
     }

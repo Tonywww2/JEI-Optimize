@@ -96,7 +96,9 @@ public final class JeiOptConfig {
             .comment("Enable sort key and tag count short cache.")
             .define("sortKeyCache", true);
         SYNC_DELAY_COMPACT = builder
-            .comment("Enable delayed JEI compact scheduling.")
+            .comment(
+                "Move JEI's recipe list compaction off the blocking startup path onto a later client tick.",
+                "It still runs on the main thread, so JEI never serves queries from a list being trimmed.")
             .define("delayCompact", true);
         builder.pop();
 
@@ -147,9 +149,9 @@ public final class JeiOptConfig {
             .define("asyncIngredientFilter", true);
         ASYNC_PARALLEL_VANILLA_RECIPES = builder
             .comment(
-                "Validate JEI's built-in (vanilla) recipes in parallel across CPU cores during startup.",
-                "The result is identical to JEI's sequential output; it falls back to sequential validation on any error.",
-                "Enabled by default.")
+                "Resolve recipe ingredient tags on worker threads before JEI validates recipes during startup.",
+                "Workers only read recipe data and their results are discarded, so JEI's own validation and",
+                "recipe registration still run unchanged on the main thread. Enabled by default.")
             .define("parallelVanillaRecipes", true);
         builder.pop();
 

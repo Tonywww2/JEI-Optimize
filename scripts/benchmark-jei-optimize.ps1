@@ -55,30 +55,40 @@ function Read-TextIfExists($Path) {
 }
 
 function New-JeiOptimizeConfig($Profile) {
+    # Both profiles carry the shipped defaults; only the master switch differs, so the delta is
+    # exactly "mod active" vs "JEI baseline".
     $enabled = if ($Profile -eq "optimized") { "true" } else { "false" }
-    $feature = if ($Profile -eq "optimized") { "true" } else { "false" }
     return @"
 [general]
 enabled = $enabled
+
+[jeiContent]
+disableAnvilRepairRecipes = false
+disableAnvilEnchantRecipes = false
 
 [diagnostics]
 pluginTiming = false
 registrationCounts = false
 
 [syncOptimizations]
-cacheScope = $feature
-batchIngredientFilterInit = $feature
-sortKeyCache = $feature
-delayCompact = $feature
+cacheScope = true
+batchIngredientFilterInit = true
+sortKeyCache = true
+delayCompact = true
 
 [async]
-searchPreheat = $feature
-snapshotChunking = $feature
-sortPreheat = $feature
-recipeFocusPreheat = $feature
-catalystPreheat = $feature
-workerThreads = 2
+searchPreheat = false
+snapshotChunking = true
+sortPreheat = true
+recipeFocusPreheat = true
+catalystPreheat = true
+workerThreads = 4
 snapshotBudgetMs = 2
+deferredIngredientFilter = true
+ingredientFilterBudgetMs = 10
+ingredientFilterChunkSize = 500
+asyncIngredientFilter = true
+parallelVanillaRecipes = true
 "@
 }
 
@@ -325,7 +335,7 @@ $markdown.Add("")
 $markdown.Add("- Command: ``.\\gradlew.bat --no-daemon runClient --args=`"--quickPlaySingleplayer $World`"``")
 $markdown.Add("- Runtime mods: JEI, Mekanism, CoFH Core, Thermal Series core, Thermal Foundation, Farmer's Delight.")
 $markdown.Add("- Baseline profile: ``general.enabled=false``; diagnostics disabled.")
-$markdown.Add("- Optimized profile: ``general.enabled=true`` with all sync and async optimization flags enabled; diagnostics disabled.")
+$markdown.Add("- Optimized profile: ``general.enabled=true`` with the shipped default feature flags; diagnostics disabled.")
 $markdown.Add("- Measurement point: JEI's own ``Starting JEI took`` log line after quick-playing into world ``$World``.")
 $markdown.Add("- Warmup runs per profile: $WarmupIterations. Measured runs per profile: $Iterations.")
 $markdown.Add("- Java: ``$javaVersion``")

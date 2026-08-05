@@ -12,6 +12,7 @@ import mezz.jei.gui.search.IElementSearch;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Builds a fully populated JEI {@link IElementSearch} on worker threads using JEI's own
@@ -27,6 +28,8 @@ import java.util.concurrent.CompletableFuture;
  */
 public final class AsyncIngredientFilterBuilder {
 
+    private static final AtomicReference<CompletableFuture<IElementSearch>> IN_FLIGHT = new AtomicReference<>();
+
     private AsyncIngredientFilterBuilder() {
     }
 
@@ -37,7 +40,7 @@ public final class AsyncIngredientFilterBuilder {
         IIngredientVisibility ingredientVisibility
     ) {
         List<IListElementInfo<?>> safeElements = List.copyOf(elements);
-        return JeiOptExecutors.supplyAsync(() -> {
+        CompletableFuture<IElementSearch> future = JeiOptExecutors.supplyAsync(() -> {
             for (IListElementInfo<?> info : safeElements) {
                 updateHiddenState(info.getElement(), ingredientVisibility);
             }
@@ -46,6 +49,19 @@ public final class AsyncIngredientFilterBuilder {
             elementSearch.addAll(safeElements, ingredientManager);
             return elementSearch;
         });
+        CompletableFuture<IElementSearch> previous = IN_FLIGHT.getAndSet(future);
+        if (previous != null) {
+            previous.cancel(false);
+        }
+        return future;
+    }
+
+    /** Drops a build that is still running for a JEI runtime that is going away. */
+    public static void cancelInFlight() {
+        CompletableFuture<IElementSearch> future = IN_FLIGHT.getAndSet(null);
+        if (future != null) {
+            future.cancel(false);
+        }
     }
 
     private static void updateHiddenState(IListElement<?> element, IIngredientVisibility ingredientVisibility) {
