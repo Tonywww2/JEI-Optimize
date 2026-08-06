@@ -36,6 +36,10 @@ function Write-Profile([bool] $optimized) {
 [general]
 enabled = true
 
+[jeiContent]
+disableAnvilRepairRecipes = false
+disableAnvilEnchantRecipes = false
+
 [diagnostics]
 pluginTiming = true
 registrationCounts = true

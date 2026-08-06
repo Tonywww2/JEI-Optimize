@@ -10,9 +10,15 @@ JEI normally builds its ingredient filter — the search index over every item a
 
 _What you will see:_ the JEI item list appears a moment after you spawn, instead of holding up world load.
 
-**Parallel recipe ingredient pre-resolution**
+**Experimental recipe ingredient pre-resolution**
 
 Before JEI can inspect its built-in recipes (crafting, smelting, stonecutting, and more), every ingredient tag has to be resolved into a concrete list of items. Minecraft does that lazily and JEI triggers all of it during startup. Just Enough Threads does the resolution across CPU cores up front, then hands back to JEI. JEI's own validation and registration still run exactly as they normally do, on the main thread, just against data that is already resolved.
+
+This option is **off by default** because custom recipes and lazy ingredient caches are not always safe to access from worker threads. It remains available for controlled testing on a specific pack.
+
+**Generated anvil recipes**
+
+JEI's generated repair and enchanted-book combination recipes are hidden by default. Generating every item and enchantment combination can take minutes in very large packs. Set `disableAnvilRepairRecipes = false` or `disableAnvilEnchantRecipes = false` to restore either class of recipes.
 
 ## Performance
 
@@ -31,7 +37,8 @@ Config file: `config/jei_optimize-client.toml`. Every optimization can be toggle
 
 *   `enabled` — master switch for the whole mod.
 *   `asyncIngredientFilter` — build the ingredient search index off-thread after world entry.
-*   `parallelVanillaRecipes` — resolve recipe ingredients across CPU cores before JEI reads them.
+*   `parallelVanillaRecipes` — experimental recipe ingredient pre-resolution; disabled by default.
+*   `disableAnvilRepairRecipes` / `disableAnvilEnchantRecipes` — hide generated anvil recipes; enabled by default.
 
 If you ever run into a problem on world entry, turn off the individual options, or set `enabled = false` to fully restore stock JEI behavior.
 
@@ -60,9 +67,15 @@ JEI 默认在主线程上构建物品筛选器——也就是覆盖所有物品�
 
 _你会看到:_ JEI 物品列表在你进入世界后稍等片刻才出现,而不是拖慢世界加载。
 
-**并行预解析配方材料**
+**实验性并行预解析配方材料**
 
 JEI 在检查内置配方(合成、熔炼、切石等)之前,需要先把每一条材料标签解析成具体的物品列表。Minecraft 采用惰性解析,而 JEI 启动时会把这些解析全部触发一遍。Just Enough Threads 提前用多个 CPU 核心完成这项解析,再交回 JEI。JEI 自身的校验与注册照常在主线程上运行,只是读到的数据已经解析完毕。
+
+此选项**默认关闭**,因为自定义配方与惰性材料缓存不一定能安全地从工作线程访问。它仍可用于针对特定整合包的受控测试。
+
+**自动生成的铁砧配方**
+
+JEI 自动生成的材料修复与附魔书组合配方默认隐藏。在超大型整合包中,枚举所有物品与附魔组合可能耗时数分钟。将 `disableAnvilRepairRecipes = false` 或 `disableAnvilEnchantRecipes = false` 即可恢复对应类型的配方。
 
 ## 性能
 
@@ -81,7 +94,8 @@ JEI 在检查内置配方(合成、熔炼、切石等)之前,需要先把每一�
 
 *   `enabled` — 整个 mod 的总开关。
 *   `asyncIngredientFilter` — 进入世界后离主线程构建物品搜索索引。
-*   `parallelVanillaRecipes` — 在 JEI 读取之前,用多个 CPU 核心并行解析配方材料。
+*   `parallelVanillaRecipes` — 实验性并行预解析配方材料;默认关闭。
+*   `disableAnvilRepairRecipes` / `disableAnvilEnchantRecipes` — 隐藏自动生成的铁砧配方;默认开启。
 
 如果进入世界时遇到任何问题,可以逐项关闭这些选项,或将 `enabled = false` 以完全恢复 JEI 的原生行为。
 

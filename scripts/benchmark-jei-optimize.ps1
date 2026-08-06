@@ -63,8 +63,8 @@ function New-JeiOptimizeConfig($Profile) {
 enabled = $enabled
 
 [jeiContent]
-disableAnvilRepairRecipes = false
-disableAnvilEnchantRecipes = false
+disableAnvilRepairRecipes = true
+disableAnvilEnchantRecipes = true
 
 [diagnostics]
 pluginTiming = false
@@ -88,7 +88,7 @@ deferredIngredientFilter = true
 ingredientFilterBudgetMs = 10
 ingredientFilterChunkSize = 500
 asyncIngredientFilter = true
-parallelVanillaRecipes = true
+parallelVanillaRecipes = false
 "@
 }
 

@@ -40,7 +40,9 @@ Run each side two or three times; JEI startup timings vary from run to run, so l
 
 - **`async ingredient filter build completed: N indexed (input N) in X ms after world entry`** — the off-thread build (optimized runs only). `indexed` must equal `input`, which confirms every ingredient made it into the index. This time overlaps with normal gameplay, so it does not count against the loading screen.
 
-- **`Registering recipes for jei:minecraft took ...`** — JEI's built-in recipe registration. Lower with `parallelVanillaRecipes` on. Requires `pluginTiming = true` (the script sets it).
+- **`Registering recipes for jei:minecraft took ...`** — JEI's built-in recipe registration. The measurement script can test the opt-in `parallelVanillaRecipes` pre-resolution path; it is disabled in the shipped config because modded recipes are not always thread-safe. Requires `pluginTiming = true`.
+
+        The script explicitly restores both generated anvil recipe classes in its baseline and optimized profiles, so the comparison measures the two optimization flags instead of the shipped content defaults.
 
 - **`parallel crafting recipes: A handled + B special from C total in X ms`** — the parallel recipe validation (optimized runs only).
 

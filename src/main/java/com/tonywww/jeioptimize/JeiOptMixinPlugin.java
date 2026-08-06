@@ -46,6 +46,10 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
             "getRepairRecipes",
             "(Lmezz/jei/api/recipe/vanilla/IVanillaRecipeFactory;"
                 + "Lmezz/jei/api/ingredients/IIngredientHelper;)Ljava/util/stream/Stream;"),
+        MIXIN_PACKAGE + "AnvilRecipeControlModernMixin", Requirement.method(
+            "anvil recipe hiding",
+            "getBookEnchantmentRecipes",
+            "()Ljava/util/stream/Stream;"),
         MIXIN_PACKAGE + "ElementSearchMixin", Requirement.field(
             "async search preheat",
             "allElements",
@@ -82,6 +86,8 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
 
     /** One of these covers each JEI generation, so the one that does not match is not a problem. */
     private static final Set<String> VARIANTS = Set.of(
+        MIXIN_PACKAGE + "AnvilRecipeControlMixin",
+        MIXIN_PACKAGE + "AnvilRecipeControlModernMixin",
         MIXIN_PACKAGE + "IngredientFilterMixin",
         MIXIN_PACKAGE + "IngredientFilterModernMixin"
     );

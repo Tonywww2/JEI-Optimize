@@ -2,7 +2,7 @@
 
 A Minecraft mod for **Forge (1.20.1)** and **NeoForge (1.21.1)** that speeds up [JEI (Just Enough Items)](https://www.curseforge.com/minecraft/mc-mods/jei) startup by moving its heaviest work off the main thread and across CPU cores.
 
-In large modpacks, JEI spends several seconds building its ingredient search index and processing recipes while the game sits on the loading screen. Just Enough Threads removes the biggest of those costs from the loading screen and parallelizes another, so you get into your world sooner.
+In large modpacks, JEI spends several seconds building its ingredient search index and processing recipes while the game sits on the loading screen. Just Enough Threads removes the biggest of those costs from the loading screen and skips JEI's expensive generated anvil recipes by default, so you get into your world sooner.
 
 ## What it does
 
@@ -12,9 +12,9 @@ In large modpacks, JEI spends several seconds building its ingredient search ind
 
   Visible effect: the JEI item list is empty for a few seconds after you enter the world, then fills in all at once.
 
-- **Parallel vanilla recipe validation** — `parallelVanillaRecipes` (on by default)
+- **Experimental recipe ingredient pre-resolution** — `parallelVanillaRecipes` (off by default)
 
-  JEI's built-in plugin validates all vanilla-type recipes (crafting, smelting, stonecutting, and so on) one at a time. This mod runs that validation across CPU cores. The output is identical to JEI's sequential result and falls back to sequential validation on any error.
+  This option resolves recipe ingredient tags across worker threads before JEI reads them. It can help some packs, but custom recipes and lazy ingredient caches are not guaranteed to be thread-safe, so it is opt-in and should be benchmarked against the specific pack.
 
 Every optimization sits behind a config flag and degrades safely to JEI's stock behavior. If anything looks wrong, set `enabled = false` to turn the whole mod off.
 
@@ -50,12 +50,12 @@ Config file: `config/jei_optimize-client.toml`
 |--------|---------|---------|-------------|
 | `enabled` | general | `true` | Master switch. When `false`, the mod does nothing and JEI behaves normally. |
 | `asyncIngredientFilter` | async | `true` | Build the ingredient search filter off-thread after world entry. |
-| `parallelVanillaRecipes` | async | `true` | Validate vanilla recipes in parallel across CPU cores. |
+| `parallelVanillaRecipes` | async | `false` | Experimentally pre-resolve recipe ingredients across worker threads. |
 | `workerThreads` | async | `2` | Worker-thread count for off-thread tasks (1-8). |
 | `pluginTiming` | diagnostics | `false` | Log per-plugin, per-phase JEI startup timings (for measurement). |
 | `registrationCounts` | diagnostics | `false` | Log per-plugin recipe and ingredient registration counts. |
-| `disableAnvilRepairRecipes` | jeiContent | `false` | Hide JEI's generated anvil repair recipes (also skips generating them at startup). |
-| `disableAnvilEnchantRecipes` | jeiContent | `false` | Hide JEI's generated anvil enchanting recipes for combining books (also skips generating them). |
+| `disableAnvilRepairRecipes` | jeiContent | `true` | Hide JEI's generated anvil repair recipes (also skips generating them at startup). |
+| `disableAnvilEnchantRecipes` | jeiContent | `true` | Hide JEI's generated anvil enchanting recipes for combining books (also skips generating them). |
 
 Remaining flags in the file are experimental and off by default.
 
@@ -97,18 +97,17 @@ The mod is Mixin-based and hooks JEI's own internal classes (`@Pseudo` mixins wi
 
 Because the new index is never shared with the main thread until the swap, there is no read/write race, and because it is built with JEI's own classes the result is identical to JEI's. If the worker build throws, the finalize task falls back to a synchronous build into the live filter (JEI's normal behavior). This is also why the item list is briefly empty after you spawn: the constructor returned an empty index, and it fills once the worker build swaps in.
 
-### Parallel vanilla recipe validation (`parallelVanillaRecipes`)
+### Experimental recipe ingredient pre-resolution (`parallelVanillaRecipes`)
 
 `VanillaRecipesMixin` targets JEI's `VanillaRecipes`:
 
-- **Crafting recipes.** An `@Inject` at the head of `getCraftingRecipes` hands off to `VanillaRecipeParallelBuilder`, which runs JEI's own `CategoryRecipeValidator` over a parallel stream of all crafting recipes and partitions them (handled vs special) with `Collectors.partitioningBy`. On an ordered stream this preserves recipe order and produces the same result JEI builds sequentially.
-- **Other vanilla types.** A `@Redirect` turns the `List.stream()` call inside `getValidHandledRecipes` into `parallelStream()`, covering smelting, blasting, smoking, campfire, stonecutting and smithing.
-
-The validator holds only final fields and its checks are read-only, so it is safe to share across threads; the output is identical to JEI's sequential result. If the parallel pass throws, it falls back to a sequential stream.
+- At the head of `getCraftingRecipes`, `VanillaRecipeWarmup` snapshots the recipe manager and asks worker threads to resolve each recipe's ingredient tags before JEI performs its normal validation.
+- JEI still validates, orders and registers every recipe on the main thread; the worker results are discarded after populating Minecraft's lazy ingredient caches.
+- Modded `Recipe` implementations and ingredient caches may perform mutable or main-thread-only work. The feature therefore defaults off and should only be enabled after testing the target modpack.
 
 ### Optional: hide anvil recipes (`disableAnvilRepairRecipes`, `disableAnvilEnchantRecipes`)
 
-`AnvilRecipeControlMixin` injects at the head of JEI's `AnvilRecipeMaker.getRepairRecipes` and `getBookEnchantmentRecipes`. When the matching flag is on, that generator returns an empty stream, so those anvil recipes are never generated or shown. Both flags default off. This is a content choice rather than a transparent optimization, but it also removes their startup cost — anvil recipe generation is one of JEI's larger startup steps in big packs.
+The matching `AnvilRecipeControl` variant injects at the head of JEI's `AnvilRecipeMaker.getRepairRecipes` and `getBookEnchantmentRecipes`. When a flag is on, that generator returns an empty stream, so those anvil recipes are never generated or shown. Both flags default on because generating every item and enchanted-book combination can dominate JEI startup in large packs. Set either flag to `false` to restore that class of JEI anvil recipes.
 
 ### Shared infrastructure
 

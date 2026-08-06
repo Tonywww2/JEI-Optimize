@@ -72,13 +72,13 @@ public final class JeiOptConfig {
         CONTENT_DISABLE_ANVIL_REPAIR = builder
             .comment(
                 "Hide JEI's generated anvil repair recipes (repairing an item with its crafting material).",
-                "Also skips generating them during startup, which saves time. Default false.")
-            .define("disableAnvilRepairRecipes", false);
+                "Also skips generating them during startup, which saves time. Default true.")
+            .define("disableAnvilRepairRecipes", true);
         CONTENT_DISABLE_ANVIL_ENCHANT = builder
             .comment(
                 "Hide JEI's generated anvil enchanting recipes (combining enchanted books on an anvil).",
-                "Also skips generating them during startup, which saves time. Default false.")
-            .define("disableAnvilEnchantRecipes", false);
+                "Also skips generating them during startup, which saves time. Default true.")
+            .define("disableAnvilEnchantRecipes", true);
         CONTENT_SKIP_CREATIVE_TABS = builder
             .comment(
                 "Emergency hatch: comma-separated creative tabs to hide from JEI, by tab id or by mod id.",
@@ -175,9 +175,9 @@ public final class JeiOptConfig {
         ASYNC_PARALLEL_VANILLA_RECIPES = builder
             .comment(
                 "Resolve recipe ingredient tags on worker threads before JEI validates recipes during startup.",
-                "Workers only read recipe data and their results are discarded, so JEI's own validation and",
-                "recipe registration still run unchanged on the main thread. Enabled by default.")
-            .define("parallelVanillaRecipes", true);
+                "Experimental: modded recipes and lazy ingredient caches are not always thread-safe.",
+                "JEI's own validation and registration still run unchanged on the main thread. Default false.")
+            .define("parallelVanillaRecipes", false);
         builder.pop();
 
         SPEC = builder.build();

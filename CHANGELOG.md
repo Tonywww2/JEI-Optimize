@@ -22,6 +22,21 @@ actually spending the time, and gives you a way to keep playing until that code 
   a way to keep playing while the real fix is made rather than a setting to leave on. An entry that
   matches nothing logs the list of tab ids that do exist.
 
+### Fixed
+
+- **The anvil recipe controls now work with JEI 15.48.** JEI moved its repair and enchanting recipe
+  generators to no-argument instance methods; Just Enough Threads now selects a matching control
+  variant instead of disabling both settings when it sees the new signatures.
+
+### Changed
+
+- **Generated anvil repair and enchanting recipes are now hidden by default.** Large packs can spend
+  minutes generating every item and enchanted-book combination. Set either `disableAnvil...` option
+  to `false` to restore that class of JEI recipes.
+- **`parallelVanillaRecipes` now defaults to `false`.** Some modded recipes and lazy ingredient
+  caches perform mutable or main-thread-only work when their ingredients are first resolved. The
+  option remains available for controlled per-pack benchmarking.
+
 ## 0.7.0
 
 A compatibility release. Just Enough Threads now adapts to the JEI build it finds instead of
