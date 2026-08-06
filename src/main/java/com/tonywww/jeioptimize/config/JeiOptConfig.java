@@ -56,6 +56,8 @@ public final class JeiOptConfig {
     static final IntValue ASYNC_INGREDIENT_FILTER_CHUNK_SIZE;
     static final BooleanValue ASYNC_PARALLEL_INGREDIENT_FILTER;
     static final BooleanValue ASYNC_PARALLEL_VANILLA_RECIPES;
+    static final BooleanValue ASYNC_PARALLEL_PLUGIN_CALLS;
+    static final ConfigValue<String> ASYNC_PARALLEL_PLUGIN_EXCLUDED;
 
     private static boolean registered;
 
@@ -178,6 +180,28 @@ public final class JeiOptConfig {
                 "Experimental: modded recipes and lazy ingredient caches are not always thread-safe.",
                 "JEI's own validation and registration still run unchanged on the main thread. Default false.")
             .define("parallelVanillaRecipes", false);
+        ASYNC_PARALLEL_PLUGIN_CALLS = builder
+            .comment(
+                "Run JEI plugin registration callbacks (subtypes, ingredients, recipes, etc.) on worker threads",
+                "instead of blocking the render thread during JEI startup. Each phase still finishes before JEI",
+                "consumes its results, and phases that hand plugins a runtime object (onRuntimeAvailable etc.)",
+                "always stay on the main thread.",
+                "A plugin call that throws on a worker thread is automatically re-run synchronously on the main",
+                "thread before JEI consumes the phase, so a not-quite-thread-safe plugin still gets to finish.",
+                "Experimental: third-party plugin code is not guaranteed thread-safe, so a mod can still misbehave",
+                "if it reads JEI state from multiple threads or depends on registration order across plugins.",
+                "For plugins that must never run off the main thread, add their uid to parallelPluginCallExclusions.",
+                "Disable this if you see errors from other mods during JEI startup. Default true.")
+            .define("parallelPluginCalls", true);
+        ASYNC_PARALLEL_PLUGIN_EXCLUDED = builder
+            .comment(
+                "Comma-separated JEI plugin uids that are never dispatched to a worker thread; they always run",
+                "synchronously on the main thread, in JEI's normal order.",
+                "Use this for plugins that keep failing parallel dispatch, or whose code must not run off the",
+                "main thread. A plugin uid that fails parallel dispatch is named in the log, so you can copy it here.",
+                "Default empty (nothing excluded).",
+                "Example: parallelPluginCallExclusions = \"almostunified:jei, examplemod:jei\"")
+            .define("parallelPluginCallExclusions", "");
         builder.pop();
 
         SPEC = builder.build();

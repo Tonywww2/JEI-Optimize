@@ -4,7 +4,10 @@ import com.tonywww.jeioptimize.JeiOptimize;
 import net.minecraft.client.Minecraft;
 
 import java.util.Objects;
+import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -35,6 +38,8 @@ public final class JeiOptExecutors {
     private static final Object LOCK = new Object();
     private static ExecutorService workerExecutor;
     private static int workerThreadCount = DEFAULT_WORKER_THREADS;
+
+    private static final Queue<CompletableFuture<?>> PENDING_PLUGIN_CALLS = new ConcurrentLinkedQueue<>();
 
     private JeiOptExecutors() {
     }
@@ -75,6 +80,42 @@ public final class JeiOptExecutors {
     public static CompletableFuture<Void> runAsync(Runnable runnable) {
         Objects.requireNonNull(runnable, "runnable");
         return CompletableFuture.runAsync(runnable, workerExecutor());
+    }
+
+    public static CompletableFuture<Void> runPluginCallAsync(Runnable runnable) {
+        Objects.requireNonNull(runnable, "runnable");
+        CompletableFuture<Void> future = CompletableFuture.runAsync(runnable, workerExecutor());
+        PENDING_PLUGIN_CALLS.add(future);
+        return future;
+    }
+
+    public static void awaitPendingPluginCalls() {
+        CompletableFuture<?>[] pending = PENDING_PLUGIN_CALLS.toArray(new CompletableFuture<?>[0]);
+        PENDING_PLUGIN_CALLS.clear();
+        if (pending.length == 0) {
+            return;
+        }
+        Throwable failure = null;
+        for (CompletableFuture<?> future : pending) {
+            try {
+                future.join();
+            } catch (CompletionException e) {
+                Throwable cause = e.getCause();
+                if (failure == null) {
+                    failure = cause != null ? cause : e;
+                }
+                LOGGER.error("Failed to call JEI plugin asynchronously", cause != null ? cause : e);
+            }
+        }
+        if (failure instanceof RuntimeException) {
+            throw (RuntimeException) failure;
+        }
+        if (failure instanceof Error) {
+            throw (Error) failure;
+        }
+        if (failure != null) {
+            throw new RuntimeException(failure);
+        }
     }
 
     public static void shutdownWorkerExecutor() {
