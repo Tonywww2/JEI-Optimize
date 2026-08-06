@@ -23,6 +23,18 @@ public final class JeiOptFeatureFlags {
         return enabled() && JeiOptConfig.DIAGNOSTICS_REGISTRATION_COUNTS.get();
     }
 
+    public static boolean stallWatchdog() {
+        return enabled() && JeiOptConfig.DIAGNOSTICS_STALL_WATCHDOG.get();
+    }
+
+    public static int stallThresholdSeconds() {
+        return configReady() ? JeiOptConfig.DIAGNOSTICS_STALL_THRESHOLD_SECONDS.get() : 10;
+    }
+
+    public static String skipCreativeTabs() {
+        return enabled() ? JeiOptConfig.CONTENT_SKIP_CREATIVE_TABS.get() : "";
+    }
+
     public static boolean disableAnvilRepairRecipes() {
         return enabled() && JeiOptConfig.CONTENT_DISABLE_ANVIL_REPAIR.get();
     }

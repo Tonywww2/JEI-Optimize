@@ -4,6 +4,24 @@ All notable changes to Just Enough Threads are documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.7.1
+
+A diagnostics release. When JEI startup drags on, the log names JEI and whichever mod registered the
+slow content, so the bug report lands on the wrong project. This release points at the code that is
+actually spending the time, and gives you a way to keep playing until that code is fixed.
+
+### Added
+
+- **A stall watchdog that names the code responsible for a slow JEI startup.** Once a phase runs
+  longer than `stallThresholdSeconds` (10 by default) the stack of the thread running it is sampled,
+  and the frames it kept landing on are written to the log. It is purely observational: it never
+  changes what runs, in what order, or on which thread. Turn it off with `stallWatchdog = false`.
+- **`skipCreativeTabs`, an emergency hatch for a creative tab that will not finish building.** Listed
+  tabs are left out of JEI's ingredient scan, by tab id (`examplemod:special_tab`) or by mod id
+  (`examplemod`, which skips all of that mod's tabs). Their items no longer appear in JEI, so this is
+  a way to keep playing while the real fix is made rather than a setting to leave on. An entry that
+  matches nothing logs the list of tab ids that do exist.
+
 ## 0.7.0
 
 A compatibility release. Just Enough Threads now adapts to the JEI build it finds instead of

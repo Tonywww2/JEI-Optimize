@@ -65,7 +65,11 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
                 + "Lmezz/jei/gui/search/ElementPrefixParser;"
                 + "Ljava/util/List;"
                 + "Lmezz/jei/api/runtime/IIngredientManager;)"
-                + "Lmezz/jei/gui/search/IElementSearch;")
+                + "Lmezz/jei/gui/search/IElementSearch;"),
+        MIXIN_PACKAGE + "ItemStackListFactoryMixin", Requirement.method(
+            "creative tab skipping",
+            "create",
+            "(Lmezz/jei/common/util/StackHelper;)Ljava/util/List;")
     );
 
     private final Map<String, ClassNode> targetCache = new HashMap<>();

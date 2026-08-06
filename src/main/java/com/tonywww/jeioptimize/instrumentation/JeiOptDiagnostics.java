@@ -17,6 +17,14 @@ public final class JeiOptDiagnostics {
     }
 
     public static void callPluginWithTiming(String title, IModPlugin plugin, Runnable call) {
+        if (!JeiOptFeatureFlags.stallWatchdog()) {
+            runWithTiming(title, plugin, call);
+            return;
+        }
+        JeiOptStallWatchdog.run(title + ": " + safePluginUid(plugin), () -> runWithTiming(title, plugin, call));
+    }
+
+    private static void runWithTiming(String title, IModPlugin plugin, Runnable call) {
         if (!JeiOptFeatureFlags.pluginTiming()) {
             call.run();
             return;

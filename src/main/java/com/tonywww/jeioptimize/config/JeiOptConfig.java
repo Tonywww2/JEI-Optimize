@@ -5,6 +5,7 @@ import com.tonywww.jeioptimize.JeiOptimize;
 import net.minecraftforge.common.ForgeConfigSpec;
 import net.minecraftforge.common.ForgeConfigSpec.BooleanValue;
 import net.minecraftforge.common.ForgeConfigSpec.Builder;
+import net.minecraftforge.common.ForgeConfigSpec.ConfigValue;
 import net.minecraftforge.common.ForgeConfigSpec.IntValue;
 import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.config.ModConfig;
@@ -14,6 +15,7 @@ import net.neoforged.fml.config.ModConfig;
 import net.neoforged.neoforge.common.ModConfigSpec;
 import net.neoforged.neoforge.common.ModConfigSpec.BooleanValue;
 import net.neoforged.neoforge.common.ModConfigSpec.Builder;
+import net.neoforged.neoforge.common.ModConfigSpec.ConfigValue;
 import net.neoforged.neoforge.common.ModConfigSpec.IntValue;
 *///?}
 
@@ -28,9 +30,12 @@ public final class JeiOptConfig {
 
     static final BooleanValue CONTENT_DISABLE_ANVIL_REPAIR;
     static final BooleanValue CONTENT_DISABLE_ANVIL_ENCHANT;
+    static final ConfigValue<String> CONTENT_SKIP_CREATIVE_TABS;
 
     static final BooleanValue DIAGNOSTICS_PLUGIN_TIMING;
     static final BooleanValue DIAGNOSTICS_REGISTRATION_COUNTS;
+    static final BooleanValue DIAGNOSTICS_STALL_WATCHDOG;
+    static final IntValue DIAGNOSTICS_STALL_THRESHOLD_SECONDS;
 
     static final BooleanValue SYNC_CACHE_SCOPE;
     static final BooleanValue SYNC_BATCH_INGREDIENT_FILTER_INIT;
@@ -74,6 +79,14 @@ public final class JeiOptConfig {
                 "Hide JEI's generated anvil enchanting recipes (combining enchanted books on an anvil).",
                 "Also skips generating them during startup, which saves time. Default false.")
             .define("disableAnvilEnchantRecipes", false);
+        CONTENT_SKIP_CREATIVE_TABS = builder
+            .comment(
+                "Emergency hatch: comma-separated creative tabs to hide from JEI, by tab id or by mod id.",
+                "Use this when one mod's creative tab makes JEI's ingredient registration take minutes;",
+                "the stall watchdog in the diagnostics section names the mod responsible.",
+                "Items from a skipped tab will not appear in JEI at all. Default empty (nothing skipped).",
+                "Example: skipCreativeTabs = \"examplemod, othermod:special_tab\"")
+            .define("skipCreativeTabs", "");
         builder.pop();
 
         builder.push("diagnostics");
@@ -83,6 +96,18 @@ public final class JeiOptConfig {
         DIAGNOSTICS_REGISTRATION_COUNTS = builder
             .comment("Enable JEI registration count diagnostics.")
             .define("registrationCounts", false);
+        DIAGNOSTICS_STALL_WATCHDOG = builder
+            .comment(
+                "Report which code is responsible when a JEI startup phase runs far longer than expected.",
+                "Costs nothing until a phase passes stallThresholdSeconds; after that it samples the stack",
+                "of the thread running the phase and logs where the time actually went.",
+                "Purely observational: it never changes what runs, in what order, or on which thread.")
+            .define("stallWatchdog", true);
+        DIAGNOSTICS_STALL_THRESHOLD_SECONDS = builder
+            .comment(
+                "How long one JEI startup phase may run before the stall watchdog starts sampling it.",
+                "0 samples every phase, which is noisy but useful when reproducing a report.")
+            .defineInRange("stallThresholdSeconds", 10, 0, 300);
         builder.pop();
 
         builder.push("syncOptimizations");

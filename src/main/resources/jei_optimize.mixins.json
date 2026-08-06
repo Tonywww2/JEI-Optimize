@@ -13,6 +13,7 @@
     "registration.RecipeRegistrationCountMixin",
     "IngredientFilterMixin",
     "IngredientFilterModernMixin",
+    "ItemStackListFactoryMixin",
     "IngredientSorterMixin",
     "RecipeManagerInternalCompactMixin",
     "VanillaRecipesMixin",

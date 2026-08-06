@@ -144,6 +144,7 @@ function Start-BenchmarkRun($Profile, $Iteration, [bool] $Warmup) {
 
     $oldJavaHome = $env:JAVA_HOME
     $oldPath = $env:Path
+    $process = $null
     try {
         $env:JAVA_HOME = $JavaHome
         $env:Path = "$JavaHome\bin;$oldPath"
@@ -156,11 +157,12 @@ function Start-BenchmarkRun($Profile, $Iteration, [bool] $Warmup) {
             -PassThru
 
         $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+        $hardDeadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
         $metricsCaptured = $false
         $status = "timeout"
         $exitCode = $null
 
-        while ($stopwatch.Elapsed.TotalSeconds -lt $TimeoutSeconds) {
+        while ([DateTime]::UtcNow -lt $hardDeadline) {
             if ($process.HasExited) {
                 $exitCode = $process.ExitCode
                 $status = if ($metricsCaptured) { "completed" } else { "process-exited" }
@@ -173,16 +175,19 @@ function Start-BenchmarkRun($Profile, $Iteration, [bool] $Warmup) {
                 $status = "metrics-captured"
                 $metricWallMs = [math]::Round($stopwatch.Elapsed.TotalMilliseconds, 0)
                 $deadline = [DateTime]::UtcNow.AddSeconds($PostJeiWaitSeconds)
+                if ($deadline -gt $hardDeadline) { $deadline = $hardDeadline }
                 while (!$process.HasExited -and [DateTime]::UtcNow -lt $deadline) {
                     [void] $process.WaitForExit(500)
                 }
                 if (!$process.HasExited) {
                     Stop-ProcessTree -ProcessId $process.Id
                     [void] $process.WaitForExit(10000)
-                    $exitCode = $process.ExitCode
-                } else {
-                    $exitCode = $process.ExitCode
                 }
+                $exitCode = $process.ExitCode
+                break
+            }
+            if ($logText -match "---- Minecraft Crash Report ----") {
+                $status = "crashed"
                 break
             }
 
@@ -227,6 +232,10 @@ function Start-BenchmarkRun($Profile, $Iteration, [bool] $Warmup) {
             StderrFile = $stderrPath
         }
     } finally {
+        if ($null -ne $process -and !$process.HasExited) {
+            Stop-ProcessTree -ProcessId $process.Id
+            [void] $process.WaitForExit(20000)
+        }
         $env:JAVA_HOME = $oldJavaHome
         $env:Path = $oldPath
     }
