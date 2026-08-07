@@ -10,7 +10,8 @@ In large modpacks, JEI spends several seconds building its ingredient search ind
 
   JEI startup runs on one dedicated background thread, so the render thread can keep updating while
   recipes and the runtime are built. Plugin callbacks keep JEI's original order and are never run
-  concurrently. The finished runtime is published atomically on the client thread. Leaving the
+  concurrently. Final `onRuntimeAvailable` callbacks return to the client thread before the runtime
+  is published there, so plugins can safely use JEI's main-thread-only runtime APIs. Leaving the
   world cancels the active generation, interrupts its build, and prevents stale publication.
 
 - **Off-thread ingredient filter build** — `asyncIngredientFilter` (on by default)
@@ -120,7 +121,7 @@ The matching `AnvilRecipeControl` variant injects at the head of JEI's `AnvilRec
 
 ### Shared infrastructure
 
-- **Startup executor** (`JeiOptExecutors`) — a single-flight daemon executor for serial JEI startup. Each start has a generation token; stop cancels and interrupts it, and runtime publication is generation-checked on the client thread.
+- **Startup executor** (`JeiOptExecutors`) — a single-flight daemon executor for serial JEI startup. Each start has a generation token; stop cancels and interrupts it. Runtime callbacks and publication are generation-checked on the client thread.
 - **Worker pool** (`JeiOptExecutors`) — a small fixed pool of daemon threads (`workerThreads`, default 4) for derived off-thread builds, plus a helper for running work back on the main thread.
 - **Client-tick work queue** (`JeiOptClientTickQueue` + `ClientTickHookMixin`) — a queue drained a little each client tick under a time budget, used to run main-thread finalize work (such as the index swap) a piece at a time instead of blocking a single frame.
 - **Mixin registration** — all hooks are listed in `jei_optimize.mixins.json`. On Forge they are registered through Architectury Loom's `forge.mixinConfig`; on NeoForge through the `[[mixins]]` entry in `neoforge.mods.toml`. Either way this is what actually loads them in both the development and production environments.

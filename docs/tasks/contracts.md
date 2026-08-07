@@ -252,16 +252,17 @@ Worker threads must not call:
 - JEI registration objects.
 
 `async.asyncStartup` is the single controlled exception to the `IModPlugin` worker rule. It moves
-the complete JEI startup sequence onto one dedicated startup thread; it does not use the worker
+JEI's build and registration sequence onto one dedicated startup thread; it does not use the worker
 pool and does not run plugin callbacks concurrently. The exception requires all of the following:
 
 - At most one JEI startup body executes at a time.
 - Plugin callback order and JEI exception behavior remain unchanged.
 - Every start owns a generation token and checks cancellation between plugin callbacks.
 - Stop invalidates the generation, interrupts the startup thread, and cancels derived tasks.
+- The final `IModPlugin.onRuntimeAvailable` callback batch executes serially on the client thread.
 - The runtime is published on the client thread only when its generation is still current.
-- Packs containing a plugin that requires the client thread can disable `asyncStartup` to restore
-    JEI's caller-thread startup path.
+- Packs containing an earlier registration callback that requires the client thread can disable
+    `asyncStartup` to restore JEI's caller-thread startup path.
 
 Publish rules:
 

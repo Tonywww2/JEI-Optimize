@@ -29,6 +29,11 @@ can no longer publish after leaving a world.
   and related recipes to be rejected as broken. Just Enough Threads now safely reuses the composed
   vanilla recipe's extension. Verified with JEI 15.48.0.179, Sophisticated Storage 1.4.79.2056,
   and Sophisticated Core 1.3.74.2216.
+- **Runtime-available plugin callbacks now run on the client thread.** Moving this final callback
+  batch off-thread caused JEI's own thread guard to reject runtime ingredient changes from Botania,
+  CC: Tweaked, KubeJS, NuclearCraft, and Applied Energistics 2. JEI construction remains serial on
+  the dedicated startup thread; `onRuntimeAvailable` callbacks and publication return to the client
+  thread without changing plugin order.
 - Removed PR #5's parallel plugin dispatch, main-thread retry, and incompatibility store. Parallel
   callbacks wrote JEI's shared registration containers concurrently, which could corrupt recipe
   maps, duplicate catalyst registrations, drop recipes, or hang startup.

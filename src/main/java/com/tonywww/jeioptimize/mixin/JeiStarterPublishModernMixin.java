@@ -58,7 +58,7 @@ public abstract class JeiStarterPublishModernMixin {
             throw new IllegalStateException("JEI runtime publication was not captured");
         }
         jeiOptimize$pendingRuntime = null;
-        JeiOptExecutors.publishJeiRuntimeOnMainThreadAndWait(() -> {
+        JeiOptExecutors.runOnMainThreadAndWait(() -> {
             Internal.setRuntime(runtime);
             running = true;
         });

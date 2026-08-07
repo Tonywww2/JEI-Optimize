@@ -23,6 +23,6 @@ public abstract class JeiStarterPublishLegacyMixin {
             Internal.setRuntime(runtime);
             return;
         }
-        JeiOptExecutors.publishJeiRuntimeOnMainThreadAndWait(() -> Internal.setRuntime(runtime));
+        JeiOptExecutors.runOnMainThreadAndWait(() -> Internal.setRuntime(runtime));
     }
 }

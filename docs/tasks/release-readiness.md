@@ -75,7 +75,7 @@ equivalence gaps are called out explicitly below.
 | Recipe focus preheat | `async.recipeFocusPreheat` | true | Shipped default; manual R/U equivalence remains open. |
 | Catalyst preheat | `async.catalystPreheat` | true | Shipped default; manual catalyst equivalence remains open. |
 | Parallel recipe pre-resolution | `async.parallelVanillaRecipes` | false | Keep disabled; modded recipes and lazy caches may be unsafe. |
-| Serial background startup | `async.asyncStartup` | true | Cross-version smoke and deterministic stop-cancellation pass; large-pack repetition pending. |
+| Serial background startup | `async.asyncStartup` | true | Cross-version smoke and deterministic stop-cancellation pass. A large-pack run exposed off-thread runtime callbacks; client-thread routing is fixed locally and the large-pack rerun is pending. |
 
 Release posture: do not reintroduce parallel plugin dispatch. `asyncStartup` remains independently
 disableable for plugins that require JEI's original caller thread.
@@ -99,7 +99,7 @@ The following checks from [validation.md](validation.md) remain open:
 |---|---|---|---|
 | Feature-equivalence not fully proven | High | Validation checklist and per-feature disable paths exist. | Complete manual search/R/U/catalyst checks before the next release claim. |
 | Async query paths may return incomplete data if misconfigured | High | Generation checks and fallback paths exist; validation incomplete. | Keep per-feature kill switches documented. |
-| A plugin requires the render thread | High | Plugin callbacks remain serial; `asyncStartup=false` restores JEI's original caller-thread path. | Do not claim universal compatibility before large-pack testing. |
+| A registration plugin requires the render thread | High | Plugin callbacks remain serial; `onRuntimeAvailable` is explicitly routed to the client thread, and `asyncStartup=false` restores JEI's original caller-thread path for earlier phases. | Do not claim universal compatibility before the fixed build is rerun in the large pack. |
 | Mixin target drift in future JEI versions | Medium | Runtime member selection verified on JEI 15.20, 15.48, and 19.27. | Scope release to verified ranges unless rechecked. |
 | Delayed compact behavior | Medium | Work remains on the main thread and is config-gated. | Complete recipe query validation. |
 | Reflection-based internals in mixins | Resolved | Source scan found no `java.lang.reflect`, `Class.forName`, `getDeclared*`, `setAccessible`, or reflective `invoke` usage under `src/main/java`. | No release blocker from reflection remains. |

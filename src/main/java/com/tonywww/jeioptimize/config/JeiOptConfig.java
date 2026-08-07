@@ -184,8 +184,9 @@ public final class JeiOptConfig {
                 "Run JEI startup serially on a dedicated background thread so the render thread stays responsive while",
                 "JEI builds its item list and recipes after you enter a world. JEI overlays and search simply",
                 "appear when startup finishes instead of freezing the loading screen.",
-                "Plugin callbacks keep JEI's original order and are never run concurrently. Disable this option",
-                "if a plugin requires the render thread. Leaving a world cancels an in-progress build before",
+                "Plugin callbacks keep JEI's original order and are never run concurrently. Runtime-available",
+                "callbacks and publication run on the client thread. Disable this option if an earlier plugin",
+                "registration callback requires the render thread. Leaving a world cancels an in-progress build before",
                 "its runtime can be published. Enabled by default.")
             .define("asyncStartup", true);
         builder.pop();

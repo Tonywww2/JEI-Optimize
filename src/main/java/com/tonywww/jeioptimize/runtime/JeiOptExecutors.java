@@ -118,11 +118,11 @@ public final class JeiOptExecutors {
         return throwable instanceof JeiStartCancelled;
     }
 
-    public static void publishJeiRuntimeOnMainThreadAndWait(Runnable publisher) {
-        Objects.requireNonNull(publisher, "publisher");
+    public static void runOnMainThreadAndWait(Runnable command) {
+        Objects.requireNonNull(command, "command");
         JeiStartTask task = CURRENT_JEI_START.get();
         if (task == null) {
-            publisher.run();
+            command.run();
             return;
         }
         ensureJeiStartActive(task);
@@ -130,13 +130,13 @@ public final class JeiOptExecutors {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.isSameThread()) {
             ensureJeiStartActive(task);
-            publisher.run();
+            command.run();
             return;
         }
 
         FutureTask<Void> publication = new FutureTask<>(() -> {
             ensureJeiStartActive(task);
-            publisher.run();
+            command.run();
             return null;
         });
         minecraft.execute(publication);

@@ -8,9 +8,9 @@
 4. 不默认跳过插件、不默认关闭搜索功能、不默认限制 recipe 数量。
 
 核心原则：不要并行执行其他插件代码。常规路径在 Minecraft client thread 上串行调用
-JEI Plugin；经 CR-1 批准的 `asyncStartup` 可以把完整启动序列移到一条 single-flight 专用
-线程，但插件调用顺序不变、不会进入 worker pool，最终 runtime 必须在客户端线程按 generation
-校验后原子发布。其他后台线程仍只处理稳定快照和 JEI 自己的派生计算。
+JEI Plugin；经 CR-1 批准的 `asyncStartup` 可以把构建与注册序列移到一条 single-flight 专用
+线程，但插件调用顺序不变、不会进入 worker pool。最终 `onRuntimeAvailable` 回调与 runtime
+发布必须返回客户端线程并通过 generation 校验。其他后台线程仍只处理稳定快照和 JEI 自己的派生计算。
 
 本文不设计本地跨世界缓存或持久化磁盘缓存。所有缓存默认只在一次 `JeiStarter.start()` 到 `JeiStarter.stop()` 的生命周期内有效，退出世界、切换服务器、资源/数据包 reload 后必须丢弃。
 

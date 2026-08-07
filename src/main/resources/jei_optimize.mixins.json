@@ -11,6 +11,7 @@
     "JeiStarterMixin",
     "JeiStarterPublishLegacyMixin",
     "JeiStarterPublishModernMixin",
+    "JeiStarterRuntimeCallbacksMixin",
     "registration.IngredientManagerBuilderRegistrationCountMixin",
     "registration.RecipeCatalystRegistrationCountMixin",
     "registration.RecipeCategoryRegistrationCountMixin",
