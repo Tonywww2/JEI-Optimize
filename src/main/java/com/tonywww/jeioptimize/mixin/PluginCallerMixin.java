@@ -30,7 +30,6 @@ public abstract class PluginCallerMixin {
             "Registering search ingredient aliases",
             "Registering Mod Info",
             "Registering categories",
-            "Registering vanilla category extensions",
             "Registering recipe catalysts",
             "Registering advanced plugins",
             "Registering recipes",
@@ -54,23 +53,43 @@ public abstract class PluginCallerMixin {
     ) {
         IModPlugin modPlugin = (IModPlugin) plugin;
         Runnable call = pluginCall(consumer, modPlugin, title);
-        if (!JeiOptFeatureFlags.parallelPluginCalls() || !ASYNC_PHASES.contains(title)
-                || JeiOptIncompatPluginStore.isExcluded(pluginUid(modPlugin))) {
+        boolean offThread = JeiOptExecutors.isJeiStartOffThread();
+        boolean dispatchAsync = JeiOptFeatureFlags.parallelPluginCalls()
+                && ASYNC_PHASES.contains(title)
+                && !JeiOptIncompatPluginStore.isExcluded(pluginUid(modPlugin));
+        if (dispatchAsync) {
+            int order = plugins.indexOf(modPlugin);
+            JeiOptExecutors.runPluginCallAsync(() -> {
+                try {
+                    call.run();
+                } catch (RuntimeException | LinkageError e) {
+                    JeiOptIncompatPluginStore.record(title, order, modPlugin, call);
+                    JeiOptimize.LOGGER.warn(
+                            "Plugin {} is not compatible with parallel dispatch: it threw {} during phase '{}'. "
+                                    + "It will be re-run on the main thread.",
+                            modPlugin.getClass(), e, title);
+                }
+            });
+            return;
+        }
+        if (!offThread) {
             call.run();
             return;
         }
+        if (JeiOptIncompatPluginStore.isExcluded(pluginUid(modPlugin))) {
+            JeiOptExecutors.runOnMainThreadAndWait(call);
+            return;
+        }
         int order = plugins.indexOf(modPlugin);
-        JeiOptExecutors.runPluginCallAsync(() -> {
-            try {
-                call.run();
-            } catch (RuntimeException | LinkageError e) {
-                JeiOptIncompatPluginStore.record(title, order, modPlugin, call);
-                JeiOptimize.LOGGER.warn(
-                        "Plugin {} is not compatible with parallel dispatch: it threw {} during phase '{}'. "
-                                + "It will be re-run on the main thread.",
-                        modPlugin.getClass(), e, title);
-            }
-        });
+        try {
+            call.run();
+        } catch (RuntimeException | LinkageError e) {
+            JeiOptIncompatPluginStore.record(title, order, modPlugin, call);
+            JeiOptimize.LOGGER.warn(
+                    "Plugin {} threw {} while JEI startup ran on a background thread during phase '{}'. "
+                            + "It will be re-run on the main thread.",
+                    modPlugin.getClass(), e, title);
+        }
     }
 
     private static Runnable pluginCall(Consumer<IModPlugin> consumer, IModPlugin modPlugin, String title) {
@@ -79,23 +98,29 @@ public abstract class PluginCallerMixin {
     }
 
     @Inject(method = "callOnPlugins", at = @At("RETURN"))
-    private static void jeiOptimize$awaitPluginCalls(CallbackInfo ci) {
+    private static void jeiOptimize$awaitPluginCalls(
+            String title,
+            List<IModPlugin> plugins,
+            Consumer<IModPlugin> func,
+            CallbackInfo ci
+    ) {
+        long startTime = System.nanoTime();
         JeiOptExecutors.awaitPendingPluginCalls();
         List<JeiOptIncompatPluginStore.Entry> retries = JeiOptIncompatPluginStore.drain();
-        if (retries.isEmpty()) {
-            return;
+        if (!retries.isEmpty()) {
+            JeiOptimize.LOGGER.info(
+                    "Re-running {} JEI plugin call(s) on the main thread after a parallel dispatch failure.",
+                    retries.size());
+            for (JeiOptIncompatPluginStore.Entry entry : retries) {
+                retryOnMainThread(entry);
+            }
         }
-        JeiOptimize.LOGGER.info(
-                "Re-running {} JEI plugin call(s) on the main thread after a parallel dispatch failure.",
-                retries.size());
-        for (JeiOptIncompatPluginStore.Entry entry : retries) {
-            retryOnMainThread(entry);
-        }
+        JeiOptDiagnostics.reportPhaseBarrier(title, System.nanoTime() - startTime);
     }
 
     private static void retryOnMainThread(JeiOptIncompatPluginStore.Entry entry) {
         try {
-            entry.call().run();
+            JeiOptExecutors.runOnMainThreadAndWait(entry.call());
             JeiOptimize.LOGGER.info(
                     "Plugin {} succeeded when re-run on the main thread during phase '{}'.",
                     entry.plugin().getClass(), entry.phase());
@@ -103,6 +128,7 @@ public abstract class PluginCallerMixin {
             if (entry.plugin() instanceof VanillaPlugin) {
                 throw e;
             }
+            JeiOptIncompatPluginStore.learnIncompatible(pluginUid(entry.plugin()));
             JeiOptimize.LOGGER.error("Caught an error from mod plugin: {} {}", entry.plugin().getClass(), pluginUid(entry.plugin()), e);
         }
     }

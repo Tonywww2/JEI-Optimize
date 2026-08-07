@@ -108,6 +108,10 @@ public final class JeiOptFeatureFlags {
         return enabled() && JeiOptConfig.ASYNC_PARALLEL_PLUGIN_CALLS.get();
     }
 
+    public static boolean asyncStartup() {
+        return enabled() && JeiOptConfig.ASYNC_STARTUP.get();
+    }
+
     public static Set<String> parallelPluginCallExclusions() {
         Set<String> cached = cachedPluginCallExclusions;
         if (cached != null) {

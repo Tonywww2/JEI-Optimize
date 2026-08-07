@@ -58,6 +58,7 @@ public final class JeiOptConfig {
     static final BooleanValue ASYNC_PARALLEL_VANILLA_RECIPES;
     static final BooleanValue ASYNC_PARALLEL_PLUGIN_CALLS;
     static final ConfigValue<String> ASYNC_PARALLEL_PLUGIN_EXCLUDED;
+    static final BooleanValue ASYNC_STARTUP;
 
     private static boolean registered;
 
@@ -104,7 +105,7 @@ public final class JeiOptConfig {
                 "Costs nothing until a phase passes stallThresholdSeconds; after that it samples the stack",
                 "of the thread running the phase and logs where the time actually went.",
                 "Purely observational: it never changes what runs, in what order, or on which thread.")
-            .define("stallWatchdog", true);
+            .define("stallWatchdog", false);
         DIAGNOSTICS_STALL_THRESHOLD_SECONDS = builder
             .comment(
                 "How long one JEI startup phase may run before the stall watchdog starts sampling it.",
@@ -179,7 +180,7 @@ public final class JeiOptConfig {
                 "Resolve recipe ingredient tags on worker threads before JEI validates recipes during startup.",
                 "Experimental: modded recipes and lazy ingredient caches are not always thread-safe.",
                 "JEI's own validation and registration still run unchanged on the main thread. Default false.")
-            .define("parallelVanillaRecipes", false);
+            .define("parallelVanillaRecipes", true);
         ASYNC_PARALLEL_PLUGIN_CALLS = builder
             .comment(
                 "Run JEI plugin registration callbacks (subtypes, ingredients, recipes, etc.) on worker threads",
@@ -202,6 +203,17 @@ public final class JeiOptConfig {
                 "Default empty (nothing excluded).",
                 "Example: parallelPluginCallExclusions = \"almostunified:jei, examplemod:jei\"")
             .define("parallelPluginCallExclusions", "");
+        ASYNC_STARTUP = builder
+            .comment(
+                "Run JEI's plugin startup on a background thread so the render thread stays responsive while",
+                "JEI builds its item list and recipes after you enter a world. JEI overlays and search simply",
+                "appear when startup finishes instead of freezing the loading screen.",
+                "Plugins that are not safe to call from a background thread are detected automatically and",
+                "re-run on the main thread before JEI consumes the phase, so JEI's own startup invariants",
+                "are preserved. Plugins that fail on both threads are kept on the main thread for the rest",
+                "of the session.",
+                "Enabled by default: this is the non-blocking JEI startup fix and it needs no per-pack config.")
+            .define("asyncStartup", true);
         builder.pop();
 
         SPEC = builder.build();

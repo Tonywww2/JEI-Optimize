@@ -42,6 +42,15 @@ public final class JeiOptDiagnostics {
         }
     }
 
+    public static void reportPhaseBarrier(String title, long elapsedNanos) {
+        if (!JeiOptFeatureFlags.pluginTiming()) {
+            return;
+        }
+        JeiOptimize.LOGGER.info(
+                "JEI plugin phase '{}' total (including parallel dispatch wait) took {}",
+                title, formatDuration(elapsedNanos));
+    }
+
     public static void reportRegistrationCounts() {
         if (!JeiOptFeatureFlags.registrationCounts()) {
             return;
