@@ -7,6 +7,7 @@
   "refmap": "jei_optimize.refmap.json",
   "mixins": [
     "PluginCallerMixin",
+    "JeiStarterMixin",
     "registration.IngredientManagerBuilderRegistrationCountMixin",
     "registration.RecipeCatalystRegistrationCountMixin",
     "registration.RecipeCategoryRegistrationCountMixin",

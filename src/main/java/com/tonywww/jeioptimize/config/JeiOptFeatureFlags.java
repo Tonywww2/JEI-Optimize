@@ -1,8 +1,13 @@
 package com.tonywww.jeioptimize.config;
 
+import java.util.HashSet;
+import java.util.Set;
+
 public final class JeiOptFeatureFlags {
     private static final int DEFAULT_WORKER_THREADS = 2;
     private static final int DEFAULT_SNAPSHOT_BUDGET_MS = 2;
+
+    private static volatile Set<String> cachedPluginCallExclusions;
 
     private JeiOptFeatureFlags() {
     }
@@ -97,6 +102,35 @@ public final class JeiOptFeatureFlags {
 
     public static boolean parallelVanillaRecipes() {
         return enabled() && JeiOptConfig.ASYNC_PARALLEL_VANILLA_RECIPES.get();
+    }
+
+    public static boolean parallelPluginCalls() {
+        return enabled() && JeiOptConfig.ASYNC_PARALLEL_PLUGIN_CALLS.get();
+    }
+
+    public static boolean asyncStartup() {
+        return enabled() && JeiOptConfig.ASYNC_STARTUP.get();
+    }
+
+    public static Set<String> parallelPluginCallExclusions() {
+        Set<String> cached = cachedPluginCallExclusions;
+        if (cached != null) {
+            return cached;
+        }
+        Set<String> exclusions = new HashSet<>();
+        if (enabled()) {
+            String raw = JeiOptConfig.ASYNC_PARALLEL_PLUGIN_EXCLUDED.get();
+            if (raw != null) {
+                for (String uid : raw.split(",")) {
+                    String trimmed = uid.trim();
+                    if (!trimmed.isEmpty()) {
+                        exclusions.add(trimmed);
+                    }
+                }
+            }
+        }
+        cachedPluginCallExclusions = Set.copyOf(exclusions);
+        return cachedPluginCallExclusions;
     }
 
     public static int ingredientFilterBudgetMs() {
