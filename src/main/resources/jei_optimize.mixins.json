@@ -7,7 +7,10 @@
   "refmap": "jei_optimize.refmap.json",
   "mixins": [
     "PluginCallerMixin",
+    "ExtendableRecipeCategoryHelperMixin",
     "JeiStarterMixin",
+    "JeiStarterPublishLegacyMixin",
+    "JeiStarterPublishModernMixin",
     "registration.IngredientManagerBuilderRegistrationCountMixin",
     "registration.RecipeCatalystRegistrationCountMixin",
     "registration.RecipeCategoryRegistrationCountMixin",
@@ -24,11 +27,13 @@
     "AnvilRecipeControlModernMixin",
     "BrewingRecipeMakerTimingMixin",
     "compat.AliGenericUtilsMixin",
+    "accessor.SophisticatedStorageShulkerRecipeAccessor",
     "ElementSearchMixin",
     "RecipeMapCatalystMixin"
   ],
   "client": [
-    "ClientTickHookMixin"
+    "ClientTickHookMixin",
+    "JeiLoadingOverlayMixin"
   ],
   "injectors": {
     "defaultRequire": 0

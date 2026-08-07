@@ -32,14 +32,11 @@ public final class JeiOptRuntimeState {
         return RUNTIME_UNLOADED_ONCE.get();
     }
 
-    /**
-     * Starts a JEI runtime lifecycle. The generation only advances on teardown, so work scheduled
-     * during {@code JeiStarter.start()} - before the runtime reports itself available - still
-     * publishes into the runtime it was built for.
-     */
+    /** Starts a new JEI lifecycle and invalidates every task from an older start. */
     public static long beginStart() {
         synchronized (LOCK) {
             cancelPendingTasksLocked();
+            currentGeneration = NEXT_GENERATION.incrementAndGet();
             return currentGeneration;
         }
     }
@@ -101,7 +98,7 @@ public final class JeiOptRuntimeState {
         List<CompletableFuture<?>> toCancel = List.copyOf(pendingTasks);
         pendingTasks.clear();
         for (CompletableFuture<?> task : toCancel) {
-            task.cancel(false);
+            task.cancel(true);
         }
     }
 }

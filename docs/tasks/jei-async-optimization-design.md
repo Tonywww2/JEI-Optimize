@@ -11,7 +11,8 @@
 
 已有设计文档 [docs/jei-mixin-optimization-plan.md](../jei-mixin-optimization-plan.md) 已确认核心边界：
 
-- JEI Plugin 回调必须保持原顺序和原线程语义。
+- JEI Plugin 回调必须保持原顺序且不得并发。默认保持调用线程语义；CR-1 允许
+  `asyncStartup` 将完整序列移动到一条可取消的专用启动线程。
 - 不能在 worker thread 直接调用 `IModPlugin`、`IRecipeCategory`、`IIngredientHelper`、`IIngredientRenderer` 等第三方扩展点。
 - 可以把 JEI 自己基于快照的派生计算移动到后台线程。
 - 本地跨世界缓存已经明确移出设计；只允许一次 JEI start 生命周期内的短缓存。
@@ -27,6 +28,10 @@
 3. 用 generation id、future 取消、双缓冲索引防止退出世界、reload、切服后的旧任务污染当前 runtime。
 4. 所有优化必须有功能等价兜底：后台索引未就绪时等待、回退原同步路径，或仅在 GUI 层显示短暂“构建中”状态。
 5. 所有非纯工具类功能入口都先检查配置开关；关闭后必须尽量走 JEI 原始路径或 no-op。
+
+`asyncStartup` 是受控的前置例外：它不拆分插件任务，而是将完整 JEI 启动作为一个
+single-flight 串行任务运行。退出世界会使 generation 失效并中断该任务，最终 runtime
+只允许在 client thread 发布。关闭此开关时恢复 JEI 原始调用线程。
 
 普通“首次使用才构建”的懒加载不作为主要方案，因为它只是把卡顿从进入世界转移到第一次搜索或第一次按 `R/U`。本设计要求每个懒加载索引都有后台预热调度。
 
@@ -123,11 +128,14 @@ Every feature must have a boolean gate. Proposed keys:
 | `async.catalystPreheat` | Enable async catalyst index preheat. |
 | `async.workerThreads` | Worker thread count, bounded integer. |
 | `async.snapshotBudgetMs` | Per-client-tick snapshot extraction budget. |
+| `async.asyncStartup` | Run the complete JEI startup serially on a cancellable dedicated thread. |
 
 ### Safety Rules
 
 - Worker thread may read only immutable snapshot DTOs and primitive/string/UID values.
 - Worker thread must not call `IModPlugin`, `IRecipeCategory`, `IIngredientHelper`, `IIngredientRenderer`, `Minecraft`, `Screen`, or mutable `ItemStack` logic.
+- The dedicated `asyncStartup` thread is not a worker-pool task. It may execute `IModPlugin` only
+  as part of JEI's unchanged serial startup loop; plugin callbacks must never overlap.
 - Every async task carries a generation id and checks it before publishing.
 - `JeiStarter.stop()` or reload invalidates generation and cancels pending tasks.
 - Every mixin path that changes JEI behavior must check `general.enabled` and its own feature gate before acting.

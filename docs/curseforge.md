@@ -36,6 +36,7 @@ The biggest single cost — the ingredient index — no longer blocks loading; i
 Config file: `config/jei_optimize-client.toml`. Every optimization can be toggled independently.
 
 *   `enabled` — master switch for the whole mod.
+*   `asyncStartup` — run JEI startup serially on a dedicated background thread, with generation-safe client-thread publication and immediate cancellation on world exit.
 *   `asyncIngredientFilter` — build the ingredient search index off-thread after world entry.
 *   `parallelVanillaRecipes` — experimental recipe ingredient pre-resolution; disabled by default.
 *   `disableAnvilRepairRecipes` / `disableAnvilEnchantRecipes` — hide generated anvil recipes; enabled by default.
@@ -67,6 +68,10 @@ JEI 默认在主线程上构建物品筛选器——也就是覆盖所有物品�
 
 _你会看到:_ JEI 物品列表在你进入世界后稍等片刻才出现,而不是拖慢世界加载。
 
+**保持界面响应的串行 JEI 启动**
+
+`asyncStartup` 会在一条专用后台线程上按 JEI 原顺序执行完整启动流程。插件回调不会并发执行;完成后的 runtime 只会在客户端线程上原子发布。退出世界时,当前 generation 会立即失效,启动线程和派生任务会被取消,旧 runtime 不会发布到下一个世界。
+
 **实验性并行预解析配方材料**
 
 JEI 在检查内置配方(合成、熔炼、切石等)之前,需要先把每一条材料标签解析成具体的物品列表。Minecraft 采用惰性解析,而 JEI 启动时会把这些解析全部触发一遍。Just Enough Threads 提前用多个 CPU 核心完成这项解析,再交回 JEI。JEI 自身的校验与注册照常在主线程上运行,只是读到的数据已经解析完毕。
@@ -93,6 +98,7 @@ JEI 自动生成的材料修复与附魔书组合配方默认隐藏。在超大�
 配置文件:`config/jei_optimize-client.toml`。每一项优化都可以单独开关。
 
 *   `enabled` — 整个 mod 的总开关。
+*   `asyncStartup` — 在专用后台线程上串行启动 JEI;退出世界时立即取消,默认开启。
 *   `asyncIngredientFilter` — 进入世界后离主线程构建物品搜索索引。
 *   `parallelVanillaRecipes` — 实验性并行预解析配方材料;默认关闭。
 *   `disableAnvilRepairRecipes` / `disableAnvilEnchantRecipes` — 隐藏自动生成的铁砧配方;默认开启。

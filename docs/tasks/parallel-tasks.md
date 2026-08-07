@@ -36,7 +36,9 @@ Legend: ☐ todo · ◐ in-progress · ☑ done · ⛔ blocked.
 - No local disk/cross-world cache. Caches are scoped to one JEI start lifecycle.
 - Every feature has a config-file switch; `general.enabled=false` must disable all behavior changes.
 - Worker threads may process only immutable snapshots and primitive/string/UID values.
-- Worker threads must not call `IModPlugin`, `IRecipeCategory`, `IIngredientHelper`, `IIngredientRenderer`, `Minecraft`, `Screen`, or mutable `ItemStack` logic.
+- Worker-pool threads must not call `IModPlugin`, `IRecipeCategory`, `IIngredientHelper`,
+  `IIngredientRenderer`, `Minecraft`, `Screen`, or mutable `ItemStack` logic. CR-1 permits only the
+  single-flight `asyncStartup` thread to execute JEI's unchanged serial plugin loop.
 - Every async publish must check generation on the client thread.
 
 Frozen interface signatures:
@@ -68,6 +70,7 @@ Frozen config keys:
 - `async.catalystPreheat`
 - `async.workerThreads`
 - `async.snapshotBudgetMs`
+- `async.asyncStartup`
 
 ## 3. Stages & dependency overview
 
@@ -311,6 +314,9 @@ Gate H: `runClient` smoke passes; equivalence checklist is filled; no unresolved
 | `src/main/java/com/tonywww/jeioptimize/JeiOptimize.java` | PB-4 | B |
 | `src/main/java/com/tonywww/jeioptimize/instrumentation/JeiOptDiagnostics.java` | PC-1 | C |
 | `src/main/java/com/tonywww/jeioptimize/mixin/PluginCallerMixin.java` | PC-1 | C |
+| `src/main/java/com/tonywww/jeioptimize/mixin/JeiStarterMixin.java` | CR-1 | H |
+| `src/main/java/com/tonywww/jeioptimize/mixin/JeiStarterPublishLegacyMixin.java` | CR-1 | H |
+| `src/main/java/com/tonywww/jeioptimize/mixin/JeiStarterPublishModernMixin.java` | CR-1 | H |
 | `src/main/java/com/tonywww/jeioptimize/instrumentation/JeiPluginCallContext.java` | PC-2 | C |
 | `src/main/java/com/tonywww/jeioptimize/mixin/registration/**` | PC-2 | C |
 | `src/main/resources/jei_optimize.mixins.json` | PC-3 | C |
@@ -347,7 +353,7 @@ Gate H: `runClient` smoke passes; equivalence checklist is filled; no unresolved
 
 | # | date | by | change (convention / borrowed file) | resolution |
 |---|---|---|---|---|
-| — | — | — | — | — |
+| CR-1 | 2026-08-07 | GitHub Copilot | Add `async.asyncStartup`; permit one dedicated startup thread to execute JEI and plugin callbacks serially; update validated defaults. | User approved. Plugin parallel dispatch was removed; startup is single-flight, stop-cancellable, generation-scoped, and publishes runtime atomically on the client thread. |
 
 ## 8. Parallel task ↔ milestone ↔ master plan
 

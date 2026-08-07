@@ -13,7 +13,7 @@
 
 - 不修改其他模组的 JEI Plugin。
 - 不并行执行 JEI Plugin 回调。
-- 不跳过插件、不关闭 JEI 功能、不限制 recipe 数量。
+- 不跳过插件、不限制 recipe 数量。生成式铁砧内容仅由独立、可关闭的内容选项控制。
 - 不引入本地跨世界缓存或磁盘持久化缓存。
 - 每一个功能都必须能通过配置文件关闭。
 - 禁用某功能时必须 no-op 或回到 JEI 原始路径。
@@ -40,7 +40,7 @@
 | `JeiOptConfig` | Defines and registers Forge client config. |
 | `JeiOptFeatureFlags` | Read-only facade for all feature checks used by mixins. |
 | `JeiOptRuntimeState` | Generation id, lifecycle invalidation, pending task cancellation. |
-| `JeiOptExecutors` | Bounded worker executor and client-thread publish helper. |
+| `JeiOptExecutors` | Bounded worker executor, single-flight JEI startup executor, and client-thread publish helper. |
 | `JeiOptTaskRegistry` | Tracks futures/tasks for cancellation and generation-safe publishing. |
 | `JeiOptClientTickQueue` | Budgeted client-thread snapshot work queue. |
 | `JeiOptCacheScope` | One-start in-memory cache, cleared on stop/reload. |
@@ -167,23 +167,31 @@ Feature facade: `com.tonywww.jeioptimize.config.JeiOptFeatureFlags`.
 | `general.enabled` | `true` | If false, all mixin behavior no-ops or falls back to JEI baseline. |
 | `diagnostics.pluginTiming` | `false` | Plugin timing mixin records nothing and emits no timing logs. |
 | `diagnostics.registrationCounts` | `false` | Registration count mixins record nothing. |
-| `syncOptimizations.cacheScope` | `false` | UID/string/sort caches are bypassed. |
-| `syncOptimizations.batchIngredientFilterInit` | `false` | `IngredientFilter` constructor uses JEI baseline behavior. |
-| `syncOptimizations.sortKeyCache` | `false` | Sort/tag helper cache is bypassed. |
-| `syncOptimizations.delayCompact` | `false` | JEI compact runs at original timing. |
+| `diagnostics.stallWatchdog` | `true` | No long-phase stack sampling is performed. |
+| `jeiContent.disableAnvilRepairRecipes` | `true` | JEI generates and displays material-repair recipes. |
+| `jeiContent.disableAnvilEnchantRecipes` | `true` | JEI generates and displays enchanted-book recipes. |
+| `syncOptimizations.cacheScope` | `true` | UID/string/sort caches are bypassed. |
+| `syncOptimizations.batchIngredientFilterInit` | `true` | `IngredientFilter` constructor uses JEI baseline behavior. |
+| `syncOptimizations.sortKeyCache` | `true` | Sort/tag helper cache is bypassed. |
+| `syncOptimizations.delayCompact` | `true` | JEI compact runs at original timing. |
 | `async.searchPreheat` | `false` | Search uses JEI baseline search path. |
-| `async.snapshotChunking` | `false` | No tick-budgeted snapshot queue is scheduled. |
-| `async.sortPreheat` | `false` | Sorting uses JEI baseline path. |
-| `async.recipeFocusPreheat` | `false` | R/U focus lookup uses JEI baseline path. |
-| `async.catalystPreheat` | `false` | Catalyst lookup uses JEI baseline path. |
+| `async.snapshotChunking` | `true` | No tick-budgeted snapshot queue is scheduled. |
+| `async.sortPreheat` | `true` | Sorting uses JEI baseline path. |
+| `async.recipeFocusPreheat` | `true` | R/U focus lookup uses JEI baseline path. |
+| `async.catalystPreheat` | `true` | Catalyst lookup uses JEI baseline path. |
+| `async.deferredIngredientFilter` | `true` | Ingredient-filter construction is not deferred. |
+| `async.asyncIngredientFilter` | `true` | JEI builds its ingredient filter synchronously. |
+| `async.parallelVanillaRecipes` | `false` | Recipe ingredients are not pre-resolved on workers. |
+| `async.asyncStartup` | `true` | `JeiStarter.start()` runs on its caller thread. |
 
-Defaults are intentionally conservative. A later validation stage may change defaults through a CR after equivalence evidence exists.
+Defaults reflect the shipped configuration after validation and change-control approval. Any later
+default change still requires a CR.
 
 ### 5.2 Numeric config keys
 
 | Key | Default | Bounds | Disable relation |
 |---|---|---|---|
-| `async.workerThreads` | `2` | `1..8` | Ignored when all async features are disabled. |
+| `async.workerThreads` | `4` | `1..8` | Ignored when all async features are disabled. |
 | `async.snapshotBudgetMs` | `2` | `1..10` | Ignored when `async.snapshotChunking=false`. |
 
 ### 5.3 Feature flag facade
@@ -197,6 +205,9 @@ public final class JeiOptFeatureFlags {
     public static boolean enabled();
     public static boolean pluginTiming();
     public static boolean registrationCounts();
+    public static boolean stallWatchdog();
+    public static boolean disableAnvilRepairRecipes();
+    public static boolean disableAnvilEnchantRecipes();
     public static boolean cacheScope();
     public static boolean batchIngredientFilterInit();
     public static boolean sortKeyCache();
@@ -206,6 +217,10 @@ public final class JeiOptFeatureFlags {
     public static boolean sortPreheat();
     public static boolean recipeFocusPreheat();
     public static boolean catalystPreheat();
+    public static boolean deferredIngredientFilter();
+    public static boolean asyncIngredientFilter();
+    public static boolean parallelVanillaRecipes();
+    public static boolean asyncStartup();
     public static int workerThreads();
     public static int snapshotBudgetMs();
 }
@@ -235,6 +250,18 @@ Worker threads must not call:
 - `Minecraft`, `ClientLevel`, `Screen`.
 - Mutable `ItemStack` logic.
 - JEI registration objects.
+
+`async.asyncStartup` is the single controlled exception to the `IModPlugin` worker rule. It moves
+the complete JEI startup sequence onto one dedicated startup thread; it does not use the worker
+pool and does not run plugin callbacks concurrently. The exception requires all of the following:
+
+- At most one JEI startup body executes at a time.
+- Plugin callback order and JEI exception behavior remain unchanged.
+- Every start owns a generation token and checks cancellation between plugin callbacks.
+- Stop invalidates the generation, interrupts the startup thread, and cancels derived tasks.
+- The runtime is published on the client thread only when its generation is still current.
+- Packs containing a plugin that requires the client thread can disable `asyncStartup` to restore
+    JEI's caller-thread startup path.
 
 Publish rules:
 

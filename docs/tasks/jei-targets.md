@@ -20,11 +20,17 @@ Verification methods used:
 - `Select-String` over extracted source for line-level source signatures.
 - `javap -classpath <jar> -p <class>` to confirm bytecode-visible fields and methods.
 
+Additional lifecycle verification on 2026-08-07 covered Forge JEI 15.20.0.120 and 15.48.0.179,
+plus NeoForge JEI 19.27.0.340. The older/NeoForge starters publish through
+`Internal.setRuntime(IJeiRuntime)` without a `running` field; JEI 15.48 publishes the runtime and
+then writes `JeiStarter.running=true`.
+
 ## 2. Lifecycle / Runtime Targets
 
 | Purpose | Target class | Verified members | Evidence | Notes |
 |---|---|---|---|---|
 | Generation begin/end hooks | `mezz.jei.library.startup.JeiStarter` | `public void start()`, `public void stop()` | source lines `93`, `164`; `javap` confirms both public methods | Best target for `JeiOptRuntimeState.beginStart()` and `invalidate()/cancel`. |
+| Async runtime publication | `mezz.jei.library.startup.JeiStarter` | `Internal.setRuntime(IJeiRuntime)`; optional field `running:Z` | `javap` on JEI 15.20, 15.48, and 19.27 | `JeiStarterPublishLegacyMixin` publishes `setRuntime` on the client thread. `JeiStarterPublishModernMixin` atomically publishes runtime and `running=true`; the mixin plugin selects by field presence. |
 | Runtime build sequence observation | `mezz.jei.library.startup.JeiStarter` | calls `PluginLoader.registerSubtypes`, `registerIngredients`, `createRecipeManager`, `createRecipeTransferManager`, `createGuiScreenHelper`, `PluginCaller.callOnPlugins("Registering Runtime", ...)`, `Internal.setRuntime(...)` | source lines `105`, `106`, `115`, `122`, `130`, `140`, `159` | Useful for diagnostics phase boundaries; do not change plugin call ordering. |
 | Runtime unavailable hook | `mezz.jei.library.startup.JeiStarter` | `PluginCaller.callOnPlugins("Sending Runtime Unavailable", ...)`, `Internal.setRuntime(null)` | source lines `167`, `168` | Safe place to clear one-start caches and cancel async tasks. |
 | Forge start/restart observer | `mezz.jei.forge.startup.StartEventObserver` | `public void register(PermanentEventSubscriptions)`, private `restart()`, private `transitionState(State)` | source lines `45`, `103`, `112`; `javap` confirms fields `observedEvents`, `startRunnable`, `stopRunnable`, `state` | Useful for restart debounce only after explicit config gate. Private methods require `@Inject` by name/descriptor. |
@@ -73,6 +79,7 @@ Verification methods used:
 | Feature | Primary target | Support target(s) | Status |
 |---|---|---|---|
 | Lifecycle generation | `JeiStarter.start`, `JeiStarter.stop` | `StartEventObserver.restart` for optional debounce | verified |
+| Serial async startup | `JeiStarter.start`, `JeiStarter.stop`, `Internal.setRuntime` | legacy/modern publication variants selected by `running:Z` | verified on JEI 15.20, 15.48, and 19.27 |
 | Plugin timing | `PluginCaller.callOnPlugins` | `PluginCallerTimerRunnable` read-only reference | verified |
 | Registration counts | `IngredientManagerBuilder`, `RecipeRegistration`, `RecipeCategoryRegistration`, `RecipeCatalystRegistration` | `JeiPluginCallContext` local helper | verified |
 | Config gated mixin wiring | Project-owned `JeiOptConfig`, `JeiOptFeatureFlags`; mixins check these before acting | Forge config API still to-verify by compile probe | partly verified |

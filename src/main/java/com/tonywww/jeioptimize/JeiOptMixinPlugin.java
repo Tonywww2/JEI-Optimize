@@ -26,6 +26,8 @@ import java.util.Set;
 public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
     private static final Logger LOGGER = LogManager.getLogger("jei_optimize");
     private static final String MIXIN_PACKAGE = "com.tonywww.jeioptimize.mixin.";
+    private static final String STARTER_PUBLISH_LEGACY_MIXIN = MIXIN_PACKAGE + "JeiStarterPublishLegacyMixin";
+    private static final String STARTER_PUBLISH_MODERN_MIXIN = MIXIN_PACKAGE + "JeiStarterPublishModernMixin";
 
     private static final Map<String, Requirement> REQUIREMENTS = Map.of(
         MIXIN_PACKAGE + "IngredientFilterMixin", Requirement.method(
@@ -50,6 +52,10 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
             "anvil recipe hiding",
             "getBookEnchantmentRecipes",
             "()Ljava/util/stream/Stream;"),
+        STARTER_PUBLISH_MODERN_MIXIN, Requirement.field(
+            "async JEI runtime publication",
+            "running",
+            "Z"),
         MIXIN_PACKAGE + "ElementSearchMixin", Requirement.field(
             "async search preheat",
             "allElements",
@@ -88,7 +94,9 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
         MIXIN_PACKAGE + "AnvilRecipeControlMixin",
         MIXIN_PACKAGE + "AnvilRecipeControlModernMixin",
         MIXIN_PACKAGE + "IngredientFilterMixin",
-        MIXIN_PACKAGE + "IngredientFilterModernMixin"
+        MIXIN_PACKAGE + "IngredientFilterModernMixin",
+        STARTER_PUBLISH_LEGACY_MIXIN,
+        STARTER_PUBLISH_MODERN_MIXIN
     );
 
     @Override
@@ -102,6 +110,24 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
 
     @Override
     public boolean shouldApplyMixin(String targetClassName, String mixinClassName) {
+        if (STARTER_PUBLISH_LEGACY_MIXIN.equals(mixinClassName)) {
+            ClassNode target = readTarget(targetClassName);
+            if (target == null) {
+                LOGGER.warn(
+                    "JEI Optimize could not read {}, so its async runtime publication stays off.",
+                    targetClassName);
+                return false;
+            }
+            boolean hasRunningField = Requirement.field("", "running", "Z").isPresentIn(target);
+            if (!hasRunningField) {
+                return true;
+            }
+            LOGGER.debug(
+                "JEI Optimize skipped {}: this JEI build uses the running-field publication variant.",
+                mixinClassName);
+            return false;
+        }
+
         RequiredClass requiredClass = REQUIRED_CLASSES.get(mixinClassName);
         if (requiredClass != null && readTarget(requiredClass.className()) == null) {
             LOGGER.warn(

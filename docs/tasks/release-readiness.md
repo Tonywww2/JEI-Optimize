@@ -4,9 +4,11 @@
 
 ## 1. Current Readiness Status
 
-Status: **not release-ready; smoke-test ready only**.
+Status: **implementation-ready for targeted testing; large-pack release validation pending**.
 
-Reason: the project compiles and `runClient` starts successfully with the current mixin wiring, but the full feature-equivalence matrix in [validation.md](validation.md) is not complete. The current state is suitable for local smoke testing and targeted validation, not for distribution to a modpack.
+Reason: dual-loader builds and normal startup smoke tests pass, and world-stop cancellation has been
+verified before runtime publication. The full feature-equivalence matrix and repeated 1800/1905-mod
+pack lifecycle runs are still pending.
 
 ## 2. Verified Build / Smoke Evidence
 
@@ -24,8 +26,9 @@ Observed evidence:
 | Check | Status | Evidence |
 |---|---|---|
 | Java compilation | Pass | `compileJava` exited with code 0 in latest context. |
-| Client smoke | Pass | `runClient` exited with code 0 in latest context. |
-| Forge startup | Pass | Forge 47.4.4 reached client startup in prior logs. |
+| Client smoke | Pass | Normal startup completed on Forge JEI 15.20/15.48 and NeoForge JEI 19.27. |
+| Forge startup | Pass | Forge 47.4.4 reached JEI runtime on both tested JEI generations. |
+| Stop during startup | Pass | A real `JeiStarter.stop()` cancelled the active generation and prevented runtime publication. |
 | JEI runtime present | Pass | JEI jar discovered and `jei:textures/atlas/gui.png-atlas` loaded in prior logs. |
 | Missing mixin class errors | Not observed | Latest `runClient` completed successfully after mixin JSON wiring. |
 | Invalid mixin target errors | Not observed | Latest `runClient` completed successfully after mixin JSON wiring. |
@@ -35,6 +38,8 @@ Observed evidence:
 Current [jei_optimize.mixins.json](../../src/main/resources/jei_optimize.mixins.json) wires:
 
 - `PluginCallerMixin`
+- `JeiStarterMixin`
+- `JeiStarterPublishLegacyMixin` or `JeiStarterPublishModernMixin` (selected from JEI members)
 - `registration.IngredientManagerBuilderRegistrationCountMixin`
 - `registration.RecipeCatalystRegistrationCountMixin`
 - `registration.RecipeCategoryRegistrationCountMixin`
@@ -51,24 +56,29 @@ Smoke result: configured mixins load without missing or invalid mixin errors in 
 
 ## 4. Default Feature Safety
 
-The current config contract intentionally defaults most behavior-changing features to disabled until equivalence evidence exists.
+The current config contract reflects the shipped defaults. Features with remaining manual
+equivalence gaps are called out explicitly below.
 
 | Feature area | Config key | Default | Readiness |
 |---|---|---|---|
 | Master switch | `general.enabled` | true | Safe as a master gate. |
 | Plugin timing | `diagnostics.pluginTiming` | false | Safe to enable for diagnostics; needs output validation. |
 | Registration counts | `diagnostics.registrationCounts` | false | Safe to enable for diagnostics; needs output validation. |
-| One-start cache | `syncOptimizations.cacheScope` | false | Not release-enabled until search/R/U/catalyst equivalence is checked. |
-| IngredientFilter batch init | `syncOptimizations.batchIngredientFilterInit` | false | Not release-enabled until ingredient list/search equivalence is checked. |
-| Sort key cache | `syncOptimizations.sortKeyCache` | false | Not release-enabled until order equivalence is checked. |
-| Delayed compact | `syncOptimizations.delayCompact` | false | Not release-enabled until recipe query equivalence is checked. |
+| Stall watchdog | `diagnostics.stallWatchdog` | true | Observational; does not change plugin order or exceptions. |
+| One-start cache | `syncOptimizations.cacheScope` | true | Shipped default; lifecycle-scoped. Full manual equivalence remains open. |
+| IngredientFilter batch init | `syncOptimizations.batchIngredientFilterInit` | true | Shipped default; manual search matrix remains open. |
+| Sort key cache | `syncOptimizations.sortKeyCache` | true | Shipped default; manual ordering check remains open. |
+| Delayed compact | `syncOptimizations.delayCompact` | true | Shipped default; manual R/U check remains open. |
 | Search preheat | `async.searchPreheat` | false | Not release-enabled until search matrix passes. |
-| Snapshot chunking | `async.snapshotChunking` | false | Not release-enabled until lifecycle/stale publish checks pass. |
-| Sort preheat | `async.sortPreheat` | false | Not release-enabled until sort order equivalence is checked. |
-| Recipe focus preheat | `async.recipeFocusPreheat` | false | Not release-enabled until R/U equivalence passes. |
-| Catalyst preheat | `async.catalystPreheat` | false | Not release-enabled until catalyst equivalence passes. |
+| Snapshot chunking | `async.snapshotChunking` | true | Shipped default; world-stop cancellation passes. Reload/second-world checks remain open. |
+| Sort preheat | `async.sortPreheat` | true | Shipped default; manual sort equivalence remains open. |
+| Recipe focus preheat | `async.recipeFocusPreheat` | true | Shipped default; manual R/U equivalence remains open. |
+| Catalyst preheat | `async.catalystPreheat` | true | Shipped default; manual catalyst equivalence remains open. |
+| Parallel recipe pre-resolution | `async.parallelVanillaRecipes` | false | Keep disabled; modded recipes and lazy caches may be unsafe. |
+| Serial background startup | `async.asyncStartup` | true | Cross-version smoke and deterministic stop-cancellation pass; large-pack repetition pending. |
 
-Release posture: users can keep all behavior-changing switches disabled. That state should behave close to baseline while still allowing smoke of config and mixin loading.
+Release posture: do not reintroduce parallel plugin dispatch. `asyncStartup` remains independently
+disableable for plugins that require JEI's original caller thread.
 
 ## 5. Remaining Validation Gaps
 
@@ -80,17 +90,18 @@ The following checks from [validation.md](validation.md) remain open:
 | Recipe lookup | R/U result comparison is not filled. | Yes for recipe focus features. |
 | Catalyst lookup | Catalyst click/lookup comparison is not filled. | Yes for catalyst feature. |
 | Recipe transfer | Transfer behavior comparison is not filled. | Yes for any recipe query release claim. |
-| Lifecycle | Logout/re-enter, resource reload, and stale publish checks are not filled. | Yes for async release claim. |
+| Lifecycle | Exit-during-start passes; logout/re-enter and resource reload checks remain open. | Yes for universal async release claim. |
 | Disabled path | `general.enabled=false` and each per-feature disabled path are not fully recorded. | Yes. |
 
 ## 6. Remaining Risks
 
 | Risk | Level | Current mitigation | Release decision |
 |---|---|---|---|
-| Feature-equivalence not proven | High | Features default false; validation checklist exists. | Do not release with features enabled. |
-| Async query paths may return incomplete data if misconfigured | High | Fallback paths exist by design; validation incomplete. | Keep async features off by default. |
-| Mixin target drift in future JEI versions | Medium | Target evidence recorded for JEI 15.20.0.133 only. | Scope release to exact JEI version unless reverified. |
-| Delayed compact off-thread behavior | Medium | Feature default false. | Do not enable without recipe query validation. |
+| Feature-equivalence not fully proven | High | Validation checklist and per-feature disable paths exist. | Complete manual search/R/U/catalyst checks before the next release claim. |
+| Async query paths may return incomplete data if misconfigured | High | Generation checks and fallback paths exist; validation incomplete. | Keep per-feature kill switches documented. |
+| A plugin requires the render thread | High | Plugin callbacks remain serial; `asyncStartup=false` restores JEI's original caller-thread path. | Do not claim universal compatibility before large-pack testing. |
+| Mixin target drift in future JEI versions | Medium | Runtime member selection verified on JEI 15.20, 15.48, and 19.27. | Scope release to verified ranges unless rechecked. |
+| Delayed compact behavior | Medium | Work remains on the main thread and is config-gated. | Complete recipe query validation. |
 | Reflection-based internals in mixins | Resolved | Source scan found no `java.lang.reflect`, `Class.forName`, `getDeclared*`, `setAccessible`, or reflective `invoke` usage under `src/main/java`. | No release blocker from reflection remains. |
 | Diagnostics overhead | Low | Diagnostics default false. | Safe for opt-in profiling. |
 
@@ -101,15 +112,14 @@ Safe for:
 - Local development.
 - `compileJava` checks.
 - `runClient` smoke testing.
+- Targeted Forge/NeoForge testing with the shipped defaults.
 - Opt-in diagnostics experiments.
 - Filling [validation.md](validation.md) matrices.
 
 Not yet safe for:
 
-- Distribution to a large modpack with optimization features enabled.
+- Claiming universal large-modpack compatibility for `asyncStartup` before repeated lifecycle tests.
 - Claiming JEI search/R/U/catalyst equivalence.
-- Enabling async features by default.
-- Enabling delayed compact by default.
 
 ## 8. Required Before Release
 
@@ -120,7 +130,7 @@ Not yet safe for:
 5. Compare search results for all query prefixes listed in validation matrix.
 6. Compare R/U/catalyst/recipe transfer behavior against baseline.
 7. Test logout/re-enter and resource reload while async tasks are active.
-8. Decide which features, if any, can default to true based on evidence.
+8. Repeat cold start, exit-during-start, and second-world tests in the 1800- and 1905-mod packs.
 
 ## 9. Final Gate Summary
 
@@ -129,8 +139,9 @@ Not yet safe for:
 | Build gate | Pass | `compileJava` passes in latest context. |
 | Smoke gate | Pass | `runClient` passes in latest context. |
 | Mixin load gate | Pass | No missing/invalid mixin errors observed in latest context. |
+| Stop-cancellation gate | Pass | Active startup was interrupted and acknowledged cancellation before runtime publication. |
 | Equivalence gate | Not complete | Validation matrices are still open. |
-| Release gate | Blocked | Build/smoke/reflection gates pass; blocked only on manual equivalence matrix execution for search, R/U, catalyst, transfer, logout/re-enter, reload, and disabled paths. |
+| Release gate | Blocked | Build/smoke/stop gates pass; blocked on manual equivalence, second-world/reload, disabled-path, and large-pack repetition. |
 
 ## Revision Log
 

@@ -4,6 +4,38 @@ All notable changes to Just Enough Threads are documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.8.0
+
+A responsiveness and correctness release. JEI startup can now run serially on a cancellable
+background thread without making third-party plugin callbacks concurrent, and stale startup work
+can no longer publish after leaving a world.
+
+### Added
+
+- **Responsive serial JEI startup.** JEI can build on one dedicated background thread while the
+  render thread remains responsive. Plugin callbacks retain JEI's original order and are never
+  dispatched concurrently. Runtime publication happens atomically on the client thread.
+- **Immediate startup cancellation on world exit.** Each JEI start now has a generation token and
+  a single-flight task. Leaving the world interrupts the active build, cancels derived work, and
+  prevents an obsolete runtime from being published.
+- **An in-game background loading indicator.** While JEI is starting asynchronously, container
+  screens show a short status message in JEI's usual area to the right of the inventory. It
+  disappears automatically when startup finishes or is cancelled.
+
+### Fixed
+
+- **Sophisticated Storage shulker box recipes now work with JEI 15.48.** Its special recipe wrapper
+  did not have a JEI category extension, causing `minecraft:shulker_box_from_vanilla_shulker_box`
+  and related recipes to be rejected as broken. Just Enough Threads now safely reuses the composed
+  vanilla recipe's extension. Verified with JEI 15.48.0.179, Sophisticated Storage 1.4.79.2056,
+  and Sophisticated Core 1.3.74.2216.
+- Removed PR #5's parallel plugin dispatch, main-thread retry, and incompatibility store. Parallel
+  callbacks wrote JEI's shared registration containers concurrently, which could corrupt recipe
+  maps, duplicate catalyst registrations, drop recipes, or hang startup.
+- Removed the misleading parallel phase-barrier timer. JEI's normal serial phase timer and the
+  optional per-plugin diagnostics now report the work that actually ran.
+- Restored `parallelVanillaRecipes = false` and `stallWatchdog = true` as shipped defaults.
+
 ## 0.7.1
 
 A diagnostics release. When JEI startup drags on, the log names JEI and whichever mod registered the

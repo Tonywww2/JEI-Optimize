@@ -190,7 +190,7 @@ Current status: matrices are intentionally not auto-filled by compile/run smoke.
 
 | Scenario | Expected | Status |
 |---|---|---|
-| Exit world while async tasks are building | Tasks are cancelled or discarded by generation check. | ☐ |
+| Exit world while async tasks are building | Tasks are cancelled or discarded by generation check. | ☑ Forge 1.20.1 / JEI 15.48: real `JeiStarter.stop()` cancelled startup 342 ms after `Starting JEI...`; startup acknowledged cancellation 11 ms later; no `Starting JEI took` or runtime publication. Evidence: `build/benchmarks/jei-compat/pr5-revised-cancel-probe.latest.log`. |
 | Enter a second world after first exit | No old search/recipe results appear. | ☐ |
 | Resource reload during async build | Old generation results are not published. | ☐ |
 | `general.enabled=false` then runClient | All feature mixins no-op or fall back to JEI baseline. | ☐ |
@@ -222,3 +222,4 @@ When a validation run resolves a to-verify item:
 - 2026-07-10 — PA-3 initial validation scaffold created by agent3.
 - 2026-07-10 — PH-1 updated validation with current compileJava/runClient evidence, generated config confirmation, implementation snapshot, and remaining manual equivalence checks.
 - 2026-07-10 — Final acceptance update: reflection scan is clean; compileJava and runClient pass after direct JEI compile-only dependency refactor.
+- 2026-08-07 — Verified single-flight startup cancellation and pre-publication abort on world stop; normal startup smoke passed on JEI 15.20, JEI 15.48, and NeoForge JEI 19.27.

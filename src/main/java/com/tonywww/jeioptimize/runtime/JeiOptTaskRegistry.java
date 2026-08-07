@@ -40,7 +40,7 @@ public final class JeiOptTaskRegistry {
         CompletableFuture<T> task = JeiOptExecutors.supplyAsync(worker);
         CompletableFuture<?> previous = TASKS.put(taskId, task);
         if (previous != null) {
-            previous.cancel(false);
+            previous.cancel(true);
             JeiOptRuntimeState.untrack(previous);
         }
         JeiOptRuntimeState.track(task);
@@ -52,7 +52,7 @@ public final class JeiOptTaskRegistry {
         Objects.requireNonNull(taskId, "taskId");
         CompletableFuture<?> task = TASKS.remove(taskId);
         if (task != null) {
-            task.cancel(false);
+            task.cancel(true);
             JeiOptRuntimeState.untrack(task);
         }
     }

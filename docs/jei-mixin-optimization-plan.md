@@ -7,7 +7,10 @@
 3. 只通过 Mixin、辅助类、配置和单次启动内缓存层改 JEI 本体行为。
 4. 不默认跳过插件、不默认关闭搜索功能、不默认限制 recipe 数量。
 
-核心原则：不要并行执行其他插件代码。应当先在 Minecraft client thread 上串行调用 JEI Plugin，得到完整结果或稳定快照；然后只把 JEI 自己的派生计算放到后台线程，例如搜索索引、排序索引、recipe UID map、短生命周期缓存填充。
+核心原则：不要并行执行其他插件代码。常规路径在 Minecraft client thread 上串行调用
+JEI Plugin；经 CR-1 批准的 `asyncStartup` 可以把完整启动序列移到一条 single-flight 专用
+线程，但插件调用顺序不变、不会进入 worker pool，最终 runtime 必须在客户端线程按 generation
+校验后原子发布。其他后台线程仍只处理稳定快照和 JEI 自己的派生计算。
 
 本文不设计本地跨世界缓存或持久化磁盘缓存。所有缓存默认只在一次 `JeiStarter.start()` 到 `JeiStarter.stop()` 的生命周期内有效，退出世界、切换服务器、资源/数据包 reload 后必须丢弃。
 
@@ -33,7 +36,8 @@
 这些方案虽然可能更快，但不满足“不破坏功能”的约束，不能作为默认优化：
 
 1. 并行调用所有 `IModPlugin` 回调。
-2. 在后台线程调用其他模组的 `registerRecipes`、`registerIngredients`、`registerRuntime`。
+2. 把不同插件的 `registerRecipes`、`registerIngredients`、`registerRuntime` 分发到 worker
+    thread 并发执行，或并发写共享 registration 对象。
 3. 在后台线程直接调用 `IRecipeCategory.setRecipe`。
 4. 在后台线程直接调用 ingredient renderer tooltip。
 5. 跳过某个插件。
@@ -57,6 +61,10 @@ flowchart TD
   D --> E[Client thread: 校验 generation]
   E --> F[原子发布新索引]
 ```
+
+`asyncStartup` 开启时，图中的 A/B 整体位于一条专用启动线程；B 到 C/D 的派生 worker
+仍遵守快照约束。E/F 发布始终回到 client thread。`JeiStarter.stop()` 会先取消启动 token，
+再中断线程并清理任务，旧 generation 不得发布。
 
 后台线程只能处理以下对象：
 

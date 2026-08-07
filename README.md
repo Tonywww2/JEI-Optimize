@@ -6,6 +6,13 @@ In large modpacks, JEI spends several seconds building its ingredient search ind
 
 ## What it does
 
+- **Responsive, serial JEI startup** — `asyncStartup` (on by default)
+
+  JEI startup runs on one dedicated background thread, so the render thread can keep updating while
+  recipes and the runtime are built. Plugin callbacks keep JEI's original order and are never run
+  concurrently. The finished runtime is published atomically on the client thread. Leaving the
+  world cancels the active generation, interrupts its build, and prevents stale publication.
+
 - **Off-thread ingredient filter build** — `asyncIngredientFilter` (on by default)
 
   JEI's "Building ingredient filter" step (its search index over every item and fluid) normally runs on the main thread and blocks loading for several seconds in large packs. This mod builds it on worker threads *after* you enter the world, then atomically swaps the finished index into JEI. The result is identical to JEI's own, and if the off-thread build fails for any reason it falls back to JEI's synchronous build.
@@ -49,11 +56,13 @@ Config file: `config/jei_optimize-client.toml`
 | Option | Section | Default | Description |
 |--------|---------|---------|-------------|
 | `enabled` | general | `true` | Master switch. When `false`, the mod does nothing and JEI behaves normally. |
+| `asyncStartup` | async | `true` | Run JEI startup serially on a dedicated background thread; cancel it on world exit. |
 | `asyncIngredientFilter` | async | `true` | Build the ingredient search filter off-thread after world entry. |
 | `parallelVanillaRecipes` | async | `false` | Experimentally pre-resolve recipe ingredients across worker threads. |
-| `workerThreads` | async | `2` | Worker-thread count for off-thread tasks (1-8). |
+| `workerThreads` | async | `4` | Worker-thread count for derived off-thread tasks (1-8). |
 | `pluginTiming` | diagnostics | `false` | Log per-plugin, per-phase JEI startup timings (for measurement). |
 | `registrationCounts` | diagnostics | `false` | Log per-plugin recipe and ingredient registration counts. |
+| `stallWatchdog` | diagnostics | `true` | Sample and report code responsible for a JEI phase that exceeds the configured threshold. |
 | `disableAnvilRepairRecipes` | jeiContent | `true` | Hide JEI's generated anvil repair recipes (also skips generating them at startup). |
 | `disableAnvilEnchantRecipes` | jeiContent | `true` | Hide JEI's generated anvil enchanting recipes for combining books (also skips generating them). |
 
@@ -111,7 +120,8 @@ The matching `AnvilRecipeControl` variant injects at the head of JEI's `AnvilRec
 
 ### Shared infrastructure
 
-- **Worker pool** (`JeiOptExecutors`) — a small fixed pool of daemon threads (`workerThreads`, default 2) for off-thread builds, plus a helper for running work back on the main thread.
+- **Startup executor** (`JeiOptExecutors`) — a single-flight daemon executor for serial JEI startup. Each start has a generation token; stop cancels and interrupts it, and runtime publication is generation-checked on the client thread.
+- **Worker pool** (`JeiOptExecutors`) — a small fixed pool of daemon threads (`workerThreads`, default 4) for derived off-thread builds, plus a helper for running work back on the main thread.
 - **Client-tick work queue** (`JeiOptClientTickQueue` + `ClientTickHookMixin`) — a queue drained a little each client tick under a time budget, used to run main-thread finalize work (such as the index swap) a piece at a time instead of blocking a single frame.
 - **Mixin registration** — all hooks are listed in `jei_optimize.mixins.json`. On Forge they are registered through Architectury Loom's `forge.mixinConfig`; on NeoForge through the `[[mixins]]` entry in `neoforge.mods.toml`. Either way this is what actually loads them in both the development and production environments.
 

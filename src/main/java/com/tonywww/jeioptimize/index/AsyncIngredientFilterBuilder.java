@@ -63,7 +63,7 @@ public final class AsyncIngredientFilterBuilder {
         });
         CompletableFuture<IElementSearch> previous = IN_FLIGHT.getAndSet(future);
         if (previous != null) {
-            previous.cancel(false);
+            previous.cancel(true);
         }
         return future;
     }
@@ -72,7 +72,7 @@ public final class AsyncIngredientFilterBuilder {
     public static void cancelInFlight() {
         CompletableFuture<IElementSearch> future = IN_FLIGHT.getAndSet(null);
         if (future != null) {
-            future.cancel(false);
+            future.cancel(true);
         }
     }
 

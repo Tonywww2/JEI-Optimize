@@ -4,14 +4,15 @@ import com.tonywww.jeioptimize.JeiOptimize;
 import net.minecraft.client.Minecraft;
 
 import java.util.Objects;
-import java.util.Queue;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
-import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
@@ -39,10 +40,10 @@ public final class JeiOptExecutors {
     private static ExecutorService workerExecutor;
     private static int workerThreadCount = DEFAULT_WORKER_THREADS;
 
-    private static final ThreadLocal<Boolean> JEI_START_OFF_THREAD =
-        ThreadLocal.withInitial(() -> Boolean.FALSE);
-
-    private static final Queue<CompletableFuture<?>> PENDING_PLUGIN_CALLS = new ConcurrentLinkedQueue<>();
+    private static final Object JEI_START_LOCK = new Object();
+    private static final ThreadLocal<JeiStartTask> CURRENT_JEI_START = new ThreadLocal<>();
+    private static ExecutorService jeiStartExecutor;
+    private static JeiStartTask latestJeiStart;
 
     private JeiOptExecutors() {
     }
@@ -55,64 +56,109 @@ public final class JeiOptExecutors {
         MAIN_THREAD.execute(command);
     }
 
-    /**
-     * Runs JEI's whole startup on a dedicated background thread so the render thread never blocks on
-     * it. Plugin calls made while this flag is set can detect the off-thread startup via
-     * {@link #isJeiStartOffThread()} and fall back to the main thread when needed.
-     */
-    public static void runJeiStartAsync(Runnable runnable) {
+    public static void runJeiStartAsync(long generation, Runnable runnable) {
         Objects.requireNonNull(runnable, "runnable");
-        Thread thread = new Thread(() -> {
-            JEI_START_OFF_THREAD.set(Boolean.TRUE);
+        JeiStartTask task = new JeiStartTask(generation);
+        FutureTask<Void> future = new FutureTask<>(() -> {
+            CURRENT_JEI_START.set(task);
             try {
+                checkJeiStartActive();
                 runnable.run();
+                checkJeiStartActive();
             } finally {
-                JEI_START_OFF_THREAD.remove();
+                CURRENT_JEI_START.remove();
+                synchronized (JEI_START_LOCK) {
+                    if (latestJeiStart == task) {
+                        latestJeiStart = null;
+                    }
+                }
             }
-        }, JeiOptimize.MOD_ID + "-start");
-        thread.setDaemon(true);
-        thread.setUncaughtExceptionHandler((t, e) ->
-            LOGGER.error("Uncaught exception on {}", t.getName(), e));
-        thread.start();
+            return null;
+        });
+        task.attach(future);
+
+        synchronized (JEI_START_LOCK) {
+            if (latestJeiStart != null) {
+                latestJeiStart.cancel();
+            }
+            latestJeiStart = task;
+            jeiStartExecutorLocked().execute(future);
+        }
     }
 
-    public static boolean isJeiStartOffThread() {
-        return Boolean.TRUE.equals(JEI_START_OFF_THREAD.get());
+    public static boolean cancelJeiStart() {
+        synchronized (JEI_START_LOCK) {
+            if (latestJeiStart == null) {
+                return false;
+            }
+            latestJeiStart.cancel();
+            latestJeiStart = null;
+            return true;
+        }
     }
 
-    /**
-     * Runs a command on the render thread and blocks the calling thread until it completes, so a
-     * phase that needs main-thread semantics can run from a background startup thread. Safe on the
-     * render thread itself, where it runs inline.
-     */
-    public static void runOnMainThreadAndWait(Runnable runnable) {
-        Objects.requireNonNull(runnable, "runnable");
-        Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.isSameThread()) {
-            runnable.run();
+    public static boolean isJeiStartRunning() {
+        synchronized (JEI_START_LOCK) {
+            return latestJeiStart != null;
+        }
+    }
+
+    public static boolean isJeiStartThread() {
+        return CURRENT_JEI_START.get() != null;
+    }
+
+    public static void checkJeiStartActive() {
+        JeiStartTask task = CURRENT_JEI_START.get();
+        if (task != null) {
+            ensureJeiStartActive(task);
+        }
+    }
+
+    public static boolean isJeiStartCancellation(Throwable throwable) {
+        return throwable instanceof JeiStartCancelled;
+    }
+
+    public static void publishJeiRuntimeOnMainThreadAndWait(Runnable publisher) {
+        Objects.requireNonNull(publisher, "publisher");
+        JeiStartTask task = CURRENT_JEI_START.get();
+        if (task == null) {
+            publisher.run();
             return;
         }
-        CompletableFuture<Void> future = new CompletableFuture<>();
-        minecraft.execute(() -> {
-            try {
-                runnable.run();
-                future.complete(null);
-            } catch (Throwable t) {
-                future.completeExceptionally(t);
-            }
-        });
-        try {
-            future.join();
-        } catch (CompletionException e) {
-            Throwable cause = e.getCause();
-            if (cause instanceof RuntimeException) {
-                throw (RuntimeException) cause;
-            }
-            if (cause instanceof Error) {
-                throw (Error) cause;
-            }
-            throw e;
+        ensureJeiStartActive(task);
+
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.isSameThread()) {
+            ensureJeiStartActive(task);
+            publisher.run();
+            return;
         }
+
+        FutureTask<Void> publication = new FutureTask<>(() -> {
+            ensureJeiStartActive(task);
+            publisher.run();
+            return null;
+        });
+        minecraft.execute(publication);
+        try {
+            publication.get();
+        } catch (InterruptedException e) {
+            publication.cancel(false);
+            Thread.currentThread().interrupt();
+            throw new JeiStartCancelled();
+        } catch (CancellationException e) {
+            throw new JeiStartCancelled();
+        } catch (ExecutionException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof RuntimeException runtimeException) {
+                throw runtimeException;
+            }
+            if (cause instanceof Error error) {
+                throw error;
+            }
+            throw new RuntimeException(cause != null ? cause : e);
+        }
+        ensureJeiStartActive(task);
     }
 
     public static ExecutorService workerExecutor() {
@@ -145,42 +191,6 @@ public final class JeiOptExecutors {
         return CompletableFuture.runAsync(runnable, workerExecutor());
     }
 
-    public static CompletableFuture<Void> runPluginCallAsync(Runnable runnable) {
-        Objects.requireNonNull(runnable, "runnable");
-        CompletableFuture<Void> future = CompletableFuture.runAsync(runnable, workerExecutor());
-        PENDING_PLUGIN_CALLS.add(future);
-        return future;
-    }
-
-    public static void awaitPendingPluginCalls() {
-        CompletableFuture<?>[] pending = PENDING_PLUGIN_CALLS.toArray(new CompletableFuture<?>[0]);
-        PENDING_PLUGIN_CALLS.clear();
-        if (pending.length == 0) {
-            return;
-        }
-        Throwable failure = null;
-        for (CompletableFuture<?> future : pending) {
-            try {
-                future.join();
-            } catch (CompletionException e) {
-                Throwable cause = e.getCause();
-                if (failure == null) {
-                    failure = cause != null ? cause : e;
-                }
-                LOGGER.error("Failed to call JEI plugin asynchronously", cause != null ? cause : e);
-            }
-        }
-        if (failure instanceof RuntimeException) {
-            throw (RuntimeException) failure;
-        }
-        if (failure instanceof Error) {
-            throw (Error) failure;
-        }
-        if (failure != null) {
-            throw new RuntimeException(failure);
-        }
-    }
-
     public static void shutdownWorkerExecutor() {
         synchronized (LOCK) {
             shutdownWorkerExecutorLocked();
@@ -191,6 +201,27 @@ public final class JeiOptExecutors {
         if (workerExecutor != null) {
             workerExecutor.shutdownNow();
             workerExecutor = null;
+        }
+    }
+
+    private static ExecutorService jeiStartExecutorLocked() {
+        if (jeiStartExecutor == null || jeiStartExecutor.isShutdown()) {
+            jeiStartExecutor = Executors.newSingleThreadExecutor(runnable -> {
+                Thread thread = new Thread(runnable, JeiOptimize.MOD_ID + "-start");
+                thread.setDaemon(true);
+                thread.setUncaughtExceptionHandler((t, e) ->
+                    LOGGER.error("Uncaught exception on {}", t.getName(), e));
+                return thread;
+            });
+        }
+        return jeiStartExecutor;
+    }
+
+    private static void ensureJeiStartActive(JeiStartTask task) {
+        if (task.cancelled.get()
+            || !JeiOptRuntimeState.isCurrent(task.generation)
+            || (CURRENT_JEI_START.get() == task && Thread.currentThread().isInterrupted())) {
+            throw new JeiStartCancelled();
         }
     }
 
@@ -208,5 +239,32 @@ public final class JeiOptExecutors {
 
     private static int clamp(int value, int min, int max) {
         return Math.max(min, Math.min(max, value));
+    }
+
+    private static final class JeiStartTask {
+        private final long generation;
+        private final AtomicBoolean cancelled = new AtomicBoolean();
+        private FutureTask<Void> future;
+
+        private JeiStartTask(long generation) {
+            this.generation = generation;
+        }
+
+        private void attach(FutureTask<Void> future) {
+            this.future = future;
+        }
+
+        private void cancel() {
+            cancelled.set(true);
+            if (future != null) {
+                future.cancel(true);
+            }
+        }
+    }
+
+    private static final class JeiStartCancelled extends Error {
+        private JeiStartCancelled() {
+            super("JEI startup was cancelled", null, false, false);
+        }
     }
 }

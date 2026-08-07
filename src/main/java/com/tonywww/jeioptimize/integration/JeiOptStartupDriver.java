@@ -11,6 +11,7 @@ import com.tonywww.jeioptimize.runtime.JeiOptExecutors;
 import com.tonywww.jeioptimize.runtime.JeiOptFilterBootstrap;
 import com.tonywww.jeioptimize.runtime.JeiOptRuntimeState;
 import com.tonywww.jeioptimize.runtime.JeiOptStartupContext;
+import com.tonywww.jeioptimize.runtime.JeiOptTaskRegistry;
 import mezz.jei.api.helpers.IColorHelper;
 import mezz.jei.api.runtime.IIngredientManager;
 import mezz.jei.common.config.IIngredientFilterConfig;
@@ -35,7 +36,6 @@ public final class JeiOptStartupDriver {
         try {
             JeiOptDiagnostics.reportRegistrationCounts();
             JeiOptExecutors.configureWorkerThreads(JeiOptFeatureFlags.workerThreads());
-            JeiOptRuntimeState.beginStart();
             driveSearchPreheat();
         } catch (RuntimeException | LinkageError e) {
             JeiOptimize.LOGGER.warn("JEI Optimize preheat wiring failed; JEI baseline remains active", e);
@@ -78,21 +78,41 @@ public final class JeiOptStartupDriver {
     }
 
     public static void onRuntimeUnavailable() {
+        onJeiStopping();
+    }
+
+    public static void onJeiStopping() {
+        boolean cancelledStartup = JeiOptExecutors.cancelJeiStart();
         try {
             JeiOptRuntimeState.invalidate();
             JeiOptRuntimeState.markRuntimeUnloaded();
-            // Work queued for the runtime that is going away must never touch the next one.
-            AsyncIngredientFilterBuilder.cancelInFlight();
-            JeiOptFilterBootstrap.clear();
-            JeiOptClientTickQueue.clear();
-            Object elementSearch = JeiOptStartupContext.elementSearch();
-            if (elementSearch != null) {
-                AsyncSearchIndexRegistry.detach(elementSearch);
+            clearRuntimeWork();
+            if (cancelledStartup) {
+                JeiOptimize.LOGGER.info("JEI Optimize cancelled the in-progress JEI startup because its world stopped.");
             }
         } catch (RuntimeException | LinkageError e) {
             JeiOptimize.LOGGER.warn("JEI Optimize failed to tear down preheat state", e);
-        } finally {
-            JeiOptStartupContext.clear();
         }
+    }
+
+    public static void onCancelledStartup() {
+        try {
+            clearRuntimeWork();
+        } catch (RuntimeException | LinkageError e) {
+            JeiOptimize.LOGGER.warn("JEI Optimize failed to clean up a cancelled JEI startup", e);
+        }
+    }
+
+    private static void clearRuntimeWork() {
+        JeiOptTaskRegistry.cancelAll();
+        AsyncIngredientFilterBuilder.cancelInFlight();
+        JeiOptFilterBootstrap.clear();
+        JeiOptClientTickQueue.clear();
+        Object elementSearch = JeiOptStartupContext.elementSearch();
+        if (elementSearch != null) {
+            AsyncSearchIndexRegistry.detach(elementSearch);
+        }
+        JeiOptStartupContext.clear();
+        JeiOptExecutors.shutdownWorkerExecutor();
     }
 }
