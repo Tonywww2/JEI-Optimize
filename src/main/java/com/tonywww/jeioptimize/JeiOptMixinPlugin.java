@@ -72,8 +72,7 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
                 + "Lmezz/jei/gui/search/IElementSearch;"),
         MIXIN_PACKAGE + "ItemStackListFactoryMixin", Requirement.method(
             "creative tab skipping",
-            "create",
-            "(Lmezz/jei/common/util/StackHelper;)Ljava/util/List;")
+            "create")
     );
 
     private final Map<String, ClassNode> targetCache = new HashMap<>();
@@ -186,6 +185,11 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
             return new Requirement(feature, name, descriptor, false);
         }
 
+        /** A null descriptor matches on name alone, for methods whose shape differs across JEI versions. */
+        static Requirement method(String feature, String name) {
+            return new Requirement(feature, name, null, false);
+        }
+
         /** A null descriptor matches on name alone, for members whose type is remapped at runtime. */
         static Requirement field(String feature, String name, String descriptor) {
             return new Requirement(feature, name, descriptor, true);
@@ -201,7 +205,7 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
                 return false;
             }
             for (MethodNode method : target.methods) {
-                if (memberName.equals(method.name) && descriptor.equals(method.desc)) {
+                if (memberName.equals(method.name) && (descriptor == null || descriptor.equals(method.desc))) {
                     return true;
                 }
             }

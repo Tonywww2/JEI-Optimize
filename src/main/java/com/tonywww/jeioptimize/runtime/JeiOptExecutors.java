@@ -39,6 +39,9 @@ public final class JeiOptExecutors {
     private static ExecutorService workerExecutor;
     private static int workerThreadCount = DEFAULT_WORKER_THREADS;
 
+    private static final ThreadLocal<Boolean> JEI_START_OFF_THREAD =
+        ThreadLocal.withInitial(() -> Boolean.FALSE);
+
     private static final Queue<CompletableFuture<?>> PENDING_PLUGIN_CALLS = new ConcurrentLinkedQueue<>();
 
     private JeiOptExecutors() {
@@ -50,6 +53,66 @@ public final class JeiOptExecutors {
 
     public static void executeOnMainThread(Runnable command) {
         MAIN_THREAD.execute(command);
+    }
+
+    /**
+     * Runs JEI's whole startup on a dedicated background thread so the render thread never blocks on
+     * it. Plugin calls made while this flag is set can detect the off-thread startup via
+     * {@link #isJeiStartOffThread()} and fall back to the main thread when needed.
+     */
+    public static void runJeiStartAsync(Runnable runnable) {
+        Objects.requireNonNull(runnable, "runnable");
+        Thread thread = new Thread(() -> {
+            JEI_START_OFF_THREAD.set(Boolean.TRUE);
+            try {
+                runnable.run();
+            } finally {
+                JEI_START_OFF_THREAD.remove();
+            }
+        }, JeiOptimize.MOD_ID + "-start");
+        thread.setDaemon(true);
+        thread.setUncaughtExceptionHandler((t, e) ->
+            LOGGER.error("Uncaught exception on {}", t.getName(), e));
+        thread.start();
+    }
+
+    public static boolean isJeiStartOffThread() {
+        return Boolean.TRUE.equals(JEI_START_OFF_THREAD.get());
+    }
+
+    /**
+     * Runs a command on the render thread and blocks the calling thread until it completes, so a
+     * phase that needs main-thread semantics can run from a background startup thread. Safe on the
+     * render thread itself, where it runs inline.
+     */
+    public static void runOnMainThreadAndWait(Runnable runnable) {
+        Objects.requireNonNull(runnable, "runnable");
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.isSameThread()) {
+            runnable.run();
+            return;
+        }
+        CompletableFuture<Void> future = new CompletableFuture<>();
+        minecraft.execute(() -> {
+            try {
+                runnable.run();
+                future.complete(null);
+            } catch (Throwable t) {
+                future.completeExceptionally(t);
+            }
+        });
+        try {
+            future.join();
+        } catch (CompletionException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof RuntimeException) {
+                throw (RuntimeException) cause;
+            }
+            if (cause instanceof Error) {
+                throw (Error) cause;
+            }
+            throw e;
+        }
     }
 
     public static ExecutorService workerExecutor() {
