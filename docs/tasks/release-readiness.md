@@ -6,8 +6,8 @@
 
 Status: **implementation-ready for targeted testing; large-pack release validation pending**.
 
-Reason: dual-loader builds and normal startup smoke tests pass, and world-stop cancellation has been
-verified before runtime publication. The full feature-equivalence matrix and repeated 1800/1905-mod
+Reason: dual-loader builds and normal startup smoke tests pass, and client teardown cancellation has
+been verified before runtime publication on both loaders. The full feature-equivalence matrix and repeated 1800/1905-mod
 pack lifecycle runs are still pending.
 
 ## 2. Verified Build / Smoke Evidence
@@ -28,7 +28,7 @@ Observed evidence:
 | Java compilation | Pass | `compileJava` exited with code 0 in latest context. |
 | Client smoke | Pass | Normal startup completed on Forge JEI 15.20/15.48 and NeoForge JEI 19.27. |
 | Forge startup | Pass | Forge 47.4.4 reached JEI runtime on both tested JEI generations. |
-| Stop during startup | Pass | A real `JeiStarter.stop()` cancelled the active generation and prevented runtime publication. |
+| Disconnect during startup | Pass | Real Forge `clearLevel` and NeoForge `disconnect` paths cancelled the active generation and prevented runtime publication. |
 | JEI runtime present | Pass | JEI jar discovered and `jei:textures/atlas/gui.png-atlas` loaded in prior logs. |
 | Missing mixin class errors | Not observed | Latest `runClient` completed successfully after mixin JSON wiring. |
 | Invalid mixin target errors | Not observed | Latest `runClient` completed successfully after mixin JSON wiring. |
@@ -139,7 +139,7 @@ Not yet safe for:
 | Build gate | Pass | `compileJava` passes in latest context. |
 | Smoke gate | Pass | `runClient` passes in latest context. |
 | Mixin load gate | Pass | No missing/invalid mixin errors observed in latest context. |
-| Stop-cancellation gate | Pass | Active startup was interrupted and acknowledged cancellation before runtime publication. |
+| Disconnect-cancellation gate | Pass | Active startup was interrupted through both loaders' client teardown paths and acknowledged cancellation before runtime publication. |
 | Equivalence gate | Not complete | Validation matrices are still open. |
 | Release gate | Blocked | Build/smoke/stop gates pass; blocked on manual equivalence, second-world/reload, disabled-path, and large-pack repetition. |
 

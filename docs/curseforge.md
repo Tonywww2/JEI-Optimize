@@ -36,7 +36,7 @@ The biggest single cost — the ingredient index — no longer blocks loading; i
 Config file: `config/jei_optimize-client.toml`. Every optimization can be toggled independently.
 
 *   `enabled` — master switch for the whole mod.
-*   `asyncStartup` — build JEI serially on a dedicated background thread, then run runtime callbacks and publication on the client thread; world exit cancels stale work immediately.
+*   `asyncStartup` — build JEI serially on a dedicated background thread, then run runtime callbacks and publication on the client thread; world exit, timeout, and server shutdown cancel stale work immediately.
 *   `asyncIngredientFilter` — build the ingredient search index off-thread after world entry.
 *   `parallelVanillaRecipes` — experimental recipe ingredient pre-resolution; disabled by default.
 *   `disableAnvilRepairRecipes` / `disableAnvilEnchantRecipes` — hide generated anvil recipes; enabled by default.
@@ -70,7 +70,7 @@ _你会看到:_ JEI 物品列表在你进入世界后稍等片刻才出现,而�
 
 **保持界面响应的串行 JEI 启动**
 
-`asyncStartup` 会在一条专用后台线程上按 JEI 原顺序构建配方与 runtime。插件回调不会并发执行;最终的 `onRuntimeAvailable` 回调和 runtime 发布会返回客户端线程,以兼容 JEI 仅允许在主线程调用的运行时 API。退出世界时,当前 generation 会立即失效,启动线程和派生任务会被取消,旧 runtime 不会发布到下一个世界。
+`asyncStartup` 会在一条专用后台线程上按 JEI 原顺序构建配方与 runtime。插件回调不会并发执行;最终的 `onRuntimeAvailable` 回调和 runtime 发布会返回客户端线程,以兼容 JEI 仅允许在主线程调用的运行时 API。退出世界、连接超时或服务器关闭时,当前 generation 会立即失效,启动线程和派生任务会被取消,旧 runtime 不会发布到下一个世界。
 
 **实验性并行预解析配方材料**
 
@@ -98,7 +98,7 @@ JEI 自动生成的材料修复与附魔书组合配方默认隐藏。在超大�
 配置文件:`config/jei_optimize-client.toml`。每一项优化都可以单独开关。
 
 *   `enabled` — 整个 mod 的总开关。
-*   `asyncStartup` — 在专用后台线程上串行启动 JEI;退出世界时立即取消,默认开启。
+*   `asyncStartup` — 在专用后台线程上串行启动 JEI;退出世界、连接超时或服务器关闭时立即取消,默认开启。
 *   `asyncIngredientFilter` — 进入世界后离主线程构建物品搜索索引。
 *   `parallelVanillaRecipes` — 实验性并行预解析配方材料;默认关闭。
 *   `disableAnvilRepairRecipes` / `disableAnvilEnchantRecipes` — 隐藏自动生成的铁砧配方;默认开启。

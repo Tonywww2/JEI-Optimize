@@ -12,7 +12,8 @@ In large modpacks, JEI spends several seconds building its ingredient search ind
   recipes and the runtime are built. Plugin callbacks keep JEI's original order and are never run
   concurrently. Final `onRuntimeAvailable` callbacks return to the client thread before the runtime
   is published there, so plugins can safely use JEI's main-thread-only runtime APIs. Leaving the
-  world cancels the active generation, interrupts its build, and prevents stale publication.
+  world, timing out, or losing the server cancels the active generation, interrupts its build, and
+  prevents stale publication.
 
 - **Off-thread ingredient filter build** — `asyncIngredientFilter` (on by default)
 
@@ -57,7 +58,7 @@ Config file: `config/jei_optimize-client.toml`
 | Option | Section | Default | Description |
 |--------|---------|---------|-------------|
 | `enabled` | general | `true` | Master switch. When `false`, the mod does nothing and JEI behaves normally. |
-| `asyncStartup` | async | `true` | Run JEI startup serially on a dedicated background thread; cancel it on world exit. |
+| `asyncStartup` | async | `true` | Run JEI startup serially on a dedicated background thread; cancel it on world exit, timeout, or server shutdown. |
 | `asyncIngredientFilter` | async | `true` | Build the ingredient search filter off-thread after world entry. |
 | `parallelVanillaRecipes` | async | `false` | Experimentally pre-resolve recipe ingredients across worker threads. |
 | `workerThreads` | async | `4` | Worker-thread count for derived off-thread tasks (1-8). |

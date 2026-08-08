@@ -88,7 +88,9 @@ public final class JeiOptStartupDriver {
             JeiOptRuntimeState.markRuntimeUnloaded();
             clearRuntimeWork();
             if (cancelledStartup) {
-                JeiOptimize.LOGGER.info("JEI Optimize cancelled the in-progress JEI startup because its world stopped.");
+                JeiOptimize.LOGGER.info(
+                    "JEI Optimize cancelled the in-progress JEI startup because the client disconnected or its world stopped."
+                );
             }
         } catch (RuntimeException | LinkageError e) {
             JeiOptimize.LOGGER.warn("JEI Optimize failed to tear down preheat state", e);

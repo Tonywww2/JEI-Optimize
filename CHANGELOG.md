@@ -4,6 +4,20 @@ All notable changes to Just Enough Threads are documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.8.1
+
+A lifecycle correctness patch. Disconnecting while JEI is still building now stops its background
+startup immediately instead of allowing it to continue after the world has closed.
+
+### Fixed
+
+- **JEI startup is cancelled when the client loses its server connection.** Network timeouts,
+  server shutdowns, manual disconnects, and server transfers can bypass or delay JEI's own
+  `JeiStarter.stop()` callback. Just Enough Threads now also cancels at Minecraft's client teardown
+  boundary, invalidates the active generation, clears derived work, and prevents stale runtime
+  publication. Verified through the real Forge 1.20.1 and NeoForge 1.21.1 disconnect paths while
+  JEI was actively starting.
+
 ## 0.8.0
 
 A responsiveness and correctness release. JEI startup can now run serially on a cancellable

@@ -186,7 +186,8 @@ public final class JeiOptConfig {
                 "appear when startup finishes instead of freezing the loading screen.",
                 "Plugin callbacks keep JEI's original order and are never run concurrently. Runtime-available",
                 "callbacks and publication run on the client thread. Disable this option if an earlier plugin",
-                "registration callback requires the render thread. Leaving a world cancels an in-progress build before",
+                "registration callback requires the render thread. Leaving a world, timing out, or losing the server",
+                "cancels an in-progress build before",
                 "its runtime can be published. Enabled by default.")
             .define("asyncStartup", true);
         builder.pop();

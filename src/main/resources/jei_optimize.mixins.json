@@ -33,6 +33,7 @@
     "RecipeMapCatalystMixin"
   ],
   "client": [
+    "ClientDisconnectHookMixin",
     "ClientTickHookMixin",
     "JeiLoadingOverlayMixin"
   ],

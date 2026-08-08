@@ -190,7 +190,7 @@ Current status: matrices are intentionally not auto-filled by compile/run smoke.
 
 | Scenario | Expected | Status |
 |---|---|---|
-| Exit world while async tasks are building | Tasks are cancelled or discarded by generation check. | ☑ Forge 1.20.1 / JEI 15.48: real `JeiStarter.stop()` cancelled startup 342 ms after `Starting JEI...`; startup acknowledged cancellation 11 ms later; no `Starting JEI took` or runtime publication. Evidence: `build/benchmarks/jei-compat/pr5-revised-cancel-probe.latest.log`. |
+| Exit world or lose the server while async tasks are building | Tasks are cancelled or discarded by generation check. | ☑ Forge 1.20.1 / JEI 15.48: `Minecraft.clearLevel(Screen)` cancelled startup 253 ms after `Starting JEI...`; worker acknowledged cancellation 113 ms later. ☑ NeoForge 1.21.1 / JEI 19.27: `Minecraft.disconnect(Screen, boolean)` cancelled startup 318 ms after start; worker acknowledged 50 ms later. Neither run sent a runtime or completed startup. Evidence: `build/benchmarks/jei-compat/disconnect-cancel-*.latest.log`. |
 | Enter a second world after first exit | No old search/recipe results appear. | ☐ |
 | Resource reload during async build | Old generation results are not published. | ☐ |
 | `general.enabled=false` then runClient | All feature mixins no-op or fall back to JEI baseline. | ☐ |
