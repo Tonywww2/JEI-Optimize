@@ -264,6 +264,9 @@ pool and does not run plugin callbacks concurrently. The exception requires all 
     progress, but must not mutate the live filter or invalidate its sidebar cache.
 - The client thread swaps the completed search index and invalidates the sidebar exactly once
     before `onRuntimeAvailable` callbacks and runtime publication.
+- JEI screen input callbacks must return "not handled" while startup progress is active because
+    JEI registers them before its runtime exists. The guard must not cancel vanilla screen input and
+    must become inert immediately after runtime publication completes.
 - The runtime is published on the client thread only when its generation is still current.
 - Packs containing an earlier registration callback that requires the client thread can disable
     `asyncStartup` to restore JEI's caller-thread startup path.

@@ -21,6 +21,10 @@ In large modpacks, JEI spends several seconds building its ingredient search ind
 
   Visible effect: the game remains responsive while the bar advances, and the JEI item list appears complete in one update instead of repeatedly rebuilding partial pages.
 
+  While this progress panel is visible, JEI-specific keyboard and mouse actions are temporarily
+  ignored because JEI has registered those listeners but has not published the runtime they need.
+  Normal inventory input remains available, and JEI controls activate automatically at completion.
+
 - **Experimental recipe ingredient pre-resolution** — `parallelVanillaRecipes` (off by default)
 
   This option resolves recipe ingredient tags across worker threads before JEI reads them. It can help some packs, but custom recipes and lazy ingredient caches are not guaranteed to be thread-safe, so it is opt-in and should be benchmarked against the specific pack.
@@ -107,6 +111,10 @@ The mod is Mixin-based and hooks JEI's own internal classes (`@Pseudo` mixins wi
 3. **Publish once on the main thread.** A finalize task in `JeiOptClientTickQueue` polls the build without blocking. At 100%, it assigns the finished index to the filter and calls `invalidateCache()` exactly once. The JEI startup thread waits for this publication before runtime-available callbacks and final runtime publication, while the render thread keeps ticking and drawing the progress bar.
 
 Because the new index is never shared with the main thread until the swap, JEI never serves a partially built sidebar. The deferred client-tick path follows the same isolated-index rule and no longer invalidates the sidebar after every chunk.
+
+JEI installs its container input listeners before `Internal.setRuntime(...)`. `JeiClientInputGuardMixin`
+returns "not handled" from those listeners while startup progress is active, preventing early R/U,
+click, scroll, or drag handling from reading a missing runtime without blocking vanilla screen input.
 
 ### Experimental recipe ingredient pre-resolution (`parallelVanillaRecipes`)
 

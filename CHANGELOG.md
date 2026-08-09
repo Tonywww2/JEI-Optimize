@@ -4,6 +4,21 @@ All notable changes to Just Enough Threads are documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.9.1
+
+A startup-interaction safety patch. Opening an inventory while JEI is still indexing remains safe,
+including in packs where another mod queues and replays GLFW input on the render thread.
+
+### Fixed
+
+- **Opening a container and pressing a key while JEI is loading no longer crashes the client.**
+  JEI registers its screen input listeners before its runtime is published, so an early key or
+  mouse event could call `Internal.getJeiRuntime()` and fail with `Jei Client Configs have not been
+  created yet`. JEI-specific keyboard, character, click, release, scroll, and drag handlers now
+  remain inactive until startup publication finishes; vanilla inventory input is not consumed.
+  Verified against the exact JEI 15.21 input ABI and a real Forge screen-key event during active
+  indexing. Ixeris can delay the event into this window, but does not duplicate it.
+
 ## 0.9.0
 
 A large-list usability release. JEI now reports real ingredient-index chunk progress and publishes

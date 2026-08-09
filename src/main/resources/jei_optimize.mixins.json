@@ -35,6 +35,7 @@
   "client": [
     "ClientDisconnectHookMixin",
     "ClientTickHookMixin",
+    "JeiClientInputGuardMixin",
     "JeiLoadingOverlayMixin"
   ],
   "injectors": {

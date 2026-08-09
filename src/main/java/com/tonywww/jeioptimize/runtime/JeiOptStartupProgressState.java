@@ -150,6 +150,15 @@ public final class JeiOptStartupProgressState {
         }
     }
 
+    public static boolean blocksJeiInput() {
+        synchronized (LOCK) {
+            return stage == Stage.PREPARING
+                || stage == Stage.INDEXING
+                || stage == Stage.READY
+                || stage == Stage.PUBLISHED;
+        }
+    }
+
     public enum Stage {
         HIDDEN,
         PREPARING,
