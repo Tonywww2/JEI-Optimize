@@ -260,6 +260,10 @@ pool and does not run plugin callbacks concurrently. The exception requires all 
 - Every start owns a generation token and checks cancellation between plugin callbacks.
 - Stop invalidates the generation, interrupts the startup thread, and cancels derived tasks.
 - The final `IModPlugin.onRuntimeAvailable` callback batch executes serially on the client thread.
+- Ingredient-filter chunks build only into an isolated search index. Chunk completion may update
+    progress, but must not mutate the live filter or invalidate its sidebar cache.
+- The client thread swaps the completed search index and invalidates the sidebar exactly once
+    before `onRuntimeAvailable` callbacks and runtime publication.
 - The runtime is published on the client thread only when its generation is still current.
 - Packs containing an earlier registration callback that requires the client thread can disable
     `asyncStartup` to restore JEI's caller-thread startup path.
@@ -267,6 +271,8 @@ pool and does not run plugin callbacks concurrently. The exception requires all 
 Publish rules:
 
 - Worker results are published only through `JeiOptExecutors` to the client thread.
+- The JEI startup thread may wait for the ingredient-filter publication gate; the client/render
+    thread must never wait on that gate.
 - Every publish checks `JeiOptRuntimeState.isCurrent(generation)`.
 - Stop/reload invalidates generation and cancels pending tasks.
 - Disabled features must cancel or ignore existing feature-specific tasks.

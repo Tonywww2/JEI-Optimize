@@ -11,6 +11,7 @@ import com.tonywww.jeioptimize.runtime.JeiOptExecutors;
 import com.tonywww.jeioptimize.runtime.JeiOptFilterBootstrap;
 import com.tonywww.jeioptimize.runtime.JeiOptRuntimeState;
 import com.tonywww.jeioptimize.runtime.JeiOptStartupContext;
+import com.tonywww.jeioptimize.runtime.JeiOptStartupProgressState;
 import com.tonywww.jeioptimize.runtime.JeiOptTaskRegistry;
 import mezz.jei.api.helpers.IColorHelper;
 import mezz.jei.api.runtime.IIngredientManager;
@@ -82,8 +83,10 @@ public final class JeiOptStartupDriver {
     }
 
     public static void onJeiStopping() {
+        long generation = JeiOptRuntimeState.currentGeneration();
         boolean cancelledStartup = JeiOptExecutors.cancelJeiStart();
         try {
+            JeiOptStartupProgressState.cancel(generation);
             JeiOptRuntimeState.invalidate();
             JeiOptRuntimeState.markRuntimeUnloaded();
             clearRuntimeWork();
@@ -94,14 +97,6 @@ public final class JeiOptStartupDriver {
             }
         } catch (RuntimeException | LinkageError e) {
             JeiOptimize.LOGGER.warn("JEI Optimize failed to tear down preheat state", e);
-        }
-    }
-
-    public static void onCancelledStartup() {
-        try {
-            clearRuntimeWork();
-        } catch (RuntimeException | LinkageError e) {
-            JeiOptimize.LOGGER.warn("JEI Optimize failed to clean up a cancelled JEI startup", e);
         }
     }
 

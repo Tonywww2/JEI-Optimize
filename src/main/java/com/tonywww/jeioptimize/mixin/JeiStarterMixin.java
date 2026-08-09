@@ -5,6 +5,7 @@ import com.tonywww.jeioptimize.config.JeiOptFeatureFlags;
 import com.tonywww.jeioptimize.integration.JeiOptStartupDriver;
 import com.tonywww.jeioptimize.runtime.JeiOptExecutors;
 import com.tonywww.jeioptimize.runtime.JeiOptRuntimeState;
+import com.tonywww.jeioptimize.runtime.JeiOptStartupProgressState;
 import mezz.jei.library.startup.JeiStarter;
 import net.minecraft.client.Minecraft;
 import org.spongepowered.asm.mixin.Mixin;
@@ -37,6 +38,7 @@ public abstract class JeiStarterMixin {
         if (!JeiOptFeatureFlags.asyncStartup() || !minecraft.isSameThread()) {
             return;
         }
+        JeiOptStartupProgressState.begin(generation);
         JeiOptimize.LOGGER.info(
                 "JEI Optimize: running JEI startup on a background thread; the render thread stays "
                         + "responsive and JEI overlays appear when startup finishes.");
@@ -44,13 +46,15 @@ public abstract class JeiStarterMixin {
         JeiOptExecutors.runJeiStartAsync(generation, () -> {
             try {
                 ((JeiStarter) (Object) this).start();
+                JeiOptStartupProgressState.markRuntimeComplete(generation);
             } catch (Throwable t) {
                 if (JeiOptExecutors.isJeiStartCancellation(t)
                     || !JeiOptRuntimeState.isCurrent(generation)) {
                     JeiOptimize.LOGGER.info("JEI Optimize stopped a cancelled JEI startup before runtime publication.");
-                    JeiOptStartupDriver.onCancelledStartup();
+                    JeiOptStartupProgressState.cancel(generation);
                     return;
                 }
+                JeiOptStartupProgressState.cancel(generation);
                 JeiOptimize.LOGGER.error("JEI failed to start on the background thread", t);
                 minecraft.execute(() -> {
                     if (JeiOptRuntimeState.isCurrent(generation)) {

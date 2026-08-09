@@ -1,19 +1,20 @@
 package com.tonywww.jeioptimize.index;
 
 import com.tonywww.jeioptimize.runtime.JeiOptExecutors;
+import com.tonywww.jeioptimize.runtime.JeiOptRuntimeState;
+import com.tonywww.jeioptimize.runtime.JeiOptStartupProgressState;
 import mezz.jei.api.ingredients.ITypedIngredient;
 import mezz.jei.api.runtime.IIngredientManager;
 import mezz.jei.api.runtime.IIngredientVisibility;
 import mezz.jei.gui.ingredients.IListElement;
 import mezz.jei.gui.ingredients.IListElementInfo;
-import mezz.jei.gui.search.ElementPrefixParser;
-import mezz.jei.gui.search.ElementSearch;
 import mezz.jei.gui.search.IElementSearch;
 
 import java.util.List;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Function;
+import java.util.function.Supplier;
 
 /**
  * Builds a fully populated JEI {@link IElementSearch} on worker threads using JEI's own
@@ -34,32 +35,35 @@ public final class AsyncIngredientFilterBuilder {
     private AsyncIngredientFilterBuilder() {
     }
 
-    public static CompletableFuture<IElementSearch> buildAsync(
+    public static CompletableFuture<IElementSearch> buildChunkedAsync(
         List<IListElementInfo<?>> elements,
         IIngredientManager ingredientManager,
-        ElementPrefixParser prefixParser,
-        IIngredientVisibility ingredientVisibility
-    ) {
-        return buildAsync(elements, ingredientVisibility, infos -> {
-            // Reuse the filter's own parser so PrefixInfo identities match its live queries.
-            ElementSearch elementSearch = new ElementSearch(prefixParser);
-            elementSearch.addAll(infos, ingredientManager);
-            return elementSearch;
-        });
-    }
-
-    /** Builds through JEI's own search factory, for JEI versions that expose one. */
-    public static CompletableFuture<IElementSearch> buildAsync(
-        List<IListElementInfo<?>> elements,
         IIngredientVisibility ingredientVisibility,
-        Function<List<IListElementInfo<?>>, IElementSearch> searchFactory
+        Supplier<IElementSearch> emptySearchFactory,
+        ChunkAppender chunkAppender,
+        int requestedChunkSize,
+        long generation
     ) {
         List<IListElementInfo<?>> safeElements = List.copyOf(elements);
+        int chunkSize = Math.max(1, requestedChunkSize);
+        int chunkCount = (safeElements.size() + chunkSize - 1) / chunkSize;
+        JeiOptStartupProgressState.registerBuild(generation, chunkCount, safeElements.size());
+
         CompletableFuture<IElementSearch> future = JeiOptExecutors.supplyAsync(() -> {
-            for (IListElementInfo<?> info : safeElements) {
-                updateHiddenState(info.getElement(), ingredientVisibility);
+            IElementSearch search = emptySearchFactory.get();
+            for (int start = 0; start < safeElements.size(); start += chunkSize) {
+                checkActive(generation);
+                int end = Math.min(start + chunkSize, safeElements.size());
+                List<IListElementInfo<?>> chunk = safeElements.subList(start, end);
+                for (IListElementInfo<?> info : chunk) {
+                    updateHiddenState(info.getElement(), ingredientVisibility);
+                }
+                chunkAppender.add(search, chunk);
+                JeiOptStartupProgressState.markChunkCompleted(generation);
             }
-            return searchFactory.apply(safeElements);
+            checkActive(generation);
+            JeiOptStartupProgressState.markReady(generation);
+            return search;
         });
         CompletableFuture<IElementSearch> previous = IN_FLIGHT.getAndSet(future);
         if (previous != null) {
@@ -82,5 +86,16 @@ public final class AsyncIngredientFilterBuilder {
         if (element.isVisible() != visible) {
             element.setVisible(visible);
         }
+    }
+
+    private static void checkActive(long generation) {
+        if (Thread.currentThread().isInterrupted() || !JeiOptRuntimeState.isCurrent(generation)) {
+            throw new CancellationException("JEI ingredient filter build is no longer current");
+        }
+    }
+
+    @FunctionalInterface
+    public interface ChunkAppender {
+        void add(IElementSearch search, List<IListElementInfo<?>> chunk);
     }
 }

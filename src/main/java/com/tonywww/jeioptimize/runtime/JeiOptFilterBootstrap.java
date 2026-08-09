@@ -1,5 +1,6 @@
 package com.tonywww.jeioptimize.runtime;
 
+import mezz.jei.api.runtime.IIngredientManager;
 import mezz.jei.gui.ingredients.IListElementInfo;
 import mezz.jei.gui.search.IElementSearch;
 
@@ -22,8 +23,12 @@ public final class JeiOptFilterBootstrap {
     private JeiOptFilterBootstrap() {
     }
 
-    public static void capture(List<IListElementInfo<?>> ingredients, Function<List<IListElementInfo<?>>, IElementSearch> searchFactory) {
-        pending = new Pending(List.copyOf(ingredients), searchFactory);
+    public static void capture(
+        List<IListElementInfo<?>> ingredients,
+        IIngredientManager ingredientManager,
+        Function<List<IListElementInfo<?>>, IElementSearch> searchFactory
+    ) {
+        pending = new Pending(List.copyOf(ingredients), ingredientManager, searchFactory);
     }
 
     public static Pending take() {
@@ -36,6 +41,10 @@ public final class JeiOptFilterBootstrap {
         pending = null;
     }
 
-    public record Pending(List<IListElementInfo<?>> ingredients, Function<List<IListElementInfo<?>>, IElementSearch> searchFactory) {
+    public record Pending(
+        List<IListElementInfo<?>> ingredients,
+        IIngredientManager ingredientManager,
+        Function<List<IListElementInfo<?>>, IElementSearch> searchFactory
+    ) {
     }
 }

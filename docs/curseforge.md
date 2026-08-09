@@ -6,7 +6,7 @@
 
 **Off-thread ingredient search index**
 
-JEI normally builds its ingredient filter — the search index over every item and fluid — on the main thread while you wait on the loading screen. In a big pack that can take several seconds. Just Enough Threads builds it on worker threads **after** you enter the world, then swaps the finished index into JEI. The result is identical to JEI's own, and if the off-thread build runs into trouble it falls back to JEI's normal build.
+JEI normally builds its ingredient filter — the search index over every item and fluid — on the main thread while you wait on the loading screen. In a big pack that can take several seconds. Just Enough Threads builds it in real chunks on worker threads after world entry, shows completed chunks in the inventory, then swaps the finished index into JEI and refreshes the sidebar once. If the off-thread build runs into trouble it falls back to JEI's normal build.
 
 _What you will see:_ the JEI item list appears a moment after you spawn, instead of holding up world load.
 
@@ -37,7 +37,7 @@ Config file: `config/jei_optimize-client.toml`. Every optimization can be toggle
 
 *   `enabled` — master switch for the whole mod.
 *   `asyncStartup` — build JEI serially on a dedicated background thread, then run runtime callbacks and publication on the client thread; world exit, timeout, and server shutdown cancel stale work immediately.
-*   `asyncIngredientFilter` — build the ingredient search index off-thread after world entry.
+*   `asyncIngredientFilter` — build the ingredient search index off-thread in chunks, then publish the sidebar once.
 *   `parallelVanillaRecipes` — experimental recipe ingredient pre-resolution; disabled by default.
 *   `disableAnvilRepairRecipes` / `disableAnvilEnchantRecipes` — hide generated anvil recipes; enabled by default.
 
@@ -99,7 +99,7 @@ JEI 自动生成的材料修复与附魔书组合配方默认隐藏。在超大�
 
 *   `enabled` — 整个 mod 的总开关。
 *   `asyncStartup` — 在专用后台线程上串行启动 JEI;退出世界、连接超时或服务器关闭时立即取消,默认开启。
-*   `asyncIngredientFilter` — 进入世界后离主线程构建物品搜索索引。
+*   `asyncIngredientFilter` — 进入世界后按真实分块离主线程构建物品搜索索引，完成后一次性发布侧栏。
 *   `parallelVanillaRecipes` — 实验性并行预解析配方材料;默认关闭。
 *   `disableAnvilRepairRecipes` / `disableAnvilEnchantRecipes` — 隐藏自动生成的铁砧配方;默认开启。
 

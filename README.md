@@ -17,9 +17,9 @@ In large modpacks, JEI spends several seconds building its ingredient search ind
 
 - **Off-thread ingredient filter build** — `asyncIngredientFilter` (on by default)
 
-  JEI's "Building ingredient filter" step (its search index over every item and fluid) normally runs on the main thread and blocks loading for several seconds in large packs. This mod builds it on worker threads *after* you enter the world, then atomically swaps the finished index into JEI. The result is identical to JEI's own, and if the off-thread build fails for any reason it falls back to JEI's synchronous build.
+  JEI's "Building ingredient filter" step (its search index over every item and fluid) normally runs on the main thread and blocks loading for several seconds in large packs. This mod builds an isolated index in real chunks on worker threads after world entry. The inventory shows completed chunks in a progress bar; at 100%, the client atomically swaps the finished index and refreshes the sidebar once. If the worker build fails, it falls back to JEI's synchronous build.
 
-  Visible effect: the JEI item list is empty for a few seconds after you enter the world, then fills in all at once.
+  Visible effect: the game remains responsive while the bar advances, and the JEI item list appears complete in one update instead of repeatedly rebuilding partial pages.
 
 - **Experimental recipe ingredient pre-resolution** — `parallelVanillaRecipes` (off by default)
 
@@ -59,7 +59,7 @@ Config file: `config/jei_optimize-client.toml`
 |--------|---------|---------|-------------|
 | `enabled` | general | `true` | Master switch. When `false`, the mod does nothing and JEI behaves normally. |
 | `asyncStartup` | async | `true` | Run JEI startup serially on a dedicated background thread; cancel it on world exit, timeout, or server shutdown. |
-| `asyncIngredientFilter` | async | `true` | Build the ingredient search filter off-thread after world entry. |
+| `asyncIngredientFilter` | async | `true` | Build the ingredient search filter off-thread in chunks, then publish the complete sidebar once. |
 | `parallelVanillaRecipes` | async | `false` | Experimentally pre-resolve recipe ingredients across worker threads. |
 | `workerThreads` | async | `4` | Worker-thread count for derived off-thread tasks (1-8). |
 | `pluginTiming` | diagnostics | `false` | Log per-plugin, per-phase JEI startup timings (for measurement). |
@@ -103,10 +103,10 @@ The mod is Mixin-based and hooks JEI's own internal classes (`@Pseudo` mixins wi
 `IngredientFilterMixin` targets JEI's `IngredientFilter`:
 
 1. **Skip the on-thread indexing.** A `@Redirect` on the per-ingredient `addIngredient` call inside the `IngredientFilter` constructor suppresses JEI's normal indexing loop when the feature is on, so the constructor returns almost immediately instead of building the search index on the main thread.
-2. **Submit an off-thread build.** An `@Inject` at the end of the constructor calls `AsyncIngredientFilterBuilder.buildAsync(...)`, which submits a task to the worker pool. On a worker thread it creates a fresh, isolated search index with JEI's own `ElementPrefixParser` and `ElementSearch`, then runs `ElementSearch.addAll(...)` — the exact JEI code path, just off the main thread. Element visibility is computed on the same worker; this is safe because those elements are not yet reachable from the live filter.
-3. **Swap it in on the main thread.** The same `@Inject` enqueues a finalize task into `JeiOptClientTickQueue`. Each client tick, `ClientTickHookMixin` (injected into `Minecraft.tick`) drains the queue. The finalize task polls the build without blocking; once it is ready it assigns the finished index into the filter's `elementSearch` field and calls `invalidateCache()`, so JEI rebuilds its visible list from the new index.
+2. **Build real chunks off-thread.** An `@Inject` at the end of the constructor calls `AsyncIngredientFilterBuilder.buildChunkedAsync(...)`. The worker creates a fresh, isolated search index and adds `ingredientFilterChunkSize` elements per chunk, updating the visible progress only after each complete chunk. JEI 15.20/19.27 use their bulk `addAll` API; JEI 15.48 uses its compatible per-element `add` API.
+3. **Publish once on the main thread.** A finalize task in `JeiOptClientTickQueue` polls the build without blocking. At 100%, it assigns the finished index to the filter and calls `invalidateCache()` exactly once. The JEI startup thread waits for this publication before runtime-available callbacks and final runtime publication, while the render thread keeps ticking and drawing the progress bar.
 
-Because the new index is never shared with the main thread until the swap, there is no read/write race, and because it is built with JEI's own classes the result is identical to JEI's. If the worker build throws, the finalize task falls back to a synchronous build into the live filter (JEI's normal behavior). This is also why the item list is briefly empty after you spawn: the constructor returned an empty index, and it fills once the worker build swaps in.
+Because the new index is never shared with the main thread until the swap, JEI never serves a partially built sidebar. The deferred client-tick path follows the same isolated-index rule and no longer invalidates the sidebar after every chunk.
 
 ### Experimental recipe ingredient pre-resolution (`parallelVanillaRecipes`)
 

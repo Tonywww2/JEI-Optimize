@@ -4,6 +4,26 @@ All notable changes to Just Enough Threads are documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.9.0
+
+A large-list usability release. JEI now reports real ingredient-index chunk progress and publishes
+its sidebar once when the completed index is ready, avoiding repeated partial refreshes in packs
+with thousands of JEI pages.
+
+### Added
+
+- **A real chunk progress bar for background JEI loading.** The inventory-side loading panel shows
+  an indeterminate preparation phase, followed by completed index chunks such as `12 / 47`, and a
+  final publication phase. Progress advances only after a whole chunk has been indexed.
+
+### Changed
+
+- **The JEI sidebar is published once, after indexing reaches 100%.** Both worker-thread and
+  client-tick filter builders now populate an isolated search index. Intermediate chunks no longer
+  invalidate JEI's live sidebar cache; the client swaps the completed index and invalidates once,
+  then runs runtime-available plugin callbacks before exposing the final runtime. This avoids a
+  cache-refresh storm in packs with thousands of JEI pages.
+
 ## 0.8.1
 
 A lifecycle correctness patch. Disconnecting while JEI is still building now stops its background

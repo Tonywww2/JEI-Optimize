@@ -118,6 +118,33 @@ public final class JeiOptExecutors {
         return throwable instanceof JeiStartCancelled;
     }
 
+    public static void awaitJeiStartTask(CompletableFuture<?> future) {
+        Objects.requireNonNull(future, "future");
+        JeiStartTask task = CURRENT_JEI_START.get();
+        if (task == null) {
+            throw new IllegalStateException("Only the JEI startup thread may wait for startup work");
+        }
+        ensureJeiStartActive(task);
+        try {
+            future.get();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new JeiStartCancelled();
+        } catch (CancellationException e) {
+            throw new JeiStartCancelled();
+        } catch (ExecutionException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof RuntimeException runtimeException) {
+                throw runtimeException;
+            }
+            if (cause instanceof Error error) {
+                throw error;
+            }
+            throw new RuntimeException(cause != null ? cause : e);
+        }
+        ensureJeiStartActive(task);
+    }
+
     public static void runOnMainThreadAndWait(Runnable command) {
         Objects.requireNonNull(command, "command");
         JeiStartTask task = CURRENT_JEI_START.get();

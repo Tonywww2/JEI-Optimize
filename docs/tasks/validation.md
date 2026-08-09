@@ -194,6 +194,7 @@ Current status: matrices are intentionally not auto-filled by compile/run smoke.
 | Enter a second world after first exit | No old search/recipe results appear. | ☐ |
 | Resource reload during async build | Old generation results are not published. | ☐ |
 | `general.enabled=false` then runClient | All feature mixins no-op or fall back to JEI baseline. | ☐ |
+| Chunked ingredient index publication | Progress is monotonic; no partial sidebar refresh; one final swap before runtime callbacks. | ☑ Automated startup smoke: JEI 15.20 completed 2670 ingredients in 6 chunks; JEI 15.48 completed 2670 in 6 chunks through its per-element ABI; NeoForge JEI 19.27 completed 1688 in 4 chunks. All published on Render thread before `Sending Runtime`, with no fallback after ABI selection. Manual visual progress review remains open. |
 
 Current status: runClient smoke passed with generated default config. Default feature-specific optimization gates are `false`, so this primarily validates baseline/no-op startup. Explicit `general.enabled=false` run remains pending.
 

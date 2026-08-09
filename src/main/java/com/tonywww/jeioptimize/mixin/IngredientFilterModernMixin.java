@@ -6,9 +6,12 @@ import com.tonywww.jeioptimize.index.AsyncIngredientFilterBuilder;
 import com.tonywww.jeioptimize.runtime.JeiOptClientTickQueue;
 import com.tonywww.jeioptimize.runtime.JeiOptFilterBootstrap;
 import com.tonywww.jeioptimize.runtime.JeiOptRuntimeState;
+import com.tonywww.jeioptimize.runtime.JeiOptStartupProgressState;
+import mezz.jei.api.ingredients.ITypedIngredient;
 import mezz.jei.api.runtime.IIngredientManager;
 import mezz.jei.api.runtime.IIngredientVisibility;
 import mezz.jei.common.config.IClientConfig;
+import mezz.jei.gui.ingredients.IListElement;
 import mezz.jei.gui.ingredients.IListElementInfo;
 import mezz.jei.gui.search.ElementPrefixParser;
 import mezz.jei.gui.search.IElementSearch;
@@ -24,6 +27,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Off-thread ingredient search index for JEI builds that construct the whole index inside
@@ -76,13 +80,14 @@ public abstract class IngredientFilterModernMixin {
         List<IListElementInfo<?>> elementInfos,
         IIngredientManager ingredientManager
     ) {
-        if (!JeiOptFeatureFlags.asyncIngredientFilter()) {
+        if (!JeiOptFeatureFlags.asyncIngredientFilter() && !JeiOptFeatureFlags.deferredIngredientFilter()) {
             return jeiopt$invokeCreateElementSearch(clientConfig, elementPrefixParser, elementInfos, ingredientManager);
         }
         // The factory has to be built here: an @Invoker lives on the target class and cannot be
         // reached from outside it.
         JeiOptFilterBootstrap.capture(
             elementInfos,
+            ingredientManager,
             infos -> jeiopt$invokeCreateElementSearch(clientConfig, elementPrefixParser, infos, ingredientManager));
         return jeiopt$invokeCreateElementSearch(clientConfig, elementPrefixParser, List.of(), ingredientManager);
     }
@@ -94,15 +99,93 @@ public abstract class IngredientFilterModernMixin {
             return;
         }
 
+        if (JeiOptFeatureFlags.asyncIngredientFilter()) {
+            jeiopt$scheduleWorkerBuild(pending);
+        } else if (JeiOptFeatureFlags.deferredIngredientFilter()) {
+            jeiopt$scheduleDeferredBuild(pending);
+        }
+    }
+
+    private void jeiopt$scheduleWorkerBuild(JeiOptFilterBootstrap.Pending pending) {
         int total = pending.ingredients().size();
+        int chunkSize = JeiOptFeatureFlags.ingredientFilterChunkSize();
+        int chunkCount = (total + chunkSize - 1) / Math.max(1, chunkSize);
         long generation = JeiOptRuntimeState.currentGeneration();
-        CompletableFuture<IElementSearch> future =
-            AsyncIngredientFilterBuilder.buildAsync(pending.ingredients(), this.ingredientVisibility, pending.searchFactory());
+        CompletableFuture<IElementSearch> future = AsyncIngredientFilterBuilder.buildChunkedAsync(
+            pending.ingredients(),
+            pending.ingredientManager(),
+            this.ingredientVisibility,
+            () -> pending.searchFactory().apply(List.of()),
+            (search, chunk) -> jeiopt$addChunk(search, chunk, pending.ingredientManager()),
+            chunkSize,
+            generation
+        );
         long startNanos = System.nanoTime();
-        JeiOptClientTickQueue.enqueue(() -> jeiopt$finalizeAsyncBuild(future, pending, total, startNanos, generation));
+        JeiOptClientTickQueue.enqueue(() -> {
+            try {
+                return jeiopt$finalizeAsyncBuild(future, pending, total, chunkCount, startNanos, generation);
+            } catch (RuntimeException | LinkageError e) {
+                JeiOptStartupProgressState.fail(generation, e);
+                throw e;
+            }
+        });
         JeiOptimize.LOGGER.info(
-            "JEI Optimize async ingredient filter build submitted off-thread: {} ingredients",
-            total
+            "JEI Optimize async ingredient filter build submitted off-thread: {} ingredients in {} chunks",
+            total,
+            chunkCount
+        );
+    }
+
+    private void jeiopt$scheduleDeferredBuild(JeiOptFilterBootstrap.Pending pending) {
+        int chunkSize = JeiOptFeatureFlags.ingredientFilterChunkSize();
+        int total = pending.ingredients().size();
+        int chunkCount = (total + chunkSize - 1) / Math.max(1, chunkSize);
+        AtomicInteger nextStart = new AtomicInteger();
+        long generation = JeiOptRuntimeState.currentGeneration();
+        long startNanos = System.nanoTime();
+        IElementSearch search = pending.searchFactory().apply(List.of());
+        JeiOptStartupProgressState.registerBuild(generation, chunkCount, total);
+        JeiOptClientTickQueue.enqueue(() -> {
+            try {
+                if (!JeiOptRuntimeState.isCurrent(generation)) {
+                    return true;
+                }
+
+                int start = nextStart.get();
+                if (start < total) {
+                    int end = Math.min(start + chunkSize, total);
+                    List<IListElementInfo<?>> chunk = pending.ingredients().subList(start, end);
+                    for (IListElementInfo<?> info : chunk) {
+                        jeiopt$updateHiddenState(info.getElement());
+                    }
+                    jeiopt$addChunk(search, chunk, pending.ingredientManager());
+                    nextStart.set(end);
+                    JeiOptStartupProgressState.markChunkCompleted(generation);
+                    return false;
+                }
+
+                long publishStartNanos = System.nanoTime();
+                this.elementSearch = search;
+                this.invalidateCache();
+                JeiOptStartupProgressState.markPublished(generation);
+                JeiOptimize.LOGGER.info(
+                    "JEI Optimize deferred ingredient filter build completed: {} ingredients ({} chunks, {} distinct uids) in {} ms; sidebar published in {} us",
+                    total,
+                    chunkCount,
+                    search.getAllIngredients().size(),
+                    (System.nanoTime() - startNanos) / 1_000_000L,
+                    (System.nanoTime() - publishStartNanos) / 1_000L
+                );
+                return true;
+            } catch (RuntimeException | LinkageError e) {
+                JeiOptStartupProgressState.fail(generation, e);
+                throw e;
+            }
+        });
+        JeiOptimize.LOGGER.info(
+            "JEI Optimize deferred ingredient filter build scheduled: {} ingredients in {} chunks",
+            total,
+            chunkCount
         );
     }
 
@@ -110,6 +193,7 @@ public abstract class IngredientFilterModernMixin {
         CompletableFuture<IElementSearch> future,
         JeiOptFilterBootstrap.Pending pending,
         int total,
+        int chunkCount,
         long startNanos,
         long generation
     ) {
@@ -122,6 +206,10 @@ public abstract class IngredientFilterModernMixin {
             return false;
         }
         if (future.isCancelled()) {
+            JeiOptStartupProgressState.fail(
+                generation,
+                new java.util.concurrent.CancellationException("JEI ingredient filter build was cancelled")
+            );
             return true;
         }
 
@@ -136,19 +224,51 @@ public abstract class IngredientFilterModernMixin {
             built = pending.searchFactory().apply(pending.ingredients());
             this.elementSearch = built;
             this.invalidateCache();
+            JeiOptStartupProgressState.markReady(generation);
+            JeiOptStartupProgressState.markPublished(generation);
             JeiOptimize.LOGGER.info(
                 "JEI Optimize async ingredient filter fell back to synchronous build: {} ingredients", total);
             return true;
         }
 
+        long publishStartNanos = System.nanoTime();
         this.elementSearch = built;
         this.invalidateCache();
+        JeiOptStartupProgressState.markPublished(generation);
         JeiOptimize.LOGGER.info(
-            "JEI Optimize async ingredient filter build completed: {} ingredients ({} distinct uids) in {} ms after world entry",
+            "JEI Optimize async ingredient filter build completed: {} ingredients ({} chunks, {} distinct uids) in {} ms; sidebar published in {} us",
             total,
+            chunkCount,
             built.getAllIngredients().size(),
-            (System.nanoTime() - startNanos) / 1_000_000L
+            (System.nanoTime() - startNanos) / 1_000_000L,
+            (System.nanoTime() - publishStartNanos) / 1_000L
         );
         return true;
+    }
+
+    private void jeiopt$updateHiddenState(IListElement<?> element) {
+        ITypedIngredient<?> typedIngredient = element.getTypedIngredient();
+        boolean visible = this.ingredientVisibility.isIngredientVisible(typedIngredient);
+        if (element.isVisible() != visible) {
+            element.setVisible(visible);
+        }
+    }
+
+    private static void jeiopt$addChunk(
+        IElementSearch search,
+        List<IListElementInfo<?>> chunk,
+        IIngredientManager ingredientManager
+    ) {
+        for (IListElementInfo<?> info : chunk) {
+            jeiopt$addElement(search, info, ingredientManager);
+        }
+    }
+
+    private static <T> void jeiopt$addElement(
+        IElementSearch search,
+        IListElementInfo<T> info,
+        IIngredientManager ingredientManager
+    ) {
+        search.add(info, ingredientManager);
     }
 }

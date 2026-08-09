@@ -1,6 +1,8 @@
 package com.tonywww.jeioptimize.mixin;
 
 import com.tonywww.jeioptimize.runtime.JeiOptExecutors;
+import com.tonywww.jeioptimize.runtime.JeiOptRuntimeState;
+import com.tonywww.jeioptimize.runtime.JeiOptStartupProgressState;
 import mezz.jei.api.IModPlugin;
 import mezz.jei.library.load.PluginCaller;
 import org.spongepowered.asm.mixin.Mixin;
@@ -28,6 +30,8 @@ public abstract class JeiStarterRuntimeCallbacksMixin {
     ) {
         Runnable callPlugins = () -> PluginCaller.callOnPlugins(title, plugins, callback);
         if (JeiOptExecutors.isJeiStartThread() && "Sending Runtime".equals(title)) {
+            long generation = JeiOptRuntimeState.currentGeneration();
+            JeiOptExecutors.awaitJeiStartTask(JeiOptStartupProgressState.publicationFuture(generation));
             JeiOptExecutors.runOnMainThreadAndWait(callPlugins);
         } else {
             callPlugins.run();

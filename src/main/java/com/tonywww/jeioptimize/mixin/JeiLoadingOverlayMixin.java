@@ -1,6 +1,6 @@
 package com.tonywww.jeioptimize.mixin;
 
-import com.tonywww.jeioptimize.runtime.JeiOptExecutors;
+import com.tonywww.jeioptimize.runtime.JeiOptStartupProgressState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -14,9 +14,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(AbstractContainerScreen.class)
 public abstract class JeiLoadingOverlayMixin {
-    private static final Component LOADING_TEXT = Component.translatable("gui.jei_optimize.loading");
-    private static final int HORIZONTAL_PADDING = 6;
-    private static final int VERTICAL_PADDING = 4;
+    private static final int MAX_PANEL_WIDTH = 160;
+    private static final int MIN_PANEL_WIDTH = 84;
+    private static final int HORIZONTAL_MARGIN = 6;
+    private static final int PADDING = 6;
+    private static final int BAR_HEIGHT = 6;
 
     @Shadow
     protected int imageWidth;
@@ -35,7 +37,8 @@ public abstract class JeiLoadingOverlayMixin {
         float partialTick,
         CallbackInfo callbackInfo
     ) {
-        if (!JeiOptExecutors.isJeiStartRunning()) {
+        JeiOptStartupProgressState.Snapshot progress = JeiOptStartupProgressState.snapshot();
+        if (!progress.visible()) {
             return;
         }
 
@@ -43,20 +46,80 @@ public abstract class JeiLoadingOverlayMixin {
         Font font = minecraft.font;
         int panelLeft = leftPos + imageWidth;
         int availableWidth = minecraft.getWindow().getGuiScaledWidth() - panelLeft;
-        int textWidth = font.width(LOADING_TEXT);
-        if (availableWidth < textWidth + HORIZONTAL_PADDING * 2) {
+        int panelWidth = Math.min(MAX_PANEL_WIDTH, availableWidth - HORIZONTAL_MARGIN * 2);
+        if (panelWidth < MIN_PANEL_WIDTH) {
             return;
         }
 
-        int textX = panelLeft + (availableWidth - textWidth) / 2;
-        int textY = Math.max(VERTICAL_PADDING, topPos + VERTICAL_PADDING);
+        Component status = jeiOptimize$statusText(progress);
+        int contentWidth = panelWidth - PADDING * 2;
+        String statusText = font.plainSubstrByWidth(status.getString(), contentWidth);
+        int statusWidth = font.width(statusText);
+        int panelX = panelLeft + (availableWidth - panelWidth) / 2;
+        int panelY = Math.max(HORIZONTAL_MARGIN, topPos + HORIZONTAL_MARGIN);
+        int panelHeight = PADDING + font.lineHeight + 5 + BAR_HEIGHT + PADDING;
+        int barX = panelX + PADDING;
+        int barY = panelY + PADDING + font.lineHeight + 5;
+
         guiGraphics.fill(
-            textX - HORIZONTAL_PADDING,
-            textY - VERTICAL_PADDING,
-            textX + textWidth + HORIZONTAL_PADDING,
-            textY + font.lineHeight + VERTICAL_PADDING,
+            panelX,
+            panelY,
+            panelX + panelWidth,
+            panelY + panelHeight,
             0xB0101010
         );
-        guiGraphics.drawString(font, LOADING_TEXT, textX, textY, 0xFFFFFFFF, true);
+        guiGraphics.drawString(
+            font,
+            statusText,
+            panelX + (panelWidth - statusWidth) / 2,
+            panelY + PADDING,
+            0xFFFFFFFF,
+            true
+        );
+        guiGraphics.fill(barX, barY, barX + contentWidth, barY + BAR_HEIGHT, 0xFF303030);
+        guiGraphics.fill(barX, barY, barX + contentWidth, barY + 1, 0xFF606060);
+        jeiOptimize$drawProgress(guiGraphics, progress, barX, barY, contentWidth);
+    }
+
+    private static Component jeiOptimize$statusText(JeiOptStartupProgressState.Snapshot progress) {
+        return switch (progress.stage()) {
+            case INDEXING -> Component.translatable(
+                "gui.jei_optimize.loading.indexing",
+                progress.completedChunks(),
+                progress.totalChunks()
+            );
+            case READY, PUBLISHED -> Component.translatable("gui.jei_optimize.loading.publishing");
+            default -> Component.translatable("gui.jei_optimize.loading.preparing");
+        };
+    }
+
+    private static void jeiOptimize$drawProgress(
+        GuiGraphics guiGraphics,
+        JeiOptStartupProgressState.Snapshot progress,
+        int barX,
+        int barY,
+        int barWidth
+    ) {
+        if (progress.stage() == JeiOptStartupProgressState.Stage.PREPARING) {
+            int segmentWidth = Math.max(12, barWidth / 3);
+            int travel = Math.max(1, barWidth - segmentWidth);
+            int offset = (int) ((System.currentTimeMillis() / 12L) % (travel * 2L));
+            if (offset > travel) {
+                offset = travel * 2 - offset;
+            }
+            guiGraphics.fill(
+                barX + offset,
+                barY + 1,
+                barX + offset + segmentWidth,
+                barY + BAR_HEIGHT,
+                0xFFE6A23C
+            );
+            return;
+        }
+
+        int filledWidth = (int) Math.round(barWidth * progress.fraction());
+        if (filledWidth > 0) {
+            guiGraphics.fill(barX, barY + 1, barX + filledWidth, barY + BAR_HEIGHT, 0xFFE6A23C);
+        }
     }
 }

@@ -158,7 +158,7 @@ public final class JeiOptConfig {
             .comment("Per-client-tick snapshot extraction budget in milliseconds. Ignored when snapshotChunking is disabled.")
             .defineInRange("snapshotBudgetMs", 2, 1, 10);
         ASYNC_DEFERRED_INGREDIENT_FILTER = builder
-            .comment("Build the JEI ingredient search filter in the background after entering the world instead of blocking startup. The JEI item list fills in progressively.")
+            .comment("Build the JEI ingredient search filter in client-tick chunks, then publish the complete sidebar once.")
             .define("deferredIngredientFilter", true);
         ASYNC_INGREDIENT_FILTER_BUDGET_MS = builder
             .comment("Per-client-tick budget in milliseconds for the deferred ingredient filter build. Higher fills faster but costs more per tick.")
@@ -169,8 +169,8 @@ public final class JeiOptConfig {
         ASYNC_PARALLEL_INGREDIENT_FILTER = builder
             .comment(
                 "Build the JEI ingredient search filter on worker threads after entering the world, then atomically swap it in.",
-                "This removes the multi-second 'Building ingredient filter' cost from the loading screen. The JEI item list",
-                "appears a few seconds after you enter the world. Falls back to a synchronous build if the off-thread build fails.",
+                "Progress reports completed chunks. JEI waits for the complete isolated index, then publishes the sidebar once",
+                "instead of repeatedly refreshing a partial list. Falls back to a synchronous build if the worker build fails.",
                 "Enabled by default.")
             .define("asyncIngredientFilter", true);
         ASYNC_PARALLEL_VANILLA_RECIPES = builder
