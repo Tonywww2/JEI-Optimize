@@ -36,7 +36,8 @@
     "ClientDisconnectHookMixin",
     "ClientTickHookMixin",
     "JeiClientInputGuardMixin",
-    "JeiLoadingOverlayMixin"
+    "JeiLoadingOverlayMixin",
+    "MinecraftProfilerGuardMixin"
   ],
   "injectors": {
     "defaultRequire": 0

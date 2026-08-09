@@ -276,6 +276,10 @@ Publish rules:
 - Worker results are published only through `JeiOptExecutors` to the client thread.
 - The JEI startup thread may wait for the ingredient-filter publication gate; the client/render
     thread must never wait on that gate.
+- Calls to `Minecraft.getProfiler()` from the dedicated JEI startup thread must return
+    `InactiveProfiler.INSTANCE`. The render thread's mutable `ActiveProfiler` map must never be
+    shared with startup callbacks because `FilledProfileResults` iterates it without synchronization.
+    This is a containment boundary; a profiler CME alone does not identify the specific writer.
 - Every publish checks `JeiOptRuntimeState.isCurrent(generation)`.
 - Stop/reload invalidates generation and cancels pending tasks.
 - Disabled features must cancel or ignore existing feature-specific tasks.

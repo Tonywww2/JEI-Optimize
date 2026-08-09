@@ -4,6 +4,21 @@ All notable changes to Just Enough Threads are documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.9.2
+
+A profiler thread-safety patch. Background JEI startup no longer shares Minecraft's mutable
+render-thread profiler state.
+
+### Fixed
+
+- **Background JEI startup is isolated from Minecraft's render-thread profiler.** Minecraft passes
+  the mutable `ActiveProfiler.entries` map directly to `FilledProfileResults`, which iterates it
+  without synchronization. Any startup callback that asks `Minecraft.getProfiler()` off-thread can
+  race that iteration and cause a `ConcurrentModificationException`. The dedicated JEI startup
+  thread now receives Minecraft's stateless `InactiveProfiler`; render-thread profiling remains
+  unchanged. The reported run also showed a render-thread push/pop mismatch, so the crash report
+  does not uniquely identify which mod wrote the shared profiler.
+
 ## 0.9.1
 
 A startup-interaction safety patch. Opening an inventory while JEI is still indexing remains safe,
