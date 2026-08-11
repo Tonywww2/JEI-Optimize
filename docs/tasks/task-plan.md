@@ -30,13 +30,13 @@
 | ☑ T1.2 | Implement bounded executor and main-thread publish utility. | M | T0.2 | `JeiOptExecutors` compiles, uses bounded daemon worker pool, and publishes via Minecraft client thread. | `src/main/java/com/tonywww/jeioptimize/runtime/JeiOptExecutors.java` |
 | ☑ T1.3 | Implement async index contracts and snapshot records. | M | T0.2 | `AsyncIndexState`, `AsyncIndex`, `IngredientSearchSnapshot`, `RecipeIndexSnapshot` compile; full `compileJava` now succeeds after PB-4 added the shared logger on `JeiOptimize`. | `src/main/java/com/tonywww/jeioptimize/index/AsyncIndexState.java`, `src/main/java/com/tonywww/jeioptimize/index/AsyncIndex.java`, `src/main/java/com/tonywww/jeioptimize/snapshot/IngredientSearchSnapshot.java`, `src/main/java/com/tonywww/jeioptimize/snapshot/RecipeIndexSnapshot.java` |
 | ☑ T1.4 | Implement Forge client config and feature flag facade. | M | T0.3 | `JeiOptConfig` registers a client config file; every documented key exists; `JeiOptFeatureFlags` exposes read-only checks. | `src/main/java/com/tonywww/jeioptimize/config/JeiOptConfig.java`, `src/main/java/com/tonywww/jeioptimize/config/JeiOptFeatureFlags.java`, `src/main/java/com/tonywww/jeioptimize/JeiOptimize.java` |
-| ☑ T1.5 | Wire empty mixin package and config entries for future mixins. | S | T0.1, T1.4 | `jei_optimize.mixins.json` wires verified mixins; `compileJava` and `runClient` pass with no missing/invalid mixin errors. | `src/main/resources/jei_optimize.mixins.json`, `src/main/java/com/tonywww/jeioptimize/mixin/**` |
+| ☑ T1.5 | Wire empty mixin package and config entries for future mixins. | S | T0.1, T1.4 | `justenoughthreads.mixins.json` wires verified mixins; `compileJava` and `runClient` pass with no missing/invalid mixin errors. | `src/main/resources/justenoughthreads.mixins.json`, `src/main/java/com/tonywww/jeioptimize/mixin/**` |
 
 ## Stage 2 · Diagnostics Baseline → M1
 
 | ID | Task | Cx | Deps | Acceptance criteria | Files |
 |---|---|---|---|---|---|
-| ☑ T2.1 | Add transparent plugin phase timing instrumentation. | M | T0.1, T1.1, T1.4 | Timing mixin and diagnostics compile, are config-gated, and are wired in `jei_optimize.mixins.json`; runClient smoke passes. | `src/main/java/com/tonywww/jeioptimize/instrumentation/JeiOptDiagnostics.java`, `src/main/java/com/tonywww/jeioptimize/mixin/PluginCallerMixin.java`, `src/main/resources/jei_optimize.mixins.json` |
+| ☑ T2.1 | Add transparent plugin phase timing instrumentation. | M | T0.1, T1.1, T1.4 | Timing mixin and diagnostics compile, are config-gated, and are wired in `justenoughthreads.mixins.json`; runClient smoke passes. | `src/main/java/com/tonywww/jeioptimize/instrumentation/JeiOptDiagnostics.java`, `src/main/java/com/tonywww/jeioptimize/mixin/PluginCallerMixin.java`, `src/main/resources/justenoughthreads.mixins.json` |
 | ☑ T2.2 | Add registration count instrumentation. | M | T1.4, T2.1 | Counts for recipes, ingredients, aliases, categories, catalysts are associated with current plugin UID when enabled; disabled path is no-op. | `src/main/java/com/tonywww/jeioptimize/instrumentation/JeiPluginCallContext.java`, registration mixins under `src/main/java/com/tonywww/jeioptimize/mixin/` |
 | ☑ T2.3 | Document baseline runClient and measurement procedure. | S | T2.1 | Repro command, Java 21 Gradle note, and expected log markers are documented. | `docs/tasks/validation.md` |
 
@@ -116,7 +116,7 @@ Critical path: T0.1/T0.2 → T1.1/T1.2/T1.3 → T4.1/T4.2 → T5.1/T5.2 → T7.1
 | ID | Item | Blocks | How to resolve |
 |---|---|---|---|
 | ☑ R1 | Exact JEI 15.20.0.133 internal method/field names for mixin targets. | T1.5, T2.*, T3.*, T4.*, T5.*, T6.* | Resolved in `docs/tasks/jei-targets.md`; implemented mixins compile and runClient smoke passes. |
-| ☑ R5 | Forge 1.20.1 client config registration imports and generated file name. | T1.4 | Resolved by `JeiOptConfig`; generated `run/config/jei_optimize-client.toml`. |
+| ☑ R5 | Forge 1.20.1 client config registration imports and generated file name. | T1.4 | Resolved by `JeiOptConfig`; generated `run/config/justenoughthreads-client.toml`. |
 | ☑ R2 | Whether `IngredientFilter` constructor can be safely redirected without overwrite. | T3.2 | Implemented pseudo redirect/inject guarded by `syncOptimizations.batchIngredientFilterInit`; compileJava passes. Full equivalence remains in validation. |
 | ☑ R3 | Whether search storage classes can be built externally without private constructors. | T5.1 | Resolved by project-owned `SearchIndexBuilder` / `AsyncSearchIndex`; compileJava passes. Full equivalence remains in validation. |
 | ☑ R4 | Recipe map replacement/access pattern. | T6.* | Resolved via project-owned snapshot/index maps plus query mixins; compileJava and runClient pass. Full R/U/catalyst equivalence remains in validation. |

@@ -234,7 +234,8 @@ $OutputDir = Join-Path $OutputRoot "$RunStamp-$Profile"
 $RawDir = Join-Path $OutputDir "raw"
 $ConfigDir = Join-Path $OutputDir "config"
 $CrashDir = Join-Path $OutputDir "crash-reports"
-$ConfigPath = Join-Path $ResolvedInstanceDir "config\jei_optimize-client.toml"
+$ConfigPath = Join-Path $ResolvedInstanceDir "config\justenoughthreads-client.toml"
+$LegacyConfigPath = Join-Path $ResolvedInstanceDir "config\jei_optimize-client.toml"
 $LatestLogPath = Join-Path $ResolvedInstanceDir "logs\latest.log"
 $DebugLogPath = Join-Path $ResolvedInstanceDir "logs\debug.log"
 $ModsDir = Join-Path $ResolvedInstanceDir "mods"
@@ -245,13 +246,14 @@ $originalConfigBytes = $null
 $configExisted = Test-Path $ConfigPath
 if ($configExisted) {
     $originalConfigBytes = [System.IO.File]::ReadAllBytes((Resolve-Path $ConfigPath).Path)
-    Copy-IfExists $ConfigPath (Join-Path $ConfigDir "jei_optimize-client.before.toml")
+    Copy-IfExists $ConfigPath (Join-Path $ConfigDir "justenoughthreads-client.before.toml")
 }
+Copy-IfExists $LegacyConfigPath (Join-Path $ConfigDir "jei_optimize-client.legacy.toml")
 
 try {
     if ($Profile -ne "observe") {
         Write-TextNoBom $ConfigPath (New-JeiOptimizeConfig $Profile)
-        Copy-IfExists $ConfigPath (Join-Path $ConfigDir "jei_optimize-client.applied.toml")
+        Copy-IfExists $ConfigPath (Join-Path $ConfigDir "justenoughthreads-client.applied.toml")
         Write-Host "Applied JEI Optimize profile '$Profile' to $ConfigPath"
     } else {
         Write-Host "Observe mode: existing JEI Optimize config is left unchanged."
@@ -298,7 +300,7 @@ try {
     Write-TextNoBom (Join-Path $RawDir "captured-log-segment.log") $capturedText
     Copy-IfExists $LatestLogPath (Join-Path $RawDir "latest.log")
     Copy-IfExists $DebugLogPath (Join-Path $RawDir "debug.log")
-    Copy-IfExists $ConfigPath (Join-Path $ConfigDir "jei_optimize-client.after.toml")
+    Copy-IfExists $ConfigPath (Join-Path $ConfigDir "justenoughthreads-client.after.toml")
 
     $jeiConfigs = @(Get-ChildItem (Join-Path $ResolvedInstanceDir "config") -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -like "jei*" })
     foreach ($configFile in $jeiConfigs) {

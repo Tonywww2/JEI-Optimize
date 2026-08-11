@@ -115,7 +115,7 @@ val mcVersion = property("vers.mcVersion").toString()
 
 group = property("mod.group").toString()
 version = "${property("mod.version")}+$mcVersion"
-base.archivesName = "${property("mod.id")}-${loader.id()}"
+base.archivesName = property("mod.id").toString()
 
 val javaVersion = if (stonecutter.eval(mcVersion, ">=1.20.6")) 21 else 17
 

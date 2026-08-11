@@ -28,7 +28,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $resolved = (Resolve-Path $InstanceDir).Path
-$configPath = Join-Path $resolved 'config\jei_optimize-client.toml'
+$configPath = Join-Path $resolved 'config\justenoughthreads-client.toml'
 
 function Write-Profile([bool] $optimized) {
     $flag = if ($optimized) { 'true' } else { 'false' }

@@ -4,7 +4,7 @@
   "package": "com.tonywww.jeioptimize.mixin",
   "plugin": "com.tonywww.jeioptimize.JeiOptMixinPlugin",
   "compatibilityLevel": "${mixinCompat}",
-  "refmap": "jei_optimize.refmap.json",
+  "refmap": "justenoughthreads.refmap.json",
   "mixins": [
     "PluginCallerMixin",
     "ExtendableRecipeCategoryHelperMixin",

@@ -35,7 +35,7 @@ Observed evidence:
 
 ## 3. Mixin Wiring State
 
-Current [jei_optimize.mixins.json](../../src/main/resources/jei_optimize.mixins.json) wires:
+Current [justenoughthreads.mixins.json](../../src/main/resources/justenoughthreads.mixins.json) wires:
 
 - `PluginCallerMixin`
 - `JeiStarterMixin`

@@ -12,7 +12,7 @@ import org.slf4j.Logger;
 
 @Mod(JeiOptimize.MOD_ID)
 public final class JeiOptimize {
-    public static final String MOD_ID = "jei_optimize";
+    public static final String MOD_ID = "justenoughthreads";
     public static final Logger LOGGER = LogUtils.getLogger();
 
     //? if forge {

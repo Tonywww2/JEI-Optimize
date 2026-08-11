@@ -102,13 +102,13 @@ Implemented and compiled components as of 2026-07-10:
 | Runtime generation | `JeiOptRuntimeState.java` | compileJava passed | Requires lifecycle mixin activation later. |
 | Executors | `JeiOptExecutors.java` | compileJava passed | Available to async tasks. |
 | Async contracts/snapshots | `AsyncIndexState.java`, `AsyncIndex.java`, `IngredientSearchSnapshot.java`, `RecipeIndexSnapshot.java` | compileJava passed | Library contracts only. |
-| Config gates | `JeiOptConfig.java`, `JeiOptFeatureFlags.java` | compileJava + runClient passed | `run/config/jei_optimize-client.toml` generated with all frozen keys. |
+| Config gates | `JeiOptConfig.java`, `JeiOptFeatureFlags.java` | compileJava + runClient passed | `run/config/justenoughthreads-client.toml` generated with all frozen keys. |
 | Diagnostics | `JeiOptDiagnostics.java`, `JeiPluginCallContext.java`, diagnostic mixins | compileJava passed | Runtime activation depends on mixin config entries. |
 | Sync optimizations | `JeiOptCacheScope.java`, `IngredientFilterMixin.java`, `IngredientSorterMixin.java`, `RecipeManagerInternalCompactMixin.java` | compileJava passed | Runtime activation depends on mixin config entries and feature flags. |
 | Async search/sort | `IngredientSearchSnapshotBuilder.java`, `AsyncSearchIndex.java`, `SearchIndexBuilder.java`, `AsyncSortIndex.java`, related mixins | compileJava passed | Functional equivalence still requires manual JEI interaction checks. |
 | Recipe/catalyst async | `RecipeIndexSnapshotBuilder.java`, `AsyncRecipeFocusIndex.java`, `AsyncCatalystIndex.java`, related mixins | compileJava passed | Functional equivalence still requires manual R/U/catalyst checks. |
 
-Generated config verified at `run/config/jei_optimize-client.toml` with all frozen keys and conservative defaults (`false` for feature-specific optimizations).
+Generated config verified at `run/config/justenoughthreads-client.toml` with all frozen keys and conservative defaults (`false` for feature-specific optimizations).
 
 Reflection scan status: source scan under `src/main/java` found no remaining `java.lang.reflect`, `Class.forName`, `getDeclared*`, `setAccessible`, or reflective `invoke` usage. JEI internals are now accessed via direct compile-only JEI module dependencies or Mixin shadows/strong types.
 
@@ -196,7 +196,7 @@ Current status: matrices are intentionally not auto-filled by compile/run smoke.
 | `general.enabled=false` then runClient | All feature mixins no-op or fall back to JEI baseline. | ☐ |
 | Chunked ingredient index publication | Progress is monotonic; no partial sidebar refresh; one final swap before runtime callbacks. | ☑ Automated startup smoke: JEI 15.20 completed 2670 ingredients in 6 chunks; JEI 15.48 completed 2670 in 6 chunks through its per-element ABI; NeoForge JEI 19.27 completed 1688 in 4 chunks. All published on Render thread before `Sending Runtime`, with no fallback after ABI selection. Manual visual progress review remains open. |
 | Container input during active indexing | JEI input is ignored without consuming vanilla input or touching an unpublished runtime. | ☑ SDBF crash root cause: JEI 15.21 registered GUI input, submitted 24,680 ingredients in 50 chunks, then Ixeris replayed one queued key before runtime publication; JEI threw `Jei Client Configs have not been created yet`. Exact JEI 15.21 input ABI matches the guard. Real Forge screen-key events dispatched between chunk submission and final publication on JEI 15.20 and 15.48 hit the guard once, returned `consumed=false`, completed startup, and produced no runtime error. NeoForge remained safe before publication. Evidence: `build/benchmarks/jei-compat/input-guard-*.latest.log`. |
-| Minecraft profiler isolation | JEI startup callbacks cannot mutate the render thread's active profiler map. | ☑ Forge and NeoForge probes confirmed `Minecraft.getProfiler()` was intercepted only on `jei_optimize-start`; the render-thread call did not hit the guard, startup completed, and no mixin/runtime failure occurred. `ActiveProfiler.getResults()` passes its mutable entries map directly to `FilledProfileResults`, matching the reported CME. The crash session also logged a render-thread profiler push/pop mismatch, so the exact writer remains unproven. Evidence: `build/benchmarks/jei-compat/profiler-guard-*.latest.log`. |
+| Minecraft profiler isolation | JEI startup callbacks cannot mutate the render thread's active profiler map. | ☑ Forge and NeoForge probes confirmed `Minecraft.getProfiler()` was intercepted only on the dedicated startup thread (then `jei_optimize-start`, now `justenoughthreads-start`); the render-thread call did not hit the guard, startup completed, and no mixin/runtime failure occurred. `ActiveProfiler.getResults()` passes its mutable entries map directly to `FilledProfileResults`, matching the reported CME. The crash session also logged a render-thread profiler push/pop mismatch, so the exact writer remains unproven. Evidence: `build/benchmarks/jei-compat/profiler-guard-*.latest.log`. |
 
 Current status: runClient smoke passed with generated default config. Default feature-specific optimization gates are `false`, so this primarily validates baseline/no-op startup. Explicit `general.enabled=false` run remains pending.
 
@@ -206,7 +206,7 @@ Current status: runClient smoke passed with generated default config. Default fe
 |---|---|---|
 | `Stonecutter requires JVM 21` | Gradle ran under Java 17. | Set `JAVA_HOME` to JDK 21 and rerun. |
 | Missing JEI API artifact with `:api` classifier | Wrong JEI dependency notation. | Use `mezz.jei:jei-1.20.1-forge-api:15.20.0.133`. |
-| Mixin class not found | `jei_optimize.mixins.json` lists unimplemented class. | Remove entry or add class. |
+| Mixin class not found | `justenoughthreads.mixins.json` lists unimplemented class. | Remove entry or add class. |
 | Mixin target not found | JEI target changed or mapping mismatch. | Check `docs/tasks/jei-targets.md` and decompile dependency. |
 | Search result missing | Async index published incomplete data. | Disable feature, compare baseline, inspect snapshot completeness. |
 | Old result after world switch | Generation check failed. | Audit `JeiOptRuntimeState.isCurrent` before publish. |

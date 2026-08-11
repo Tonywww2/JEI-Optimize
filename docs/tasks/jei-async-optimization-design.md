@@ -109,7 +109,7 @@ These contracts are draft here and must be frozen in the parallel plan before im
 
 ### Configuration Contract
 
-Config file: `run/config/jei_optimize-client.toml`.
+Config file: `run/config/justenoughthreads-client.toml`.
 
 Every feature must have a boolean gate. Proposed keys:
 
@@ -174,8 +174,8 @@ Boundaries — this will NOT do:
 | Stonecutter 0.9.6 needs Java 21 runtime | verified | Gradle failure under Java 17; successful wrapper/client run under Java 21. |
 | JEI internals exact bytecode names for planned mixin targets | verified | Recorded from JEI 15.20.0.133 source jars and `javap` in [jei-targets.md](jei-targets.md); implemented mixins compile and `runClient` smoke passes. |
 | Worker-safe snapshot fields are sufficient for feature parity | partially verified | Snapshot builders and async indexes compile and `runClient` smoke passes; full search/R/U/catalyst equivalence matrices remain for PH-1/PH-3 validation. |
-| Forge client config registration exact imports for 1.20.1 | verified | `JeiOptConfig` compiled; `runClient` generated `run/config/jei_optimize-client.toml` with all frozen keys. |
-| Search/focus/catalyst async mixin wiring | partially verified | Relevant mixin classes are present in `jei_optimize.mixins.json`; `compileJava` and `runClient` pass. Full feature-on equivalence remains to be captured in validation. |
+| Forge client config registration exact imports for 1.20.1 | verified | `JeiOptConfig` compiled; `runClient` generated `run/config/justenoughthreads-client.toml` with all frozen keys. |
+| Search/focus/catalyst async mixin wiring | partially verified | Relevant mixin classes are present in `justenoughthreads.mixins.json`; `compileJava` and `runClient` pass. Full feature-on equivalence remains to be captured in validation. |
 
 ## 8. Open Questions
 

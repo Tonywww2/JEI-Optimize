@@ -1,6 +1,0 @@
-{
-  "gui.jei_optimize.loading": "JEI is loading in the background...",
-  "gui.jei_optimize.loading.indexing": "Building JEI index %s / %s",
-  "gui.jei_optimize.loading.preparing": "Preparing JEI index...",
-  "gui.jei_optimize.loading.publishing": "Publishing JEI sidebar..."
-}

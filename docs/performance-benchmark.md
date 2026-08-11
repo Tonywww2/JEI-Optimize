@@ -7,7 +7,7 @@ This benchmark compares JEI startup performance with this mod's optimization fla
 - Baseline: `general.enabled=false`; diagnostics disabled.
 - Optimized: `general.enabled=true`; all sync and async optimization flags enabled; diagnostics disabled.
 
-The script edits `run/config/jei_optimize-client.toml` before each run and restores the original file when finished.
+The script edits `run/config/justenoughthreads-client.toml` before each run and restores the original file when finished.
 
 ## Command
 

@@ -13,7 +13,7 @@ $ErrorActionPreference = "Stop"
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RepoRoot = Split-Path -Parent $ScriptDir
-$ConfigPath = Join-Path $RepoRoot "run\config\jei_optimize-client.toml"
+$ConfigPath = Join-Path $RepoRoot "run\config\justenoughthreads-client.toml"
 $RunLogPath = Join-Path $RepoRoot "run\logs\latest.log"
 $GradleBat = Join-Path $RepoRoot "gradlew.bat"
 $ResolvedOutputDir = Join-Path $RepoRoot $OutputDir

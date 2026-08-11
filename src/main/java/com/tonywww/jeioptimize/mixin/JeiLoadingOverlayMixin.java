@@ -55,7 +55,7 @@ public abstract class JeiLoadingOverlayMixin {
         int contentWidth = panelWidth - PADDING * 2;
         String statusText = font.plainSubstrByWidth(status.getString(), contentWidth);
         int statusWidth = font.width(statusText);
-        int panelX = panelLeft + (availableWidth - panelWidth) / 2;
+        int panelX = minecraft.getWindow().getGuiScaledWidth() - HORIZONTAL_MARGIN - panelWidth;
         int panelY = Math.max(HORIZONTAL_MARGIN, topPos + HORIZONTAL_MARGIN);
         int panelHeight = PADDING + font.lineHeight + 5 + BAR_HEIGHT + PADDING;
         int barX = panelX + PADDING;
@@ -84,12 +84,12 @@ public abstract class JeiLoadingOverlayMixin {
     private static Component jeiOptimize$statusText(JeiOptStartupProgressState.Snapshot progress) {
         return switch (progress.stage()) {
             case INDEXING -> Component.translatable(
-                "gui.jei_optimize.loading.indexing",
+                "gui.justenoughthreads.loading.indexing",
                 progress.completedChunks(),
                 progress.totalChunks()
             );
-            case READY, PUBLISHED -> Component.translatable("gui.jei_optimize.loading.publishing");
-            default -> Component.translatable("gui.jei_optimize.loading.preparing");
+            case READY, PUBLISHED -> Component.translatable("gui.justenoughthreads.loading.publishing");
+            default -> Component.translatable("gui.justenoughthreads.loading.preparing");
         };
     }
 

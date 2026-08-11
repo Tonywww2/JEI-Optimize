@@ -21,7 +21,7 @@ The package may contain local paths, usernames, hardware details, and full logs.
 - `optimized`: writes `general.enabled=true` and enables all JEI Optimize sync/async feature flags.
 - `observe`: does not edit config; only watches and packages the current run.
 
-For `baseline` and `optimized`, the original `config/jei_optimize-client.toml` is restored after collection unless `-NoRestoreConfig` is specified.
+For `baseline` and `optimized`, the original `config/justenoughthreads-client.toml` is restored after collection unless `-NoRestoreConfig` is specified. A legacy `config/jei_optimize-client.toml` is captured separately when present.
 
 ## Recommended Two-Run Procedure
 
@@ -77,7 +77,7 @@ Start the script before launching Minecraft. Add `-ReadExistingLog` only when yo
 The collector expects these paths inside `-InstanceDir`:
 
 ```text
-config\jei_optimize-client.toml
+config\justenoughthreads-client.toml
 logs\latest.log
 mods\
 ```

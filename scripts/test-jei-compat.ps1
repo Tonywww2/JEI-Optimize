@@ -13,7 +13,7 @@
     JEI build to resolve at runtime, e.g. 15.48.0.179. Omit to use the version from gradle.properties.
 
 .PARAMETER KeepConfig
-    Do not overwrite run/config/jei_optimize-client.toml. Use this to test a hand-written config.
+    Do not overwrite run/config/justenoughthreads-client.toml. Use this to test a hand-written config.
 
 .EXAMPLE
     .\scripts\test-jei-compat.ps1 -JeiVersion 15.48.0.179
@@ -52,7 +52,7 @@ if ($Loader -eq "forge") {
     if (-not $World) { $World = "v121" }
 }
 
-$ConfigPath = Join-Path $RunDir "config\jei_optimize-client.toml"
+$ConfigPath = Join-Path $RunDir "config\justenoughthreads-client.toml"
 $RunLogPath = Join-Path $RunDir "logs\latest.log"
 $OutDir = Join-Path $RepoRoot "build\benchmarks\jei-compat"
 $Tag = "$Loader-" + $(if ($JeiVersion) { $JeiVersion } else { "default" })

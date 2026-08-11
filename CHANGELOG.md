@@ -4,6 +4,26 @@ All notable changes to Just Enough Threads are documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.10.0
+
+A loader identity and packaging consistency release. The mod id now matches the CurseForge slug,
+and distribution filenames use that id directly instead of the Stonecutter loader/project suffix.
+
+### Changed
+
+- **The loader mod id is now `justenoughthreads`.** Metadata, JEI plugin UID, Mixin/refmap names,
+  assets, translation keys, logger name, config filename, and release artifacts all use the
+  CurseForge-aligned identity. Remove the old jar before installing this release so both loader
+  identities are not loaded together.
+- **Existing client configuration is preserved.** If `justenoughthreads-client.toml` is absent,
+  the mod copies `jei_optimize-client.toml` to the new name before config registration. It never
+  overwrites the new file or deletes the legacy file.
+- **Release jars are now named from `mod.id`.** Forge and NeoForge artifacts use
+  `justenoughthreads-<version>+<minecraft>.jar`. Loader identity remains available from the
+  containing Stonecutter build directory and the jar's loader metadata.
+- **The JEI loading progress panel is now right-aligned.** Its right edge follows the scaled
+  screen's right margin instead of centering inside the empty area beside the inventory.
+
 ## 0.9.2
 
 A profiler thread-safety patch. Background JEI startup no longer shares Minecraft's mutable

@@ -2,7 +2,7 @@
 
 Owner: agent1  
 Task: PA-1 / T0.1  
-Scope: Forge 1.20.1, JEI 15.20.0.133, current `jei_optimize` project.
+Scope: Forge 1.20.1, JEI 15.20.0.133, current `justenoughthreads` loader mod.
 
 ## 1. Evidence Sources
 
@@ -99,7 +99,7 @@ then writes `JeiStarter.running=true`.
 | R1-A | Exact injection strategy for `IngredientFilter` constructor batch add. | PD-2 | Prototype redirect/inject in dev runtime; if constructor redirect is brittle, use field replacement after constructor or leave disabled. |
 | R1-B | Whether JEI `PrefixInfo` / storage classes can be reused externally without private constructor access. | PF-1 | Inspect `jei-1.20.1-core` source/jar and compile `SearchIndexBuilder` probe. |
 | R1-C | Safe replacement path for recipe focus maps without corrupting `RecipeManagerInternal` / `PluginManager`. | PG-1, PG-2 | Build accessor prototype; compare R/U results against baseline. |
-| R1-D | Forge 1.20.1 config registration exact imports and generated file name. | PB-4 | Implement `JeiOptConfig`, compile, and confirm `run/config/jei_optimize-client.toml`. |
+| R1-D | Forge 1.20.1 config registration exact imports and generated file name. | PB-4 | Implement `JeiOptConfig`, compile, and confirm `run/config/justenoughthreads-client.toml`. |
 | R1-E | Whether any target methods are renamed by remapping in runtime mixin environment. | All mixins | Compile + runClient with each mixin enabled one at a time. |
 
 ## 9. PA-1 Result

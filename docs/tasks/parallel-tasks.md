@@ -23,7 +23,7 @@ Legend: ☐ todo · ◐ in-progress · ☑ done · ⛔ blocked.
 
 ## 2. Shared conventions (FROZEN)
 
-- Mod id: `jei_optimize`.
+- Mod id: `justenoughthreads` (legacy id before 0.10.0: `jei_optimize`).
 - Base package: `com.tonywww.jeioptimize`.
 - Mixin package: `com.tonywww.jeioptimize.mixin`.
 - Accessors package: `com.tonywww.jeioptimize.mixin.accessor`.
@@ -142,7 +142,7 @@ Gate A: `docs/tasks/jei-targets.md`, `contracts.md`, and `validation.md` exist; 
 - Deliverable / Acceptance: Frozen async contracts and snapshot records compile.
 - Maps to: T1.3
 
-**PB-4 · Config system** ☑ owner:agent1 output:`JeiOptConfig.java`, `JeiOptFeatureFlags.java`, generated `run/config/jei_optimize-client.toml`
+**PB-4 · Config system** ☑ owner:agent1 output:`JeiOptConfig.java`, `JeiOptFeatureFlags.java`, generated `run/config/justenoughthreads-client.toml`
 - Owns: `src/main/java/com/tonywww/jeioptimize/config/JeiOptConfig.java`, `src/main/java/com/tonywww/jeioptimize/config/JeiOptFeatureFlags.java`, `src/main/java/com/tonywww/jeioptimize/JeiOptimize.java`
 - Reads: `docs/tasks/contracts.md`, `src/main/resources/META-INF/mods.toml`
 - Deliverable / Acceptance: Forge client config registers; every frozen config key exists; global and per-feature checks are readable by mixins.
@@ -164,8 +164,8 @@ Gate B: `./gradlew.bat --no-daemon compileJava` with Java 21 Gradle runtime reac
 - Deliverable / Acceptance: Recipes/ingredients/aliases/categories/catalysts count attribution works by plugin UID and is disabled by `diagnostics.registrationCounts=false`.
 - Maps to: T2.2
 
-**PC-3 · Mixin config wiring** ☑ owner:agent output:`jei_optimize.mixins.json` wires verified mixins; `compileJava` and `runClient` passed with no missing/invalid mixin errors
-- Owns: `src/main/resources/jei_optimize.mixins.json`
+**PC-3 · Mixin config wiring** ☑ owner:agent output:`justenoughthreads.mixins.json` wires verified mixins; `compileJava` and `runClient` passed with no missing/invalid mixin errors
+- Owns: `src/main/resources/justenoughthreads.mixins.json`
 - Reads: PC-1 and PC-2 class names, `docs/tasks/contracts.md`
 - Deliverable / Acceptance: Only verified diagnostic mixins are listed; runClient has no missing mixin class errors.
 - Maps to: T1.4, T2.1, T2.2
@@ -319,7 +319,7 @@ Gate H: `runClient` smoke passes; equivalence checklist is filled; no unresolved
 | `src/main/java/com/tonywww/jeioptimize/mixin/JeiStarterPublishModernMixin.java` | CR-1 | H |
 | `src/main/java/com/tonywww/jeioptimize/instrumentation/JeiPluginCallContext.java` | PC-2 | C |
 | `src/main/java/com/tonywww/jeioptimize/mixin/registration/**` | PC-2 | C |
-| `src/main/resources/jei_optimize.mixins.json` | PC-3 | C |
+| `src/main/resources/justenoughthreads.mixins.json` | PC-3 | C |
 | `src/main/java/com/tonywww/jeioptimize/runtime/JeiOptCacheScope.java` | PD-1 | D |
 | `src/main/java/com/tonywww/jeioptimize/mixin/IngredientFilterMixin.java` | PD-2 | D |
 | `src/main/java/com/tonywww/jeioptimize/mixin/accessor/IngredientFilterAccessor.java` | PD-2 | D |

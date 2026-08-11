@@ -1,0 +1,6 @@
+{
+  "gui.justenoughthreads.loading": "JEI 正在后台加载...",
+  "gui.justenoughthreads.loading.indexing": "正在构建 JEI 索引 %s / %s",
+  "gui.justenoughthreads.loading.preparing": "正在准备 JEI 索引...",
+  "gui.justenoughthreads.loading.publishing": "正在发布 JEI 侧栏..."
+}

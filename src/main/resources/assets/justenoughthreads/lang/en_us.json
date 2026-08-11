@@ -1,0 +1,6 @@
+{
+  "gui.justenoughthreads.loading": "JEI is loading in the background...",
+  "gui.justenoughthreads.loading.indexing": "Building JEI index %s / %s",
+  "gui.justenoughthreads.loading.preparing": "Preparing JEI index...",
+  "gui.justenoughthreads.loading.publishing": "Publishing JEI sidebar..."
+}

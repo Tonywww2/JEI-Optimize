@@ -1,5 +1,6 @@
 package com.tonywww.jeioptimize.instrumentation;
 
+import com.tonywww.jeioptimize.JeiOptimize;
 import com.tonywww.jeioptimize.config.JeiOptFeatureFlags;
 import mezz.jei.api.IModPlugin;
 import net.minecraft.resources.ResourceLocation;
@@ -99,9 +100,9 @@ public final class JeiPluginCallContext {
             return plugin.getPluginUid();
         } catch (RuntimeException | LinkageError e) {
             //? if forge {
-            return new ResourceLocation("jei_optimize", "unknown_plugin");
+            return new ResourceLocation(JeiOptimize.MOD_ID, "unknown_plugin");
             //?} else {
-            /*return ResourceLocation.fromNamespaceAndPath("jei_optimize", "unknown_plugin");
+            /*return ResourceLocation.fromNamespaceAndPath(JeiOptimize.MOD_ID, "unknown_plugin");
             *///?}
         }
     }

@@ -57,7 +57,10 @@ Because the mod hooks JEI's internal classes, each build is tied to the JEI vers
 
 ## Configuration
 
-Config file: `config/jei_optimize-client.toml`
+Config file: `config/justenoughthreads-client.toml`
+
+When upgrading from an older release, `config/jei_optimize-client.toml` is copied automatically if
+the new file does not exist. The legacy file is left untouched and never overwrites a new config.
 
 | Option | Section | Default | Description |
 |--------|---------|---------|-------------|
@@ -86,8 +89,8 @@ Gradle must run on JDK 21. The Forge (1.20.1) target compiles to Java 17; the Ne
 
 `build` compiles and jars **both loaders**. The jars land in each version's build folder:
 
-    versions/1.20.1-forge/build/libs/jei_optimize-forge-<version>+1.20.1.jar
-    versions/1.21.1-neoforge/build/libs/jei_optimize-neoforge-<version>+1.21.1.jar
+    versions/1.20.1-forge/build/libs/justenoughthreads-<version>+1.20.1.jar
+    versions/1.21.1-neoforge/build/libs/justenoughthreads-<version>+1.21.1.jar
 
 ### Publishing
 
@@ -133,7 +136,7 @@ The matching `AnvilRecipeControl` variant injects at the head of JEI's `AnvilRec
 - **Startup executor** (`JeiOptExecutors`) — a single-flight daemon executor for serial JEI startup. Each start has a generation token; stop cancels and interrupts it. Runtime callbacks and publication are generation-checked on the client thread.
 - **Worker pool** (`JeiOptExecutors`) — a small fixed pool of daemon threads (`workerThreads`, default 4) for derived off-thread builds, plus a helper for running work back on the main thread.
 - **Client-tick work queue** (`JeiOptClientTickQueue` + `ClientTickHookMixin`) — a queue drained a little each client tick under a time budget, used to run main-thread finalize work (such as the index swap) a piece at a time instead of blocking a single frame.
-- **Mixin registration** — all hooks are listed in `jei_optimize.mixins.json`. On Forge they are registered through Architectury Loom's `forge.mixinConfig`; on NeoForge through the `[[mixins]]` entry in `neoforge.mods.toml`. Either way this is what actually loads them in both the development and production environments.
+- **Mixin registration** — all hooks are listed in `justenoughthreads.mixins.json`. On Forge they are registered through Architectury Loom's `forge.mixinConfig`; on NeoForge through the `[[mixins]]` entry in `neoforge.mods.toml`. Either way this is what actually loads them in both the development and production environments.
 
 ### Diagnostics
 

@@ -154,7 +154,7 @@ Rules:
 
 ## 5. Configuration Contract
 
-Config file: `run/config/jei_optimize-client.toml`.
+Config file: `run/config/justenoughthreads-client.toml`.
 
 Implementation class: `com.tonywww.jeioptimize.config.JeiOptConfig`.
 
@@ -317,7 +317,7 @@ Lifecycle:
 
 ## 9. Mixin Contract
 
-- Mixin class names must be recorded in [jei-targets.md](jei-targets.md) before being added to `jei_optimize.mixins.json`.
+- Mixin class names must be recorded in [jei-targets.md](jei-targets.md) before being added to `justenoughthreads.mixins.json`.
 - Every behavior-changing injection starts with a feature flag check.
 - If feature is disabled, injection must return without changing JEI behavior.
 - Accessors/invokers live under `com.tonywww.jeioptimize.mixin.accessor`.

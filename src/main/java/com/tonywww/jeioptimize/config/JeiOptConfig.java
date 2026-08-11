@@ -9,9 +9,11 @@ import net.minecraftforge.common.ForgeConfigSpec.ConfigValue;
 import net.minecraftforge.common.ForgeConfigSpec.IntValue;
 import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.config.ModConfig;
+import net.minecraftforge.fml.loading.FMLPaths;
 //?} else {
 /*import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.config.ModConfig;
+import net.neoforged.fml.loading.FMLPaths;
 import net.neoforged.neoforge.common.ModConfigSpec;
 import net.neoforged.neoforge.common.ModConfigSpec.BooleanValue;
 import net.neoforged.neoforge.common.ModConfigSpec.Builder;
@@ -19,7 +21,14 @@ import net.neoforged.neoforge.common.ModConfigSpec.ConfigValue;
 import net.neoforged.neoforge.common.ModConfigSpec.IntValue;
 *///?}
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+
 public final class JeiOptConfig {
+    private static final String CONFIG_NAME = JeiOptimize.MOD_ID + "-client.toml";
+    private static final String LEGACY_CONFIG_NAME = "jei_optimize-client.toml";
+
     //? if forge {
     public static final ForgeConfigSpec SPEC;
     //?} else {
@@ -203,7 +212,8 @@ public final class JeiOptConfig {
         if (registered) {
             return;
         }
-        ModLoadingContext.get().registerConfig(ModConfig.Type.CLIENT, SPEC, JeiOptimize.MOD_ID + "-client.toml");
+        migrateLegacyConfig();
+        ModLoadingContext.get().registerConfig(ModConfig.Type.CLIENT, SPEC, CONFIG_NAME);
         registered = true;
     }
     //?} else {
@@ -211,8 +221,29 @@ public final class JeiOptConfig {
         if (registered) {
             return;
         }
-        container.registerConfig(ModConfig.Type.CLIENT, SPEC);
+        migrateLegacyConfig();
+        container.registerConfig(ModConfig.Type.CLIENT, SPEC, CONFIG_NAME);
         registered = true;
     }
     *///?}
+
+    private static void migrateLegacyConfig() {
+        Path configDir = FMLPaths.CONFIGDIR.get();
+        Path current = configDir.resolve(CONFIG_NAME);
+        Path legacy = configDir.resolve(LEGACY_CONFIG_NAME);
+        if (Files.exists(current) || !Files.isRegularFile(legacy)) {
+            return;
+        }
+        try {
+            Files.copy(legacy, current);
+            JeiOptimize.LOGGER.info("Migrated legacy config {} to {}", LEGACY_CONFIG_NAME, CONFIG_NAME);
+        } catch (IOException e) {
+            JeiOptimize.LOGGER.warn(
+                "Could not migrate legacy config {} to {}; defaults will be used if the new file is absent",
+                LEGACY_CONFIG_NAME,
+                CONFIG_NAME,
+                e
+            );
+        }
+    }
 }

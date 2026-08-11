@@ -24,7 +24,7 @@ import java.util.Set;
  * applied. Everything not listed here is left to Mixin's own (now non-fatal) target resolution.
  */
 public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
-    private static final Logger LOGGER = LogManager.getLogger("jei_optimize");
+    private static final Logger LOGGER = LogManager.getLogger(JeiOptimize.MOD_ID);
     private static final String MIXIN_PACKAGE = "com.tonywww.jeioptimize.mixin.";
     private static final String STARTER_PUBLISH_LEGACY_MIXIN = MIXIN_PACKAGE + "JeiStarterPublishLegacyMixin";
     private static final String STARTER_PUBLISH_MODERN_MIXIN = MIXIN_PACKAGE + "JeiStarterPublishModernMixin";

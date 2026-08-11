@@ -69,9 +69,8 @@ Write-Host ""
 Write-Host "  About to PUBLISH $modName $version to CurseForge (project $projectId):" -ForegroundColor Yellow
 if ($nodes.Count -gt 0) {
     foreach ($node in $nodes) {
-        $loader = $node.Substring($node.LastIndexOf('-') + 1)
         $mc     = $node.Substring(0, $node.LastIndexOf('-'))
-        Write-Host "    - $modId-$loader-$version+$mc.jar"
+        Write-Host "    - $modId-$version+$mc.jar ($node)"
     }
 } else {
     Write-Host "    - every loader version"

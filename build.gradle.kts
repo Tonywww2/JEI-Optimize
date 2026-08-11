@@ -31,7 +31,7 @@ val mixinExtrasForgeVersion = (findProperty("deps.mixinExtrasForge") ?: "").toSt
 
 group = property("mod.group").toString()
 version = "$modVersion+$mcVersion"
-base.archivesName = "$modId-${loader.id()}"
+base.archivesName = modId
 
 loom {
     silentMojangMappingsLicense()
@@ -117,7 +117,7 @@ tasks {
             "mixinCompat" to "JAVA_$javaVersion",
         )
         inputs.properties(props)
-        filesMatching(listOf("META-INF/mods.toml", "META-INF/neoforge.mods.toml", "pack.mcmeta", "jei_optimize.mixins.json")) {
+        filesMatching(listOf("META-INF/mods.toml", "META-INF/neoforge.mods.toml", "pack.mcmeta", "$modId.mixins.json")) {
             expand(props)
         }
     }

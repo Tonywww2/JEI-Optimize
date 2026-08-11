@@ -33,7 +33,7 @@ The biggest single cost — the ingredient index — no longer blocks loading; i
 
 ## Configuration
 
-Config file: `config/jei_optimize-client.toml`. Every optimization can be toggled independently.
+Config file: `config/justenoughthreads-client.toml`. Every optimization can be toggled independently. The legacy `jei_optimize-client.toml` is copied automatically when the new file is absent.
 
 *   `enabled` — master switch for the whole mod.
 *   `asyncStartup` — build JEI serially on a dedicated background thread, then run runtime callbacks and publication on the client thread; world exit, timeout, and server shutdown cancel stale work immediately.
@@ -95,7 +95,7 @@ JEI 自动生成的材料修复与附魔书组合配方默认隐藏。在超大�
 
 ## 配置
 
-配置文件:`config/jei_optimize-client.toml`。每一项优化都可以单独开关。
+配置文件:`config/justenoughthreads-client.toml`。每一项优化都可以单独开关。若新文件不存在，会自动从旧的 `jei_optimize-client.toml` 复制配置，且不会删除旧文件。
 
 *   `enabled` — 整个 mod 的总开关。
 *   `asyncStartup` — 在专用后台线程上串行启动 JEI;退出世界、连接超时或服务器关闭时立即取消,默认开启。

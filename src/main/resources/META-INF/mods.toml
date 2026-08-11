@@ -25,10 +25,3 @@ mandatory = true
 versionRange = "[${minecraftVersion},1.20.2)"
 ordering = "NONE"
 side = "BOTH"
-
-[[dependencies.${id}]]
-modId = "jei"
-mandatory = true
-versionRange = "[${jeiVersion},)"
-ordering = "AFTER"
-side = "CLIENT"
