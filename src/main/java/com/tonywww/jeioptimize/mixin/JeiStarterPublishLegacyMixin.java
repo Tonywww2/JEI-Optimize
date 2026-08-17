@@ -1,6 +1,7 @@
 package com.tonywww.jeioptimize.mixin;
 
 import com.tonywww.jeioptimize.runtime.JeiOptExecutors;
+import com.tonywww.jeioptimize.runtime.JeiOptRuntimePublication;
 import mezz.jei.api.runtime.IJeiRuntime;
 import mezz.jei.common.Internal;
 import org.spongepowered.asm.mixin.Mixin;
@@ -23,6 +24,6 @@ public abstract class JeiStarterPublishLegacyMixin {
             Internal.setRuntime(runtime);
             return;
         }
-        JeiOptExecutors.runOnMainThreadAndWait(() -> Internal.setRuntime(runtime));
+        JeiOptRuntimePublication.runCallbacksAndPublish(() -> Internal.setRuntime(runtime));
     }
 }

@@ -37,6 +37,7 @@
     "ClientTickHookMixin",
     "JeiClientInputGuardMixin",
     "JeiLoadingOverlayMixin",
+    "JeiRecipesGuiGuardMixin",
     "MinecraftProfilerGuardMixin"
   ],
   "injectors": {

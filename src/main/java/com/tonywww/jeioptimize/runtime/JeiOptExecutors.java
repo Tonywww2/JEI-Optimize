@@ -66,6 +66,7 @@ public final class JeiOptExecutors {
                 runnable.run();
                 checkJeiStartActive();
             } finally {
+                JeiOptRuntimePublication.clearPendingCallbacks();
                 CURRENT_JEI_START.remove();
                 synchronized (JEI_START_LOCK) {
                     if (latestJeiStart == task) {
@@ -111,6 +112,12 @@ public final class JeiOptExecutors {
         JeiStartTask task = CURRENT_JEI_START.get();
         if (task != null) {
             ensureJeiStartActive(task);
+        }
+    }
+
+    public static void checkJeiStartGeneration(long generation) {
+        if (!JeiOptRuntimeState.isCurrent(generation)) {
+            throw new JeiStartCancelled();
         }
     }
 

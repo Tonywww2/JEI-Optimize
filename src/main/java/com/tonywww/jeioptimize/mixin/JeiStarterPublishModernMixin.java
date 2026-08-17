@@ -1,6 +1,7 @@
 package com.tonywww.jeioptimize.mixin;
 
 import com.tonywww.jeioptimize.runtime.JeiOptExecutors;
+import com.tonywww.jeioptimize.runtime.JeiOptRuntimePublication;
 import mezz.jei.api.runtime.IJeiRuntime;
 import mezz.jei.common.Internal;
 import mezz.jei.library.startup.JeiStarter;
@@ -58,7 +59,7 @@ public abstract class JeiStarterPublishModernMixin {
             throw new IllegalStateException("JEI runtime publication was not captured");
         }
         jeiOptimize$pendingRuntime = null;
-        JeiOptExecutors.runOnMainThreadAndWait(() -> {
+        JeiOptRuntimePublication.runCallbacksAndPublish(() -> {
             Internal.setRuntime(runtime);
             running = true;
         });

@@ -78,7 +78,11 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
                 + "Lmezz/jei/gui/search/IElementSearch;"),
         MIXIN_PACKAGE + "ItemStackListFactoryMixin", Requirement.method(
             "creative tab skipping",
-            "create")
+            "create"),
+        MIXIN_PACKAGE + "JeiRecipesGuiGuardMixin", Requirement.method(
+            "startup recipe GUI guard",
+            "show",
+            "(Ljava/util/List;)V")
     );
 
     private final Map<String, ClassNode> targetCache = new HashMap<>();

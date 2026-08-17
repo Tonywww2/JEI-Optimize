@@ -4,6 +4,20 @@ All notable changes to Just Enough Threads are documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.10.1
+
+A startup interaction patch. Window events can no longer expose JEI's recipe GUI between runtime
+callbacks and global runtime publication.
+
+### Fixed
+
+- **Resizing or maximizing the window while JEI is loading no longer lets a replayed click open a
+  half-initialized recipe GUI.** Runtime-available callbacks and `Internal.setRuntime` now execute
+  in one uninterrupted client-thread task, preserving JEI's callback-before-publication order
+  without leaving an event-queue gap. Third-party `RecipesGui` open requests are also ignored
+  while startup publication is incomplete. This fixes the FTB Quests + Ixeris crash reporting
+  `Jei Client Configs have not been created yet` from `RecipeLayoutDrawableErrored`.
+
 ## 0.10.0
 
 A loader identity and packaging consistency release. The mod id now matches the CurseForge slug,

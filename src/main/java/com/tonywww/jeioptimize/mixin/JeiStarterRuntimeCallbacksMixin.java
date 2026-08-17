@@ -1,6 +1,7 @@
 package com.tonywww.jeioptimize.mixin;
 
 import com.tonywww.jeioptimize.runtime.JeiOptExecutors;
+import com.tonywww.jeioptimize.runtime.JeiOptRuntimePublication;
 import com.tonywww.jeioptimize.runtime.JeiOptRuntimeState;
 import com.tonywww.jeioptimize.runtime.JeiOptStartupProgressState;
 import mezz.jei.api.IModPlugin;
@@ -32,7 +33,7 @@ public abstract class JeiStarterRuntimeCallbacksMixin {
         if (JeiOptExecutors.isJeiStartThread() && "Sending Runtime".equals(title)) {
             long generation = JeiOptRuntimeState.currentGeneration();
             JeiOptExecutors.awaitJeiStartTask(JeiOptStartupProgressState.publicationFuture(generation));
-            JeiOptExecutors.runOnMainThreadAndWait(callPlugins);
+            JeiOptRuntimePublication.deferCallbacks(generation, callPlugins);
         } else {
             callPlugins.run();
         }
