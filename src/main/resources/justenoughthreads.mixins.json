@@ -36,6 +36,7 @@
     "ClientDisconnectHookMixin",
     "ClientTickHookMixin",
     "JeiClientInputGuardMixin",
+    "JeiGuiRenderGuardMixin",
     "JeiLoadingOverlayMixin",
     "JeiRecipesGuiGuardMixin",
     "MinecraftProfilerGuardMixin"

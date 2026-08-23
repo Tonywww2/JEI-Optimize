@@ -4,6 +4,19 @@ All notable changes to Just Enough Threads are documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.10.2
+
+A multiplayer startup rendering patch. JEI overlays now remain dormant until their runtime is
+fully published when the client enters a server world.
+
+### Fixed
+
+- **Opening or rendering an inventory while joining a multiplayer server no longer lets JEI's
+  bookmark overlay read an unpublished runtime.** JEI GUI initialization, layout updates, and
+  overlay rendering now remain inactive while background startup is in progress, then resume on
+  the first frame after runtime publication. This fixes `Jei Client Configs have not been created
+  yet` crashes from `RecipeBookmarkElement` with JEI 19.27 and JEI++.
+
 ## 0.10.1
 
 A startup interaction patch. Window events can no longer expose JEI's recipe GUI between runtime

@@ -29,8 +29,8 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
     private static final String STARTER_PUBLISH_LEGACY_MIXIN = MIXIN_PACKAGE + "JeiStarterPublishLegacyMixin";
     private static final String STARTER_PUBLISH_MODERN_MIXIN = MIXIN_PACKAGE + "JeiStarterPublishModernMixin";
 
-    private static final Map<String, Requirement> REQUIREMENTS = Map.of(
-        MIXIN_PACKAGE + "IngredientFilterMixin", Requirement.method(
+    private static final Map<String, Requirement> REQUIREMENTS = Map.ofEntries(
+        Map.entry(MIXIN_PACKAGE + "IngredientFilterMixin", Requirement.method(
             "async ingredient filter",
             "<init>",
             "(Lmezz/jei/gui/filter/IFilterTextSource;"
@@ -42,47 +42,52 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
                 + "Lmezz/jei/api/helpers/IModIdHelper;"
                 + "Lmezz/jei/api/runtime/IIngredientVisibility;"
                 + "Lmezz/jei/api/helpers/IColorHelper;"
-                + "Lmezz/jei/common/config/IClientToggleState;)V"),
-        MIXIN_PACKAGE + "AnvilRecipeControlMixin", Requirement.method(
+                + "Lmezz/jei/common/config/IClientToggleState;)V")),
+        Map.entry(MIXIN_PACKAGE + "AnvilRecipeControlMixin", Requirement.method(
             "anvil recipe hiding",
             "getRepairRecipes",
             "(Lmezz/jei/api/recipe/vanilla/IVanillaRecipeFactory;"
-                + "Lmezz/jei/api/ingredients/IIngredientHelper;)Ljava/util/stream/Stream;"),
-        MIXIN_PACKAGE + "AnvilRecipeControlModernMixin", Requirement.method(
+                + "Lmezz/jei/api/ingredients/IIngredientHelper;)Ljava/util/stream/Stream;")),
+        Map.entry(MIXIN_PACKAGE + "AnvilRecipeControlModernMixin", Requirement.method(
             "anvil recipe hiding",
             "getBookEnchantmentRecipes",
-            "()Ljava/util/stream/Stream;"),
-        STARTER_PUBLISH_MODERN_MIXIN, Requirement.field(
+            "()Ljava/util/stream/Stream;")),
+        Map.entry(STARTER_PUBLISH_MODERN_MIXIN, Requirement.field(
             "async JEI runtime publication",
             "running",
-            "Z"),
-        MIXIN_PACKAGE + "ElementSearchMixin", Requirement.field(
+            "Z")),
+        Map.entry(MIXIN_PACKAGE + "ElementSearchMixin", Requirement.field(
             "async search preheat",
             "allElements",
-            "Ljava/util/Map;"),
-        MIXIN_PACKAGE + "RecipeManagerInternalCompactMixin", Requirement.method(
+            "Ljava/util/Map;")),
+        Map.entry(MIXIN_PACKAGE + "RecipeManagerInternalCompactMixin", Requirement.method(
             "delayed recipe list compaction",
             "compact",
-            "()V"),
-        MIXIN_PACKAGE + "VanillaRecipesMixin", Requirement.field(
+            "()V")),
+        Map.entry(MIXIN_PACKAGE + "VanillaRecipesMixin", Requirement.field(
             "recipe ingredient pre-resolve",
             "recipeManager",
-            null),
-        MIXIN_PACKAGE + "IngredientFilterModernMixin", Requirement.method(
+            null)),
+        Map.entry(MIXIN_PACKAGE + "IngredientFilterModernMixin", Requirement.method(
             "async ingredient filter",
             "createElementSearch",
             "(Lmezz/jei/common/config/IClientConfig;"
                 + "Lmezz/jei/gui/search/ElementPrefixParser;"
                 + "Ljava/util/List;"
                 + "Lmezz/jei/api/runtime/IIngredientManager;)"
-                + "Lmezz/jei/gui/search/IElementSearch;"),
-        MIXIN_PACKAGE + "ItemStackListFactoryMixin", Requirement.method(
+                + "Lmezz/jei/gui/search/IElementSearch;")),
+        Map.entry(MIXIN_PACKAGE + "ItemStackListFactoryMixin", Requirement.method(
             "creative tab skipping",
-            "create"),
-        MIXIN_PACKAGE + "JeiRecipesGuiGuardMixin", Requirement.method(
+            "create")),
+        Map.entry(MIXIN_PACKAGE + "JeiRecipesGuiGuardMixin", Requirement.method(
             "startup recipe GUI guard",
             "show",
-            "(Ljava/util/List;)V")
+            "(Ljava/util/List;)V")),
+        Map.entry(MIXIN_PACKAGE + "JeiGuiRenderGuardMixin", Requirement.method(
+            "startup JEI render guard",
+            "onDrawScreenPost",
+            "(Lnet/minecraft/client/gui/screens/Screen;"
+                + "Lnet/minecraft/client/gui/GuiGraphics;II)V"))
     );
 
     private final Map<String, ClassNode> targetCache = new HashMap<>();
