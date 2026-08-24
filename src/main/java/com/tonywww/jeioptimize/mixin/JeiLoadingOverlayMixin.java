@@ -1,6 +1,7 @@
 package com.tonywww.jeioptimize.mixin;
 
 import com.tonywww.jeioptimize.runtime.JeiOptStartupProgressState;
+import com.tonywww.jeioptimize.ui.LoadingPanelLayout;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -24,6 +25,9 @@ public abstract class JeiLoadingOverlayMixin {
     protected int imageWidth;
 
     @Shadow
+    protected int imageHeight;
+
+    @Shadow
     protected int leftPos;
 
     @Shadow
@@ -44,20 +48,30 @@ public abstract class JeiLoadingOverlayMixin {
 
         Minecraft minecraft = Minecraft.getInstance();
         Font font = minecraft.font;
-        int panelLeft = leftPos + imageWidth;
-        int availableWidth = minecraft.getWindow().getGuiScaledWidth() - panelLeft;
-        int panelWidth = Math.min(MAX_PANEL_WIDTH, availableWidth - HORIZONTAL_MARGIN * 2);
-        if (panelWidth < MIN_PANEL_WIDTH) {
+        int panelHeight = PADDING + font.lineHeight + 5 + BAR_HEIGHT + PADDING;
+        LoadingPanelLayout.Layout layout = LoadingPanelLayout.calculate(
+            minecraft.getWindow().getGuiScaledWidth(),
+            minecraft.getWindow().getGuiScaledHeight(),
+            leftPos,
+            topPos,
+            imageWidth,
+            imageHeight,
+            MAX_PANEL_WIDTH,
+            MIN_PANEL_WIDTH,
+            panelHeight,
+            HORIZONTAL_MARGIN
+        );
+        if (layout == null) {
             return;
         }
 
         Component status = jeiOptimize$statusText(progress);
+        int panelWidth = layout.width();
         int contentWidth = panelWidth - PADDING * 2;
         String statusText = font.plainSubstrByWidth(status.getString(), contentWidth);
         int statusWidth = font.width(statusText);
-        int panelX = minecraft.getWindow().getGuiScaledWidth() - HORIZONTAL_MARGIN - panelWidth;
-        int panelY = Math.max(HORIZONTAL_MARGIN, topPos + HORIZONTAL_MARGIN);
-        int panelHeight = PADDING + font.lineHeight + 5 + BAR_HEIGHT + PADDING;
+        int panelX = layout.x();
+        int panelY = layout.y();
         int barX = panelX + PADDING;
         int barY = panelY + PADDING + font.lineHeight + 5;
 

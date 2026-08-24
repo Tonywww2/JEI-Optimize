@@ -39,7 +39,8 @@
     "JeiGuiRenderGuardMixin",
     "JeiLoadingOverlayMixin",
     "JeiRecipesGuiGuardMixin",
-    "MinecraftProfilerGuardMixin"
+    "MinecraftProfilerGuardMixin",
+    "StartupOverlayInputGuardMixin"
   ],
   "injectors": {
     "defaultRequire": 0

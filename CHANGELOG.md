@@ -4,6 +4,22 @@ All notable changes to Just Enough Threads are documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.10.4
+
+A startup interaction and display compatibility patch. Loading remains safe around third-party
+screen extensions, and its progress panel now adapts to the available screen space.
+
+### Fixed
+
+- **Clicking JEED effect descriptions while JEI is still loading no longer crashes the client.**
+  Mouse button events on container screens are held back until JEI publishes its runtime, preventing
+  JEED and similar screen extensions from reading partially initialized JEI state. Normal input
+  resumes immediately after startup completes.
+- **The loading progress panel now remains fully visible across GUI scales and resolutions.** It
+  evaluates the space to the right, left, below, and above the open container, chooses the widest
+  fitting placement, and falls back to a screen-clamped position when no side can contain it. This
+  includes 1920x1080 at high GUI scales and unusually wide modded containers.
+
 ## 0.10.3
 
 A Just Enough Resources compatibility patch. JER plugin callbacks now preserve their client-thread
