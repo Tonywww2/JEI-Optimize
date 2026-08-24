@@ -4,6 +4,18 @@ All notable changes to Just Enough Threads are documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.10.3
+
+A Just Enough Resources compatibility patch. JER plugin callbacks now preserve their client-thread
+assumptions while JEI starts in the background.
+
+### Fixed
+
+- **Just Enough Resources registration no longer runs on the dedicated JEI startup thread.** JER's
+  callbacks are executed synchronously on the client thread while preserving JEI's callback order,
+  timing diagnostics, plugin context, and exception propagation. This has been verified with JER
+  1.4.0.247 on Forge 1.20.1 and JER 1.6.0.17 on NeoForge 1.21.1.
+
 ## 0.10.2
 
 A multiplayer startup rendering patch. JEI overlays now remain dormant until their runtime is

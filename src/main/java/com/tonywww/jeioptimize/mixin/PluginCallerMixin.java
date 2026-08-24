@@ -15,6 +15,8 @@ import java.util.function.Consumer;
 @Pseudo
 @Mixin(targets = "mezz.jei.library.load.PluginCaller", remap = false)
 public abstract class PluginCallerMixin {
+    private static final String JER_PLUGIN_CLASS = "jeresources.jei.JEIConfig";
+
     @Redirect(
         method = "callOnPlugins",
         at = @At(
@@ -31,9 +33,15 @@ public abstract class PluginCallerMixin {
     ) {
         JeiOptExecutors.checkJeiStartActive();
         IModPlugin modPlugin = (IModPlugin) plugin;
+        boolean isJerPlugin = JER_PLUGIN_CLASS.equals(modPlugin.getClass().getName());
+        Runnable pluginCall = () -> JeiOptDiagnostics.callPluginWithTiming(title, modPlugin, () ->
+            JeiPluginCallContext.runWithPlugin(modPlugin, () -> consumer.accept(modPlugin)));
         try {
-            JeiOptDiagnostics.callPluginWithTiming(title, modPlugin, () ->
-                JeiPluginCallContext.runWithPlugin(modPlugin, () -> consumer.accept(modPlugin)));
+            if (JeiOptExecutors.isJeiStartThread() && isJerPlugin) {
+                JeiOptExecutors.runOnMainThreadAndWait(pluginCall);
+            } else {
+                pluginCall.run();
+            }
         } finally {
             JeiOptExecutors.checkJeiStartActive();
         }
