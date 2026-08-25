@@ -2,7 +2,7 @@
 
 A Minecraft mod for **Forge (1.20.1)** and **NeoForge (1.21.1)** that speeds up [JEI (Just Enough Items)](https://www.curseforge.com/minecraft/mc-mods/jei) startup by moving its heaviest work off the main thread and across CPU cores.
 
-In large modpacks, JEI spends several seconds building its ingredient search index and processing recipes while the game sits on the loading screen. Just Enough Threads removes the biggest of those costs from the loading screen and skips JEI's expensive generated anvil recipes by default, so you get into your world sooner.
+In large modpacks, JEI spends several seconds building its ingredient search index and processing recipes while the game sits on the loading screen. Just Enough Threads removes the biggest of those costs from the loading screen and replaces expensive generated anvil and grindstone combinations with compact representative sets, so you get into your world sooner without losing recipe coverage.
 
 ## What it does
 
@@ -28,6 +28,14 @@ In large modpacks, JEI spends several seconds building its ingredient search ind
 - **Experimental recipe ingredient pre-resolution** — `parallelVanillaRecipes` (off by default)
 
   This option resolves recipe ingredient tags across worker threads before JEI reads them. It can help some packs, but custom recipes and lazy ingredient caches are not guaranteed to be thread-safe, so it is opt-in and should be benchmarked against the specific pack.
+
+- **Coverage-preserving generated recipe compaction** — on by default
+
+  JEI's synthetic anvil and grindstone examples are limited before expensive item-stack and menu
+  simulation. Every applicable enchantment remains visible on up to three distinct item families,
+  with up to 16 generic repair examples. When Iron's Spells 'n Spellbooks is installed, its Arcane
+  Anvil imbuing matrix is reduced to a minimal representative set that still covers every eligible
+  item and every spell level. The integration is optional and safely falls back if its API changes.
 
 Every optimization sits behind a config flag and degrades safely to JEI's stock behavior. If anything looks wrong, set `enabled = false` to turn the whole mod off.
 
@@ -72,8 +80,15 @@ the new file does not exist. The legacy file is left untouched and never overwri
 | `pluginTiming` | diagnostics | `false` | Log per-plugin, per-phase JEI startup timings (for measurement). |
 | `registrationCounts` | diagnostics | `false` | Log per-plugin recipe and ingredient registration counts. |
 | `stallWatchdog` | diagnostics | `true` | Sample and report code responsible for a JEI phase that exceeds the configured threshold. |
-| `disableAnvilRepairRecipes` | jeiContent | `true` | Hide JEI's generated anvil repair recipes (also skips generating them at startup). |
-| `disableAnvilEnchantRecipes` | jeiContent | `true` | Hide JEI's generated anvil enchanting recipes for combining books (also skips generating them). |
+| `disableAnvilRepairRecipes` | jeiContent | `false` | Hide all generated anvil repair recipes. Overrides representative optimization for this recipe class. |
+| `disableAnvilEnchantRecipes` | jeiContent | `false` | Hide all generated anvil enchanting recipes. Overrides representative optimization for this recipe class. |
+| `optimizeAnvilRepresentatives` | jeiContent | `true` | Keep coverage-preserving anvil examples instead of every generated item combination. |
+| `anvilRepresentativesPerEnchantment` | jeiContent | `3` | Maximum distinct item families retained for each anvil enchantment. |
+| `anvilRepairRepresentatives` | jeiContent | `16` | Maximum generic material-repair examples retained for the anvil. |
+| `optimizeGrindstoneRepresentatives` | jeiContent | `true` | Keep coverage-preserving examples on JEI versions that generate synthetic grindstone recipes. |
+| `grindstoneRepresentativesPerEnchantment` | jeiContent | `3` | Maximum distinct item families retained for each removable enchantment. |
+| `grindstoneRepairRepresentatives` | jeiContent | `16` | Maximum generic self-repair examples retained for the grindstone. |
+| `compactIronsSpellsImbuing` | jeiContent | `true` | Compact optional Iron's Spells Arcane Anvil imbuing combinations while preserving every item and spell level. |
 
 Remaining flags in the file are experimental and off by default.
 
@@ -127,9 +142,17 @@ click, scroll, or drag handling from reading a missing runtime without blocking 
 - JEI still validates, orders and registers every recipe on the main thread; the worker results are discarded after populating Minecraft's lazy ingredient caches.
 - Modded `Recipe` implementations and ingredient caches may perform mutable or main-thread-only work. The feature therefore defaults off and should only be enabled after testing the target modpack.
 
-### Optional: hide anvil recipes (`disableAnvilRepairRecipes`, `disableAnvilEnchantRecipes`)
+### Generated recipe compaction
 
-The matching `AnvilRecipeControl` variant injects at the head of JEI's `AnvilRecipeMaker.getRepairRecipes` and `getBookEnchantmentRecipes`. When a flag is on, that generator returns an empty stream, so those anvil recipes are never generated or shown. Both flags default on because generating every item and enchanted-book combination can dominate JEI startup in large packs. Set either flag to `false` to restore that class of JEI anvil recipes.
+The anvil and grindstone hooks filter candidates before JEI performs its expensive output or menu
+simulation. Selection is stable and keeps distinct item families where possible, so each applicable
+enchantment remains discoverable without generating the full item-by-enchantment matrix. Generic
+repair examples use separate limits. Setting either legacy `disableAnvil*Recipes` option to `true`
+still skips that entire generator and takes precedence over representative selection.
+
+Iron's Spells support is loaded only when its JEI classes are present. Its item-by-spell-level matrix
+is reduced from $W \times S$ combinations to $\max(W, S)$ representative recipes while covering all
+$W$ eligible items and all $S$ spell levels. No hard dependency on Iron's Spells is added.
 
 ### Shared infrastructure
 

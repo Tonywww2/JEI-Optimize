@@ -24,6 +24,19 @@ public abstract class AnvilRecipeControlModernMixin {
     }
 
     @Inject(
+        method = "getRepairRecipes()Ljava/util/stream/Stream;",
+        at = @At("RETURN"),
+        cancellable = true
+    )
+    private void jeiOptimize$limitRepairRecipes(CallbackInfoReturnable<Stream<?>> callbackInfo) {
+        if (JeiOptFeatureFlags.optimizeAnvilRepresentatives() && callbackInfo.getReturnValue() != null) {
+            callbackInfo.setReturnValue(
+                callbackInfo.getReturnValue().limit(JeiOptFeatureFlags.anvilRepairRepresentatives())
+            );
+        }
+    }
+
+    @Inject(
         method = "getBookEnchantmentRecipes()Ljava/util/stream/Stream;",
         at = @At("HEAD"),
         cancellable = true

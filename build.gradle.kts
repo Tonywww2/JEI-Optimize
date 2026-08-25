@@ -26,7 +26,7 @@ val cofhCoreVersion = (findProperty("deps.cofhCore") ?: "").toString()
 val thermalCoreVersion = (findProperty("deps.thermalCore") ?: "").toString()
 val thermalFoundationVersion = (findProperty("deps.thermalFoundation") ?: "").toString()
 val farmersDelightVersion = (findProperty("deps.farmersDelight") ?: "").toString()
-val mixinExtrasCommonVersion = (findProperty("deps.mixinExtrasCommon") ?: "").toString()
+val mixinExtrasCommonVersion = (findProperty("deps.mixinExtrasCommon") ?: "0.3.6").toString()
 val mixinExtrasForgeVersion = (findProperty("deps.mixinExtrasForge") ?: "").toString()
 
 group = property("mod.group").toString()
@@ -64,6 +64,7 @@ repositories {
 dependencies {
     minecraft("com.mojang:minecraft:$mcVersion")
     mappings(loom.officialMojangMappings())
+    compileOnly("io.github.llamalad7:mixinextras-common:$mixinExtrasCommonVersion")
 
     if (loader == ModPlatform.FORGE) {
         "forge"("net.minecraftforge:forge:$mcVersion-${property("vers.deps.fml")}")

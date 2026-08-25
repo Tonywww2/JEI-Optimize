@@ -43,6 +43,34 @@ public final class JeiOptFeatureFlags {
         return enabled() && JeiOptConfig.CONTENT_DISABLE_ANVIL_ENCHANT.get();
     }
 
+    public static boolean optimizeAnvilRepresentatives() {
+        return enabled() && JeiOptConfig.CONTENT_OPTIMIZE_ANVIL_REPRESENTATIVES.get();
+    }
+
+    public static int anvilRepresentativesPerEnchantment() {
+        return configReady() ? JeiOptConfig.CONTENT_ANVIL_REPRESENTATIVES_PER_ENCHANTMENT.get() : 3;
+    }
+
+    public static int anvilRepairRepresentatives() {
+        return configReady() ? JeiOptConfig.CONTENT_ANVIL_REPAIR_REPRESENTATIVES.get() : 16;
+    }
+
+    public static boolean optimizeGrindstoneRepresentatives() {
+        return enabled() && JeiOptConfig.CONTENT_OPTIMIZE_GRINDSTONE_REPRESENTATIVES.get();
+    }
+
+    public static int grindstoneRepresentativesPerEnchantment() {
+        return configReady() ? JeiOptConfig.CONTENT_GRINDSTONE_REPRESENTATIVES_PER_ENCHANTMENT.get() : 3;
+    }
+
+    public static int grindstoneRepairRepresentatives() {
+        return configReady() ? JeiOptConfig.CONTENT_GRINDSTONE_REPAIR_REPRESENTATIVES.get() : 16;
+    }
+
+    public static boolean compactIronsSpellsImbuing() {
+        return enabled() && JeiOptConfig.CONTENT_COMPACT_IRONS_SPELLS_IMBUING.get();
+    }
+
     public static boolean cacheScope() {
         return enabled() && JeiOptConfig.SYNC_CACHE_SCOPE.get();
     }

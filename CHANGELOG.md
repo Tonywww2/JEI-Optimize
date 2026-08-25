@@ -4,6 +4,37 @@ All notable changes to Just Enough Threads are documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.11.0
+
+### Added
+
+- **Generated anvil recipes now use coverage-preserving representative items by default.** Each
+  enchantment retains examples for up to three distinct item families, while generic
+  material-repair recipes retain up to 16 examples. Candidates are filtered before output-stack
+  simulation to avoid generating the full item-by-enchantment matrix.
+- **Generated grindstone recipes now use the same representative selection.** Each removable
+  enchantment retains examples for up to three distinct item families, and generic self-repair
+  recipes retain up to 16 examples on JEI versions that provide synthetic grindstone recipes.
+- **Iron's Spells Arcane Anvil imbuing recipes are compacted when the mod is installed.** The
+  item-by-spell-level matrix is reduced to a representative set while preserving every eligible
+  item and every spell level. The integration has no hard dependency and falls back to unchanged
+  recipes if the installed API is incompatible.
+- **Representative recipe limits are configurable.** `optimizeAnvilRepresentatives`,
+  `anvilRepresentativesPerEnchantment`, `anvilRepairRepresentatives`,
+  `optimizeGrindstoneRepresentatives`, `grindstoneRepresentativesPerEnchantment`,
+  `grindstoneRepairRepresentatives`, and `compactIronsSpellsImbuing` are available in the
+  `jeiContent` section.
+
+### Changed
+
+- **Generated anvil recipes are retained by default instead of being completely hidden.**
+  `disableAnvilRepairRecipes` and `disableAnvilEnchantRecipes` now default to `false`. Enabling
+  either option still hides that entire recipe class and takes precedence over representative
+  selection.
+- **Optional recipe optimizations are selected against the installed class and method shapes.** A
+  missing optional integration is skipped without a warning, while an installed but incompatible
+  integration keeps its original recipe behavior and reports the incompatibility.
+
 ## 0.10.4
 
 A startup interaction and display compatibility patch. Loading remains safe around third-party

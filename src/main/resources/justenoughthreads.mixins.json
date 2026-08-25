@@ -26,8 +26,13 @@
     "AnvilRecipeMakerTimingMixin",
     "AnvilRecipeControlMixin",
     "AnvilRecipeControlModernMixin",
+    "AnvilRepresentativeContextMixin",
+    "AnvilEnchantmentRepresentativeMixin",
+    "GrindstoneRepresentativeMixin",
     "BrewingRecipeMakerTimingMixin",
     "compat.AliGenericUtilsMixin",
+    "compat.IronsSpellsArcaneAnvilMakerMixin",
+    "compat.IronsSpellsArcaneAnvilRecipeMixin",
     "accessor.SophisticatedStorageShulkerRecipeAccessor",
     "ElementSearchMixin",
     "RecipeMapCatalystMixin"

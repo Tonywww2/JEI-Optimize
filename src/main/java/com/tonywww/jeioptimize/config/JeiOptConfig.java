@@ -39,6 +39,13 @@ public final class JeiOptConfig {
 
     static final BooleanValue CONTENT_DISABLE_ANVIL_REPAIR;
     static final BooleanValue CONTENT_DISABLE_ANVIL_ENCHANT;
+    static final BooleanValue CONTENT_OPTIMIZE_ANVIL_REPRESENTATIVES;
+    static final IntValue CONTENT_ANVIL_REPRESENTATIVES_PER_ENCHANTMENT;
+    static final IntValue CONTENT_ANVIL_REPAIR_REPRESENTATIVES;
+    static final BooleanValue CONTENT_OPTIMIZE_GRINDSTONE_REPRESENTATIVES;
+    static final IntValue CONTENT_GRINDSTONE_REPRESENTATIVES_PER_ENCHANTMENT;
+    static final IntValue CONTENT_GRINDSTONE_REPAIR_REPRESENTATIVES;
+    static final BooleanValue CONTENT_COMPACT_IRONS_SPELLS_IMBUING;
     static final ConfigValue<String> CONTENT_SKIP_CREATIVE_TABS;
 
     static final BooleanValue DIAGNOSTICS_PLUGIN_TIMING;
@@ -82,13 +89,40 @@ public final class JeiOptConfig {
         CONTENT_DISABLE_ANVIL_REPAIR = builder
             .comment(
                 "Hide JEI's generated anvil repair recipes (repairing an item with its crafting material).",
-                "Also skips generating them during startup, which saves time. Default true.")
-            .define("disableAnvilRepairRecipes", true);
+                "Also skips generating them during startup. Overrides anvil representative optimization.")
+            .define("disableAnvilRepairRecipes", false);
         CONTENT_DISABLE_ANVIL_ENCHANT = builder
             .comment(
                 "Hide JEI's generated anvil enchanting recipes (combining enchanted books on an anvil).",
-                "Also skips generating them during startup, which saves time. Default true.")
-            .define("disableAnvilEnchantRecipes", true);
+                "Also skips generating them during startup. Overrides anvil representative optimization.")
+            .define("disableAnvilEnchantRecipes", false);
+        CONTENT_OPTIMIZE_ANVIL_REPRESENTATIVES = builder
+            .comment(
+                "Keep a small, coverage-preserving set of JEI anvil examples instead of generating every item combination.",
+                "Every enchantment with a compatible generated example remains represented.")
+            .define("optimizeAnvilRepresentatives", true);
+        CONTENT_ANVIL_REPRESENTATIVES_PER_ENCHANTMENT = builder
+            .comment("Maximum number of distinct item families shown for each anvil enchantment.")
+            .defineInRange("anvilRepresentativesPerEnchantment", 3, 1, 64);
+        CONTENT_ANVIL_REPAIR_REPRESENTATIVES = builder
+            .comment("Maximum number of generic material-repair examples retained for the anvil.")
+            .defineInRange("anvilRepairRepresentatives", 16, 0, 256);
+        CONTENT_OPTIMIZE_GRINDSTONE_REPRESENTATIVES = builder
+            .comment(
+                "Keep a small, coverage-preserving set of JEI grindstone examples.",
+                "Only affects JEI versions that generate synthetic grindstone recipes.")
+            .define("optimizeGrindstoneRepresentatives", true);
+        CONTENT_GRINDSTONE_REPRESENTATIVES_PER_ENCHANTMENT = builder
+            .comment("Maximum number of distinct item families shown for each removable enchantment.")
+            .defineInRange("grindstoneRepresentativesPerEnchantment", 3, 1, 64);
+        CONTENT_GRINDSTONE_REPAIR_REPRESENTATIVES = builder
+            .comment("Maximum number of generic self-repair examples retained for the grindstone.")
+            .defineInRange("grindstoneRepairRepresentatives", 16, 0, 256);
+        CONTENT_COMPACT_IRONS_SPELLS_IMBUING = builder
+            .comment(
+                "Compact Iron's Spells Arcane Anvil imbuing combinations while preserving every item and spell level.",
+                "Has no effect when Iron's Spells is not installed or its integration API is incompatible.")
+            .define("compactIronsSpellsImbuing", true);
         CONTENT_SKIP_CREATIVE_TABS = builder
             .comment(
                 "Emergency hatch: comma-separated creative tabs to hide from JEI, by tab id or by mod id.",

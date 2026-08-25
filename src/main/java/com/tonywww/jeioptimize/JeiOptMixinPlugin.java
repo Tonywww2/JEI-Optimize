@@ -52,6 +52,26 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
             "anvil recipe hiding",
             "getBookEnchantmentRecipes",
             "()Ljava/util/stream/Stream;")),
+        Map.entry(MIXIN_PACKAGE + "AnvilRepresentativeContextMixin", Requirement.method(
+            "anvil representative recipes",
+            "getAnvilRecipes",
+            "(Lmezz/jei/api/recipe/vanilla/IVanillaRecipeFactory;"
+                + "Lmezz/jei/api/runtime/IIngredientManager;)Ljava/util/List;")),
+        Map.entry(MIXIN_PACKAGE + "AnvilEnchantmentRepresentativeMixin", Requirement.method(
+            "anvil representative recipes",
+            "canEnchant",
+            "(Lnet/minecraft/world/item/ItemStack;)Z")),
+        Map.entry(MIXIN_PACKAGE + "GrindstoneRepresentativeMixin", Requirement.method(
+            "grindstone representative recipes",
+            "getGrindstoneRecipes",
+            "(Lmezz/jei/api/runtime/IIngredientManager;"
+                + "Lmezz/jei/common/platform/IPlatformRecipeHelper;)Ljava/util/List;")),
+        Map.entry(MIXIN_PACKAGE + "compat.IronsSpellsArcaneAnvilMakerMixin", Requirement.method(
+            "Iron's Spells Arcane Anvil compaction",
+            "getRecipes")),
+        Map.entry(MIXIN_PACKAGE + "compat.IronsSpellsArcaneAnvilRecipeMixin", Requirement.method(
+            "Iron's Spells Arcane Anvil compaction",
+            "getRecipeItems")),
         Map.entry(STARTER_PUBLISH_MODERN_MIXIN, Requirement.field(
             "async JEI runtime publication",
             "running",
@@ -104,8 +124,15 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
         MIXIN_PACKAGE + "AnvilRecipeControlModernMixin",
         MIXIN_PACKAGE + "IngredientFilterMixin",
         MIXIN_PACKAGE + "IngredientFilterModernMixin",
+        MIXIN_PACKAGE + "GrindstoneRepresentativeMixin",
         STARTER_PUBLISH_LEGACY_MIXIN,
         STARTER_PUBLISH_MODERN_MIXIN
+    );
+
+    private static final Set<String> OPTIONAL_MIXINS = Set.of(
+        MIXIN_PACKAGE + "GrindstoneRepresentativeMixin",
+        MIXIN_PACKAGE + "compat.IronsSpellsArcaneAnvilMakerMixin",
+        MIXIN_PACKAGE + "compat.IronsSpellsArcaneAnvilRecipeMixin"
     );
 
     @Override
@@ -153,6 +180,12 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
 
         ClassNode target = readTarget(targetClassName);
         if (target == null) {
+            if (OPTIONAL_MIXINS.contains(mixinClassName)) {
+                LOGGER.debug(
+                    "JEI Optimize skipped optional {} because {} is not installed in this runtime.",
+                    mixinClassName, targetClassName);
+                return false;
+            }
             LOGGER.warn(
                 "JEI Optimize could not read {}, so its {} optimization stays off and JEI keeps its normal behavior.",
                 targetClassName, requirement.feature());

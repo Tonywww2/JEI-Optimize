@@ -37,6 +37,23 @@ public abstract class AnvilRecipeControlMixin {
         }
     }
 
+    @Inject(
+        method = "getRepairRecipes(Lmezz/jei/api/recipe/vanilla/IVanillaRecipeFactory;Lmezz/jei/api/ingredients/IIngredientHelper;)Ljava/util/stream/Stream;",
+        at = @At("RETURN"),
+        cancellable = true
+    )
+    private static void jeiOptimize$limitRepairRecipes(
+        IVanillaRecipeFactory vanillaRecipeFactory,
+        IIngredientHelper<?> ingredientHelper,
+        CallbackInfoReturnable<Stream<?>> callbackInfo
+    ) {
+        if (JeiOptFeatureFlags.optimizeAnvilRepresentatives() && callbackInfo.getReturnValue() != null) {
+            callbackInfo.setReturnValue(
+                callbackInfo.getReturnValue().limit(JeiOptFeatureFlags.anvilRepairRepresentatives())
+            );
+        }
+    }
+
     // getBookEnchantmentRecipes differs: Forge 1.20.1 takes a trailing IIngredientHelper; NeoForge
     // 1.21.1 (JEI 19.27.x) dropped it.
     //? if forge {
