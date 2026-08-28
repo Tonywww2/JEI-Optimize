@@ -28,6 +28,11 @@ val thermalFoundationVersion = (findProperty("deps.thermalFoundation") ?: "").to
 val farmersDelightVersion = (findProperty("deps.farmersDelight") ?: "").toString()
 val mixinExtrasCommonVersion = (findProperty("deps.mixinExtrasCommon") ?: "0.3.6").toString()
 val mixinExtrasForgeVersion = (findProperty("deps.mixinExtrasForge") ?: "").toString()
+val compatTestRuntimeModJars = (findProperty("compatTest.runtimeModJars.$mcVersion") ?: "")
+    .toString()
+    .split(',')
+    .map(String::trim)
+    .filter(String::isNotEmpty)
 
 group = property("mod.group").toString()
 version = "$modVersion+$mcVersion"
@@ -65,6 +70,10 @@ dependencies {
     minecraft("com.mojang:minecraft:$mcVersion")
     mappings(loom.officialMojangMappings())
     compileOnly("io.github.llamalad7:mixinextras-common:$mixinExtrasCommonVersion")
+    testImplementation(platform("org.junit:junit-bom:5.11.4"))
+    testImplementation("org.junit.jupiter:junit-jupiter")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+    compatTestRuntimeModJars.forEach { modRuntimeOnly(files(rootProject.file(it))) }
 
     if (loader == ModPlatform.FORGE) {
         "forge"("net.minecraftforge:forge:$mcVersion-${property("vers.deps.fml")}")
@@ -126,6 +135,10 @@ tasks {
     withType<JavaCompile> {
         options.encoding = "UTF-8"
         options.release = javaVersion
+    }
+
+    test {
+        useJUnitPlatform()
     }
 }
 

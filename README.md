@@ -89,6 +89,13 @@ the new file does not exist. The legacy file is left untouched and never overwri
 | `grindstoneRepresentativesPerEnchantment` | jeiContent | `3` | Maximum distinct item families retained for each removable enchantment. |
 | `grindstoneRepairRepresentatives` | jeiContent | `16` | Maximum generic self-repair examples retained for the grindstone. |
 | `compactIronsSpellsImbuing` | jeiContent | `true` | Compact optional Iron's Spells Arcane Anvil imbuing combinations while preserving every item and spell level. |
+| `aggressiveCelestialForgeReinforce` | jeiContent | `false` | Limit Celestial Forge reinforce previews to representative item families. This can remove direct focus hits. |
+| `aggressiveEmbersDawnstoneAnvil` | jeiContent | `false` | Limit compacted Embers anvil groups to representative tools. This can remove direct focus hits. |
+| `aggressiveSfmFallingAnvil` | jeiContent | `false` | Limit SFM's unfiltered disenchantment overview per enchantment; focused queries retain the original path. |
+| `aggressiveRepresentativesPerGroup` | jeiContent | `3` | Item-family limit for explicitly enabled aggressive integration modes. |
+| `aggressiveGenericRepairRepresentatives` | jeiContent | `16` | Example limit for generic repair recipes in explicitly enabled aggressive modes. |
+| `prefilterTinkersIngredients` | jeiContent | `false` | Remove `#tconstruct:modifiable` and `#tconstruct:parts` stacks before JEI builds its global item index. |
+| `tinkersIngredientFilterAdditionalTags` | jeiContent | `""` | Comma-separated item tags added to the Tinkers prefilter; a leading `#` is optional. |
 
 Remaining flags in the file are experimental and off by default.
 
@@ -133,6 +140,11 @@ Because the new index is never shared with the main thread until the swap, JEI n
 JEI installs its container input listeners before `Internal.setRuntime(...)`. `JeiClientInputGuardMixin`
 returns "not handled" from those listeners while startup progress is active, preventing early R/U,
 click, scroll, or drag handling from reading a missing runtime without blocking vanilla screen input.
+JEED 1.20 also exposes effect clicks before its JEI helpers and runtime are ready, so an optional
+ABI-checked guard ignores only that effect activation until the current runtime is published. It
+does not intercept Minecraft's global mouse handler, and ordinary inventory slots remain usable
+while JEI loads. Other screen extensions need similarly narrow compatibility guards if they access
+unpublished JEI state.
 
 ### Experimental recipe ingredient pre-resolution (`parallelVanillaRecipes`)
 

@@ -29,10 +29,24 @@
     "AnvilRepresentativeContextMixin",
     "AnvilEnchantmentRepresentativeMixin",
     "GrindstoneRepresentativeMixin",
+    "FuelRecipeMakerMixin",
     "BrewingRecipeMakerTimingMixin",
     "compat.AliGenericUtilsMixin",
+    "compat.CelestialForgeReinforceRecipeMixin",
+    "compat.EmbersDawnstoneAnvilCategoryMixin",
+    "compat.EmbersJeiPluginMixin",
+    "compat.GeneratorGaloreJeiPluginMixin",
+    "compat.IronFurnacesGeneratorCategoryMixin",
+    "compat.IronFurnacesJeiPluginMixin",
     "compat.IronsSpellsArcaneAnvilMakerMixin",
     "compat.IronsSpellsArcaneAnvilRecipeMixin",
+    "compat.MekanismRecipeRegistryHelperMixin",
+    "compat.ProductiveTreesLogStrippingCategoryMixin",
+    "compat.SfmFallingAnvilCategoryMixin",
+    "compat.ThermalExpansionJeiPluginMixin",
+    "compat.TinkersJeiPluginMixin",
+    "compat.UltimateCarRecipeBuilderMixin",
+    "compat.UltimateCarRecipeCategoryMixin",
     "accessor.SophisticatedStorageShulkerRecipeAccessor",
     "ElementSearchMixin",
     "RecipeMapCatalystMixin"
@@ -44,8 +58,8 @@
     "JeiGuiRenderGuardMixin",
     "JeiLoadingOverlayMixin",
     "JeiRecipesGuiGuardMixin",
-    "MinecraftProfilerGuardMixin",
-    "StartupOverlayInputGuardMixin"
+    "compat.JeedEffectClickGuardMixin",
+    "MinecraftProfilerGuardMixin"
   ],
   "injectors": {
     "defaultRequire": 0

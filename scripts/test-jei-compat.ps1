@@ -15,6 +15,9 @@
 .PARAMETER KeepConfig
     Do not overwrite run/config/justenoughthreads-client.toml. Use this to test a hand-written config.
 
+.PARAMETER RuntimeModJars
+    Local mod jars to remap and add only to this compatibility run. They are never packaged.
+
 .EXAMPLE
     .\scripts\test-jei-compat.ps1 -JeiVersion 15.48.0.179
 
@@ -28,6 +31,7 @@ param(
     [string] $Loader = "forge",
     [string] $World = "",
     [switch] $KeepConfig,
+    [string[]] $RuntimeModJars = @(),
     [int] $TimeoutSeconds = 300,
     [int] $PostJeiWaitSeconds = 12,
     [string] $JavaHome = "C:\Program Files\Java\jdk-21"
@@ -99,6 +103,10 @@ try {
 
     $gradleArgs = "--no-daemon $GradleProject`:runClient --args=`"--quickPlaySingleplayer $World`""
     if ($JeiVersion) { $gradleArgs += " -Pjei.runtime.$McVersion=$JeiVersion" }
+    if ($RuntimeModJars.Count -gt 0) {
+        $resolvedModJars = $RuntimeModJars | ForEach-Object { (Resolve-Path $_).Path }
+        $gradleArgs += " `"-PcompatTest.runtimeModJars.$McVersion=$($resolvedModJars -join ',')`""
+    }
 
     Write-Host "running $Loader client (JEI $(if ($JeiVersion) { $JeiVersion } else { 'default' }), world '$World'), auto-exit within $TimeoutSeconds s ..."
     $process = Start-Process -FilePath (Join-Path $RepoRoot 'gradlew.bat') `
@@ -118,7 +126,10 @@ try {
             while (!$process.HasExited -and [DateTime]::UtcNow -lt $wait) { [void] $process.WaitForExit(500) }
             break
         }
-        if ($text -match "---- Minecraft Crash Report ----") { $status = "crashed"; break }
+        if ($text -match "---- Minecraft Crash Report ----|Failed to complete lifecycle event|Crash report saved to") {
+            $status = "crashed"
+            break
+        }
 
         [void] $process.WaitForExit(1000)
     }

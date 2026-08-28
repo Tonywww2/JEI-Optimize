@@ -28,6 +28,23 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
     private static final String MIXIN_PACKAGE = "com.tonywww.jeioptimize.mixin.";
     private static final String STARTER_PUBLISH_LEGACY_MIXIN = MIXIN_PACKAGE + "JeiStarterPublishLegacyMixin";
     private static final String STARTER_PUBLISH_MODERN_MIXIN = MIXIN_PACKAGE + "JeiStarterPublishModernMixin";
+    private static final String CELESTIAL_REINFORCE_MIXIN =
+        MIXIN_PACKAGE + "compat.CelestialForgeReinforceRecipeMixin";
+    private static final String ULTIMATE_CAR_BUILDER_MIXIN =
+        MIXIN_PACKAGE + "compat.UltimateCarRecipeBuilderMixin";
+    private static final String ULTIMATE_CAR_CATEGORY_MIXIN =
+        MIXIN_PACKAGE + "compat.UltimateCarRecipeCategoryMixin";
+    private static final String IRON_FURNACES_PLUGIN_MIXIN =
+        MIXIN_PACKAGE + "compat.IronFurnacesJeiPluginMixin";
+    private static final String IRON_FURNACES_CATEGORY_MIXIN =
+        MIXIN_PACKAGE + "compat.IronFurnacesGeneratorCategoryMixin";
+    private static final String EMBERS_PLUGIN_MIXIN = MIXIN_PACKAGE + "compat.EmbersJeiPluginMixin";
+    private static final String EMBERS_CATEGORY_MIXIN =
+        MIXIN_PACKAGE + "compat.EmbersDawnstoneAnvilCategoryMixin";
+    private static final String SFM_FALLING_ANVIL_MIXIN =
+        MIXIN_PACKAGE + "compat.SfmFallingAnvilCategoryMixin";
+    private static final String JEED_EFFECT_CLICK_MIXIN =
+        MIXIN_PACKAGE + "compat.JeedEffectClickGuardMixin";
 
     private static final Map<String, Requirement> REQUIREMENTS = Map.ofEntries(
         Map.entry(MIXIN_PACKAGE + "IngredientFilterMixin", Requirement.method(
@@ -66,12 +83,69 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
             "getGrindstoneRecipes",
             "(Lmezz/jei/api/runtime/IIngredientManager;"
                 + "Lmezz/jei/common/platform/IPlatformRecipeHelper;)Ljava/util/List;")),
+        Map.entry(MIXIN_PACKAGE + "FuelRecipeMakerMixin", Requirement.method(
+            "fuel recipe compaction",
+            "getFuelRecipes",
+            "(Lmezz/jei/api/runtime/IIngredientManager;)Ljava/util/List;")),
         Map.entry(MIXIN_PACKAGE + "compat.IronsSpellsArcaneAnvilMakerMixin", Requirement.method(
             "Iron's Spells Arcane Anvil compaction",
             "getRecipes")),
         Map.entry(MIXIN_PACKAGE + "compat.IronsSpellsArcaneAnvilRecipeMixin", Requirement.method(
             "Iron's Spells Arcane Anvil compaction",
             "getRecipeItems")),
+        Map.entry(MIXIN_PACKAGE + "compat.GeneratorGaloreJeiPluginMixin", Requirement.method(
+            "Generator Galore solid-fuel compaction",
+            "registerRecipes",
+            "(Lmezz/jei/api/registration/IRecipeRegistration;)V")),
+        Map.entry(MIXIN_PACKAGE + "compat.MekanismRecipeRegistryHelperMixin", Requirement.method(
+            "Mekanism Nutritional Liquifier compaction",
+            "register",
+            "(Lmezz/jei/api/registration/IRecipeRegistration;"
+                + "Lmekanism/client/jei/MekanismJEIRecipeType;Ljava/util/List;)V")),
+        Map.entry(MIXIN_PACKAGE + "compat.ThermalExpansionJeiPluginMixin", Requirement.method(
+            "Thermal Stirling Dynamo fuel compaction",
+            "registerRecipes",
+            "(Lmezz/jei/api/registration/IRecipeRegistration;)V")),
+        Map.entry(CELESTIAL_REINFORCE_MIXIN, Requirement.method(
+            "Celestial Forge Item Reinforce caching",
+            "input",
+            "()Lnet/minecraft/world/item/crafting/Ingredient;")),
+        Map.entry(ULTIMATE_CAR_BUILDER_MIXIN, Requirement.method(
+            "Ultimate Car Mod workshop compaction",
+            "getAllRecipes",
+            "()Ljava/util/List;")),
+        Map.entry(ULTIMATE_CAR_CATEGORY_MIXIN, Requirement.method(
+            "Ultimate Car Mod workshop compaction",
+            "setRecipe")),
+        Map.entry(IRON_FURNACES_PLUGIN_MIXIN, Requirement.method(
+            "Iron Furnaces generator compaction",
+            "registerRecipes",
+            "(Lmezz/jei/api/registration/IRecipeRegistration;)V")),
+        Map.entry(IRON_FURNACES_CATEGORY_MIXIN, Requirement.method(
+            "Iron Furnaces generator compaction",
+            "setRecipe")),
+        Map.entry(SFM_FALLING_ANVIL_MIXIN, Requirement.method(
+            "SFM Falling Anvil optimization",
+            "setRecipeForFallingAnvilDisenchantRecipe",
+            "(Lmezz/jei/api/gui/builder/IRecipeLayoutBuilder;Lmezz/jei/api/recipe/IFocusGroup;"
+                + "Ljava/util/List;)V")),
+        Map.entry(JEED_EFFECT_CLICK_MIXIN, Requirement.method(
+            "JEED startup effect click guard",
+            "onClickedEffect",
+            "(Lnet/minecraft/world/effect/MobEffectInstance;DDI)V")),
+        Map.entry(EMBERS_PLUGIN_MIXIN, Requirement.method(
+            "Embers Dawnstone Anvil compaction",
+            "addRecipes")),
+        Map.entry(EMBERS_CATEGORY_MIXIN, Requirement.method(
+            "Embers Dawnstone Anvil compaction",
+            "setRecipe")),
+        Map.entry(MIXIN_PACKAGE + "compat.ProductiveTreesLogStrippingCategoryMixin", Requirement.method(
+            "Productive Trees log-stripping tool caching",
+            "setRecipe")),
+        Map.entry(MIXIN_PACKAGE + "compat.TinkersJeiPluginMixin", Requirement.method(
+            "Tinkers casting compaction",
+            "registerRecipes",
+            "(Lmezz/jei/api/registration/IRecipeRegistration;)V")),
         Map.entry(STARTER_PUBLISH_MODERN_MIXIN, Requirement.field(
             "async JEI runtime publication",
             "running",
@@ -110,7 +184,126 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
                 + "Lnet/minecraft/client/gui/GuiGraphics;II)V"))
     );
 
+    private static final AtomicFeature CELESTIAL_REINFORCE_FEATURE = new AtomicFeature(
+        "Celestial Forge Item Reinforce caching",
+        List.of(new TargetRequirement(
+            "com.xiaoyue.celestial_forge.compat.ReinforceRecipeWrapper",
+            List.of(
+                Requirement.method("", "input", "()Lnet/minecraft/world/item/crafting/Ingredient;"),
+                Requirement.method("", "result", "()Lnet/minecraft/world/item/crafting/Ingredient;")
+            )
+        ))
+    );
+    private static final AtomicFeature ULTIMATE_CAR_FEATURE = new AtomicFeature(
+        "Ultimate Car Mod workshop compaction",
+        List.of(
+            new TargetRequirement(
+                "de.maxhenkel.car.integration.jei.CarRecipeBuilder",
+                List.of(Requirement.method("", "getAllRecipes", "()Ljava/util/List;"))
+            ),
+            new TargetRequirement(
+                "de.maxhenkel.car.integration.jei.CarRecipeCategory",
+                List.of(Requirement.method("", "setRecipe"))
+            )
+        )
+    );
+    private static final AtomicFeature IRON_FURNACES_FEATURE = new AtomicFeature(
+        "Iron Furnaces generator compaction",
+        List.of(
+            new TargetRequirement(
+                "ironfurnaces.jei.IronFurnacesJEIPlugin",
+                List.of(Requirement.method(
+                    "", "registerRecipes", "(Lmezz/jei/api/registration/IRecipeRegistration;)V"))
+            ),
+            new TargetRequirement(
+                "ironfurnaces.jei.RecipeCategoryGeneratorRegular",
+                List.of(Requirement.method("", "setRecipe"))
+            ),
+            new TargetRequirement(
+                "ironfurnaces.jei.RecipeCategoryGeneratorSmoking",
+                List.of(Requirement.method("", "setRecipe"))
+            )
+        )
+    );
+    private static final AtomicFeature EMBERS_DAWNSTONE_ANVIL_FEATURE = new AtomicFeature(
+        "Embers Dawnstone Anvil compaction",
+        List.of(
+            new TargetRequirement(
+                "com.rekindled.embers.compat.jei.JEIPlugin",
+                List.of(Requirement.method("", "addRecipes"))
+            ),
+            new TargetRequirement(
+                "com.rekindled.embers.compat.jei.DawnstoneAnvilCategory",
+                List.of(Requirement.method("", "setRecipe"))
+            ),
+            new TargetRequirement(
+                "com.rekindled.embers.recipe.AnvilDisplayRecipe",
+                List.of(
+                    Requirement.method(
+                        "",
+                        "<init>",
+                        "(Lnet/minecraft/resources/ResourceLocation;Ljava/util/List;Ljava/util/List;"
+                            + "Lnet/minecraft/world/item/crafting/Ingredient;)V"
+                    ),
+                    Requirement.field("", "id", "Lnet/minecraft/resources/ResourceLocation;"),
+                    Requirement.field("", "outputs", "Ljava/util/List;"),
+                    Requirement.field("", "inputs", "Ljava/util/List;"),
+                    Requirement.field("", "ingredient", "Lnet/minecraft/world/item/crafting/Ingredient;")
+                )
+            )
+        )
+    );
+    private static final AtomicFeature SFM_FALLING_ANVIL_FEATURE = new AtomicFeature(
+        "SFM Falling Anvil optimization",
+        List.of(
+            new TargetRequirement(
+                "ca.teamdman.sfm.client.jei.FallingAnvilJEICategory",
+                List.of(Requirement.method(
+                    "",
+                    "setRecipeForFallingAnvilDisenchantRecipe",
+                    "(Lmezz/jei/api/gui/builder/IRecipeLayoutBuilder;Lmezz/jei/api/recipe/IFocusGroup;"
+                        + "Ljava/util/List;)V"
+                ))
+            ),
+            new TargetRequirement(
+                "ca.teamdman.sfm.common.enchantment.SFMEnchantmentKey",
+                List.of(Requirement.method(
+                    "",
+                    "canEnchant",
+                    "(Lnet/minecraft/world/item/ItemStack;)Z"
+                ))
+            )
+        )
+    );
+    private static final AtomicFeature JEED_EFFECT_CLICK_FEATURE = new AtomicFeature(
+        "JEED startup effect click guard",
+        List.of(new TargetRequirement(
+            "net.mehvahdjukaar.jeed.plugin.jei.JEIPlugin",
+            List.of(
+                Requirement.method(
+                    "",
+                    "onClickedEffect",
+                    "(Lnet/minecraft/world/effect/MobEffectInstance;DDI)V"
+                ),
+                Requirement.field("", "JEI_HELPERS", "Lmezz/jei/api/helpers/IJeiHelpers;"),
+                Requirement.field("", "JEI_RUNTIME", "Lmezz/jei/api/runtime/IJeiRuntime;")
+            )
+        ))
+    );
+    private static final Map<String, AtomicFeature> ATOMIC_FEATURES = Map.ofEntries(
+        Map.entry(CELESTIAL_REINFORCE_MIXIN, CELESTIAL_REINFORCE_FEATURE),
+        Map.entry(ULTIMATE_CAR_BUILDER_MIXIN, ULTIMATE_CAR_FEATURE),
+        Map.entry(ULTIMATE_CAR_CATEGORY_MIXIN, ULTIMATE_CAR_FEATURE),
+        Map.entry(IRON_FURNACES_PLUGIN_MIXIN, IRON_FURNACES_FEATURE),
+        Map.entry(IRON_FURNACES_CATEGORY_MIXIN, IRON_FURNACES_FEATURE),
+        Map.entry(EMBERS_PLUGIN_MIXIN, EMBERS_DAWNSTONE_ANVIL_FEATURE),
+        Map.entry(EMBERS_CATEGORY_MIXIN, EMBERS_DAWNSTONE_ANVIL_FEATURE),
+        Map.entry(SFM_FALLING_ANVIL_MIXIN, SFM_FALLING_ANVIL_FEATURE),
+        Map.entry(JEED_EFFECT_CLICK_MIXIN, JEED_EFFECT_CLICK_FEATURE)
+    );
+
     private final Map<String, ClassNode> targetCache = new HashMap<>();
+    private final Map<AtomicFeature, Boolean> atomicFeatureCompatibility = new HashMap<>();
 
     /** Types a mixin names in its own signatures; Mixin fails hard if one of them has moved. */
     private static final Map<String, RequiredClass> REQUIRED_CLASSES = Map.of(
@@ -131,8 +324,22 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
 
     private static final Set<String> OPTIONAL_MIXINS = Set.of(
         MIXIN_PACKAGE + "GrindstoneRepresentativeMixin",
+        MIXIN_PACKAGE + "compat.CelestialForgeReinforceRecipeMixin",
+        EMBERS_CATEGORY_MIXIN,
+        EMBERS_PLUGIN_MIXIN,
+        MIXIN_PACKAGE + "compat.GeneratorGaloreJeiPluginMixin",
+        MIXIN_PACKAGE + "compat.IronFurnacesGeneratorCategoryMixin",
+        MIXIN_PACKAGE + "compat.IronFurnacesJeiPluginMixin",
         MIXIN_PACKAGE + "compat.IronsSpellsArcaneAnvilMakerMixin",
-        MIXIN_PACKAGE + "compat.IronsSpellsArcaneAnvilRecipeMixin"
+        MIXIN_PACKAGE + "compat.IronsSpellsArcaneAnvilRecipeMixin",
+        JEED_EFFECT_CLICK_MIXIN,
+        MIXIN_PACKAGE + "compat.MekanismRecipeRegistryHelperMixin",
+        MIXIN_PACKAGE + "compat.ProductiveTreesLogStrippingCategoryMixin",
+        MIXIN_PACKAGE + "compat.SfmFallingAnvilCategoryMixin",
+        MIXIN_PACKAGE + "compat.ThermalExpansionJeiPluginMixin",
+        MIXIN_PACKAGE + "compat.TinkersJeiPluginMixin",
+        MIXIN_PACKAGE + "compat.UltimateCarRecipeBuilderMixin",
+        MIXIN_PACKAGE + "compat.UltimateCarRecipeCategoryMixin"
     );
 
     @Override
@@ -161,6 +368,11 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
             LOGGER.debug(
                 "JEI Optimize skipped {}: this JEI build uses the running-field publication variant.",
                 mixinClassName);
+            return false;
+        }
+
+        AtomicFeature atomicFeature = ATOMIC_FEATURES.get(mixinClassName);
+        if (atomicFeature != null && !isAtomicFeatureCompatible(atomicFeature)) {
             return false;
         }
 
@@ -209,6 +421,47 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
         return false;
     }
 
+    private boolean isAtomicFeatureCompatible(AtomicFeature feature) {
+        Boolean cached = atomicFeatureCompatibility.get(feature);
+        if (cached != null) {
+            return cached;
+        }
+
+        boolean sawTarget = false;
+        String missing = null;
+        for (TargetRequirement targetRequirement : feature.targets()) {
+            ClassNode target = readTarget(targetRequirement.className());
+            if (target == null) {
+                if (missing == null) {
+                    missing = "class " + targetRequirement.className();
+                }
+                continue;
+            }
+            sawTarget = true;
+            for (Requirement requirement : targetRequirement.requirements()) {
+                if (!requirement.isPresentIn(target) && missing == null) {
+                    missing = targetRequirement.className() + " " + requirement.describe();
+                }
+            }
+        }
+
+        boolean compatible = missing == null;
+        atomicFeatureCompatibility.put(feature, compatible);
+        if (!compatible) {
+            if (sawTarget) {
+                LOGGER.warn(
+                    "JEI Optimize turned off its {} optimization because its complete ABI contract is missing {}. "
+                        + "The target mod keeps its normal behavior.",
+                    feature.name(), missing);
+            } else {
+                LOGGER.debug(
+                    "JEI Optimize skipped optional {} because its target mod is not installed.",
+                    feature.name());
+            }
+        }
+        return compatible;
+    }
+
     private ClassNode readTarget(String targetClassName) {
         if (targetCache.containsKey(targetClassName)) {
             return targetCache.get(targetClassName);
@@ -246,6 +499,12 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
     }
 
     private record RequiredClass(String feature, String className) {
+    }
+
+    private record AtomicFeature(String name, List<TargetRequirement> targets) {
+    }
+
+    private record TargetRequirement(String className, List<Requirement> requirements) {
     }
 
     private record Requirement(String feature, String memberName, String descriptor, boolean isField) {

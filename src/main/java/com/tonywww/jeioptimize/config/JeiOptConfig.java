@@ -46,6 +46,24 @@ public final class JeiOptConfig {
     static final IntValue CONTENT_GRINDSTONE_REPRESENTATIVES_PER_ENCHANTMENT;
     static final IntValue CONTENT_GRINDSTONE_REPAIR_REPRESENTATIVES;
     static final BooleanValue CONTENT_COMPACT_IRONS_SPELLS_IMBUING;
+    static final BooleanValue CONTENT_COMPACT_FUEL_RECIPES;
+    static final BooleanValue CONTENT_COMPACT_GENERATOR_GALORE_FUELS;
+    static final BooleanValue CONTENT_COMPACT_MEKANISM_NUTRITIONAL_LIQUIFIER;
+    static final BooleanValue CONTENT_COMPACT_THERMAL_STIRLING_FUELS;
+    static final BooleanValue CONTENT_CACHE_CELESTIAL_FORGE_REINFORCE;
+    static final BooleanValue CONTENT_COMPACT_ULTIMATE_CAR_WORKSHOP;
+    static final BooleanValue CONTENT_COMPACT_IRON_FURNACES_GENERATOR;
+    static final BooleanValue CONTENT_CACHE_SFM_FALLING_ANVIL;
+    static final BooleanValue CONTENT_COMPACT_EMBERS_DAWNSTONE_ANVIL;
+    static final BooleanValue CONTENT_CACHE_PRODUCTIVE_TREES_STRIPPER_TOOLS;
+    static final BooleanValue CONTENT_COMPACT_TINKERS_CASTING;
+    static final BooleanValue CONTENT_AGGRESSIVE_CELESTIAL_FORGE_REINFORCE;
+    static final BooleanValue CONTENT_AGGRESSIVE_EMBERS_DAWNSTONE_ANVIL;
+    static final BooleanValue CONTENT_AGGRESSIVE_SFM_FALLING_ANVIL;
+    static final IntValue CONTENT_AGGRESSIVE_REPRESENTATIVES_PER_GROUP;
+    static final IntValue CONTENT_AGGRESSIVE_GENERIC_REPAIR_REPRESENTATIVES;
+    static final BooleanValue CONTENT_PREFILTER_TINKERS_INGREDIENTS;
+    static final ConfigValue<String> CONTENT_TINKERS_INGREDIENT_FILTER_ADDITIONAL_TAGS;
     static final ConfigValue<String> CONTENT_SKIP_CREATIVE_TABS;
 
     static final BooleanValue DIAGNOSTICS_PLUGIN_TIMING;
@@ -123,6 +141,92 @@ public final class JeiOptConfig {
                 "Compact Iron's Spells Arcane Anvil imbuing combinations while preserving every item and spell level.",
                 "Has no effect when Iron's Spells is not installed or its integration API is incompatible.")
             .define("compactIronsSpellsImbuing", true);
+        CONTENT_COMPACT_FUEL_RECIPES = builder
+            .comment(
+                "Merge JEI fuel recipes with the same burn time into one page.",
+                "All fuel items remain indexed and discoverable through recipe focus searches.")
+            .define("compactFuelRecipes", true);
+        CONTENT_COMPACT_GENERATOR_GALORE_FUELS = builder
+            .comment(
+                "Merge equivalent Generator Galore solid-fuel pages while retaining every fuel input.",
+                "Has no effect when Generator Galore is not installed or its integration API is incompatible.")
+            .define("compactGeneratorGaloreFuels", true);
+        CONTENT_COMPACT_MEKANISM_NUTRITIONAL_LIQUIFIER = builder
+            .comment(
+                "Merge equivalent Mekanism Nutritional Liquifier pages by paste output.",
+                "Every food input remains indexed and discoverable through recipe focus searches.")
+            .define("compactMekanismNutritionalLiquifier", true);
+        CONTENT_COMPACT_THERMAL_STIRLING_FUELS = builder
+            .comment(
+                "Merge equivalent Thermal Stirling Dynamo fuel pages while retaining every input.",
+                "Has no effect when Thermal Expansion is not installed or its integration API is incompatible.")
+            .define("compactThermalStirlingFuels", true);
+        CONTENT_CACHE_CELESTIAL_FORGE_REINFORCE = builder
+            .comment(
+                "Cache Celestial Forge Item Reinforce input and preview scans for each JEI recipe.",
+                "Does not remove any matching equipment or change focus results.")
+            .define("cacheCelestialForgeReinforce", true);
+        CONTENT_COMPACT_ULTIMATE_CAR_WORKSHOP = builder
+            .comment(
+                "Collapse Ultimate Car Mod workshop combinations into one page per vehicle layout.",
+                "All compatible parts remain in JEI input slots; the 3D preview uses one representative vehicle.")
+            .define("compactUltimateCarWorkshop", true);
+        CONTENT_COMPACT_IRON_FURNACES_GENERATOR = builder
+            .comment(
+                "Merge equivalent Iron Furnaces Augment: Generator pages by energy value.",
+                "All fuel and food inputs remain indexed and discoverable through recipe focus searches.")
+            .define("compactIronFurnacesGenerator", true);
+        CONTENT_CACHE_SFM_FALLING_ANVIL = builder
+            .comment(
+                "Cache Super Factory Manager's full Falling Anvil disenchantment display lists.",
+                "Focused item and enchantment queries still use SFM's original specialized path.")
+            .define("cacheSfmFallingAnvil", true);
+        CONTENT_COMPACT_EMBERS_DAWNSTONE_ANVIL = builder
+            .comment(
+                "Merge equivalent Embers Dawnstone Anvil visual pages while retaining every input/output pair.",
+                "Bottom inputs and outputs remain position-linked for JEI focus searches.")
+            .define("compactEmbersDawnstoneAnvil", true);
+        CONTENT_CACHE_PRODUCTIVE_TREES_STRIPPER_TOOLS = builder
+            .comment(
+                "Cache Productive Trees' log-stripping tool tag expansion for the current JEI lifecycle.",
+                "Does not remove tools, recipes, catalysts, or focus results.")
+            .define("cacheProductiveTreesStripperTools", true);
+        CONTENT_COMPACT_TINKERS_CASTING = builder
+            .comment(
+                "Merge Tinkers' Construct casting display pages only when they share one parent recipe and display parameters.",
+                "Every cast/output pair remains position-linked; ambiguous recipes keep their original pages.")
+            .define("compactTinkersCasting", true);
+        CONTENT_AGGRESSIVE_CELESTIAL_FORGE_REINFORCE = builder
+            .comment(
+                "Lossy: limit Celestial Forge Item Reinforce input previews to representative item families.",
+                "Disabled by default; omitted items no longer provide direct JEI focus hits for this category.")
+            .define("aggressiveCelestialForgeReinforce", false);
+        CONTENT_AGGRESSIVE_EMBERS_DAWNSTONE_ANVIL = builder
+            .comment(
+                "Lossy: limit each compacted Embers Dawnstone Anvil group to representative tools.",
+                "Disabled by default; omitted tools no longer provide direct JEI focus hits for this category.")
+            .define("aggressiveEmbersDawnstoneAnvil", false);
+        CONTENT_AGGRESSIVE_SFM_FALLING_ANVIL = builder
+            .comment(
+                "Lossy: limit SFM Falling Anvil's unfiltered overview to representative tool families per enchantment.",
+                "Disabled by default; focused queries still use SFM's original specialized path.")
+            .define("aggressiveSfmFallingAnvil", false);
+        CONTENT_AGGRESSIVE_REPRESENTATIVES_PER_GROUP = builder
+            .comment("Representative item-family limit used by explicitly enabled aggressive modes.")
+            .defineInRange("aggressiveRepresentativesPerGroup", 3, 1, 64);
+        CONTENT_AGGRESSIVE_GENERIC_REPAIR_REPRESENTATIVES = builder
+            .comment("Example limit for generic repair recipes in explicitly enabled aggressive modes.")
+            .defineInRange("aggressiveGenericRepairRepresentatives", 16, 1, 256);
+        CONTENT_PREFILTER_TINKERS_INGREDIENTS = builder
+            .comment(
+                "Lossy: remove item stacks in #tconstruct:modifiable and #tconstruct:parts before JEI builds its global index.",
+                "Disabled by default. Filtered variants remain in the game and creative tabs but not JEI's right-side list.")
+            .define("prefilterTinkersIngredients", false);
+        CONTENT_TINKERS_INGREDIENT_FILTER_ADDITIONAL_TAGS = builder
+            .comment(
+                "Comma-separated item tags to filter in addition to Tinkers' default modifiable and parts tags.",
+                "A leading # is optional. Only used when prefilterTinkersIngredients is enabled.")
+            .define("tinkersIngredientFilterAdditionalTags", "");
         CONTENT_SKIP_CREATIVE_TABS = builder
             .comment(
                 "Emergency hatch: comma-separated creative tabs to hide from JEI, by tab id or by mod id.",

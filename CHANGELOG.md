@@ -4,6 +4,46 @@ All notable changes to Just Enough Threads are documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.12.0
+
+### Added
+
+- **Coverage-preserving recipe compaction now covers more JEI and optional-mod categories.** Fuel,
+  Generator Galore solid fuel, Mekanism Nutritional Liquifier, Thermal Stirling Dynamo, Iron
+  Furnaces generators, Ultimate Car workshops, Embers Dawnstone Anvil, and Tinkers casting recipes
+  are compacted only when their complete displayed input/output relationships can be preserved.
+- **Repeated optional-mod recipe generation is cached where compaction is not appropriate.**
+  Celestial Forge reinforce previews, SFM Falling Anvil recipes, and Productive Trees stripper-tool
+  ingredients use generation-scoped caches while retaining their original focus behavior.
+- **Celestial Forge, Embers, and SFM have independent aggressive representative modes.** These
+  opt-in modes default to off because they can remove direct focus hits for non-representative
+  items. Their shared defaults retain three item families per group and 16 generic repair examples.
+- **Tinkers' Construct can optionally prefilter high-cardinality item variants before JEI indexing.**
+  The default-off filter covers `#tconstruct:modifiable` and `#tconstruct:parts` and accepts
+  additional comma-separated item tags.
+- **Optional integrations now have released-jar ABI contracts.** Missing mods are skipped quietly;
+  an installed mod with an incompatible class, field, constructor, or method shape keeps its
+  original JEI behavior instead of applying a partial optimization.
+
+### Changed
+
+- **Iron's Spells Arcane Anvil compaction now preserves parallel item, spell-scroll, and output
+  relationships.** Representative recipes are selected before expensive output simulation instead
+  of expanding each wrapper into the full item-by-spell-level matrix.
+- **Lossless optional integrations are enabled by default, while every focus-reducing optimization
+  remains opt-in.** Unproven parallel lists, incomplete coverage, or runtime integration failures
+  fall back to the original recipes.
+
+### Fixed
+
+- **Inventory slots remain interactive while JEI loads with JEED installed.** The broad container
+  mouse-event block has been replaced by an ABI-checked guard on JEED's effect-click callback. Only
+  an effect activation that would read an unpublished JEI runtime is ignored; vanilla clicks,
+  right-clicks and drags continue through the normal container path.
+- **Celestial Forge cached ingredients can no longer be mutated through third-party preview code.**
+  Cached inputs and results are deep-copied, and aggressive modes no longer reuse lossless cache
+  entries.
+
 ## 0.11.0
 
 ### Added
@@ -45,7 +85,8 @@ screen extensions, and its progress panel now adapts to the available screen spa
 - **Clicking JEED effect descriptions while JEI is still loading no longer crashes the client.**
   Mouse button events on container screens are held back until JEI publishes its runtime, preventing
   JEED and similar screen extensions from reading partially initialized JEI state. Normal input
-  resumes immediately after startup completes.
+  resumes immediately after startup completes. This broad 0.10.4 guard is replaced by the narrow
+  JEED callback guard in 0.12.0.
 - **The loading progress panel now remains fully visible across GUI scales and resolutions.** It
   evaluates the space to the right, left, below, and above the open container, chooses the widest
   fitting placement, and falls back to a screen-clamped position when no side can contain it. This

@@ -196,11 +196,83 @@ Current status: matrices are intentionally not auto-filled by compile/run smoke.
 | `general.enabled=false` then runClient | All feature mixins no-op or fall back to JEI baseline. | ☐ |
 | Chunked ingredient index publication | Progress is monotonic; no partial sidebar refresh; one final swap before runtime callbacks. | ☑ Automated startup smoke: JEI 15.20 completed 2670 ingredients in 6 chunks; JEI 15.48 completed 2670 in 6 chunks through its per-element ABI; NeoForge JEI 19.27 completed 1688 in 4 chunks. All published on Render thread before `Sending Runtime`, with no fallback after ABI selection. Manual visual progress review remains open. |
 | Container input during active indexing | JEI input is ignored without consuming vanilla input or touching an unpublished runtime. | ☑ SDBF crash root cause: JEI 15.21 registered GUI input, submitted 24,680 ingredients in 50 chunks, then Ixeris replayed one queued key before runtime publication; JEI threw `Jei Client Configs have not been created yet`. Exact JEI 15.21 input ABI matches the guard. Real Forge screen-key events dispatched between chunk submission and final publication on JEI 15.20 and 15.48 hit the guard once, returned `consumed=false`, completed startup, and produced no runtime error. NeoForge remained safe before publication. Evidence: `build/benchmarks/jei-compat/input-guard-*.latest.log`. |
+| JEED effect click during active indexing | Ignore only the premature effect activation; preserve vanilla container mouse input. | ◐ The global `MouseHandler.onPress` cancellation was removed. A temporary Forge 1.20 probe called JEED `onClickedEffect` after `registerRecipes`, while helpers existed but runtime publication was still pending; the dedicated guard cancelled the call and JEI completed in 2.741 seconds. The probe was removed and the final production run completed in 2.693 seconds. Direct slot/drag and second-world interaction checks remain open. Evidence: `build/benchmarks/jei-compat/*-jeed.latest.log`. |
 | Window resize or maximize during active startup | Replayed third-party clicks cannot enter `RecipesGui` before `Internal.setRuntime`; runtime callbacks and publication cannot be separated by another queued event. | ☑ Crash report from Forge JEI 15.21 showed Ixeris replaying an FTB Quests mouse click after `onRuntimeAvailable` but before global runtime publication. JEI bytecode confirms callback-before-publication ordering. Runtime callbacks and publication now share one Render-thread task, with all public `RecipesGui` open entry points guarded until startup completes. Temporary direct early-show and queued-publication probes passed on Forge JEI 15.20, Forge JEI 15.48's running-field variant, and NeoForge JEI 19.27; the instrumentation was then removed. Final probe-free Forge 15.20 and NeoForge 19.27 smoke runs also completed startup. Evidence: `build/benchmarks/jei-compat/forge-15.20.0.120.latest.log`, `forge-15.48.0.179.latest.log`, and `neoforge-default.latest.log`. |
 | Inventory rendering while joining a multiplayer server | JEI GUI initialization, layout updates, and overlays stay inactive until runtime publication, then resume without reopening the screen. | ☑ NeoForge JEI 19.27 crash path reached `RecipeBookmarkElement` from `GuiEventHandler.onDrawScreenPost` while `Internal.getJeiRuntime()` was unavailable. A temporary probe opened the inventory during active startup: the render guard blocked the callback, JEI completed in 2.113 seconds, and rendering resumed on the next frame with no runtime error. Probe instrumentation was removed. Final probe-free NeoForge 19.27, Forge JEI 15.20, and Forge JEI 15.48 runs completed with no injection or runtime failure. Evidence: `build/benchmarks/jei-compat/neoforge-default.latest.log`, `forge-15.20.0.120.latest.log`, and `forge-15.48.0.179.latest.log`. |
 | Minecraft profiler isolation | JEI startup callbacks cannot mutate the render thread's active profiler map. | ☑ Forge and NeoForge probes confirmed `Minecraft.getProfiler()` was intercepted only on the dedicated startup thread (then `jei_optimize-start`, now `justenoughthreads-start`); the render-thread call did not hit the guard, startup completed, and no mixin/runtime failure occurred. `ActiveProfiler.getResults()` passes its mutable entries map directly to `FilledProfileResults`, matching the reported CME. The crash session also logged a render-thread profiler push/pop mismatch, so the exact writer remains unproven. Evidence: `build/benchmarks/jei-compat/profiler-guard-*.latest.log`. |
 
 Current status: runClient smoke passed with generated default config. Default feature-specific optimization gates are `false`, so this primarily validates baseline/no-op startup. Explicit `general.enabled=false` run remains pending.
+
+### Optional Integration Smoke: Just Enough Effect Descriptions
+
+| Input | Version / SHA-256 | Result |
+|---|---|---|
+| JEED, Forge 1.20.1 | `1.20-2.2.5` / `841DEE59C98C1B490073866A47DBD77F13125D425A8C6A8E850CF8C43E699A83` | Released bytecode exposes `onClickedEffect(MobEffectInstance, double, double, int)` and the expected helpers/runtime fields, but dereferences them without null checks. The dedicated guard mixin loaded on JEI 15.20 and 15.48. |
+| JEED, NeoForge 1.21.1 | `1.21-2.3.3` / `B3FF4795E0CBB491FFADA136884A78BA8D66DF5D9C3C44230BFFDBFA3DC797D7` | Released bytecode has the same guarded ABI and already includes upstream helpers/runtime null checks. The additional generation-aware guard mixin loaded successfully. |
+| Forge JEI 15.20 | `15.20.0.120` | JEI startup completed in 2.681 seconds with no JEED NPE, mixin injection error, or ABI-disable marker. |
+| Forge JEI 15.48 | `15.48.0.179` | JEI startup completed in 3.211 seconds with no JEED NPE, mixin injection error, or ABI-disable marker. |
+| NeoForge JEI 19.27 | `19.27.0.340` | JEI startup completed in 4.708 seconds with no JEED NPE, mixin injection error, or ABI-disable marker. |
+
+The compatibility follows the narrow early-return design in JEED pull request 77, while also
+checking this project's generation-aware startup state. That extra state check prevents a static,
+non-null JEED runtime left by an earlier world from being used during a later JEI startup. The old
+global `MouseHandler` mixin is no longer registered, so unrelated container clicks are not held
+back while the ingredient index builds. A temporary runtime probe directly exercised the pre-runtime
+effect-click path on the released Forge jar; it was safely ignored and then removed before the final
+probe-free build and smoke run.
+
+### Optional Integration Smoke: Tinkers' Construct
+
+| Input | Version / SHA-256 | Result |
+|---|---|---|
+| Tinkers' Construct | `3.11.2.166` / `653B49D73481A1325BA78ADC7273DEE6C765A51BAFDF264A7510576D6EF91C43` | Forge 1.20.1 runtime loaded; casting compaction reduced 2,473 display pages to 2,390. |
+| Mantle | `1.11.104` / `6052E47C3981064BD5213728EAA3C5418289F6F85B07A1CD4DD1505239248838` | Required dependency loaded with Tinkers. |
+| JEI 15.20 | `15.20.0.120` | Default-off and enabled prefilter runs reached JEI startup; enabled run removed 2,060 tagged variants before global indexing. |
+| JEI 15.48 | `15.48.0.179` | Enabled prefilter run reached JEI startup in 4.231 seconds and removed the same 2,060 variants. |
+
+The tested Tinkers jar contains both default item tag resources: `tconstruct:modifiable` and
+`tconstruct:parts`. No official Tinkers' Construct NeoForge 1.21.1 release was identified, so that
+optional integration remains a guarded no-op on the NeoForge target.
+
+### Optional Integration Smoke: Forge 1.20.1 Multi-Mod Compatibility
+
+The following released jars were checked against Forge 47.4.4 and JEI 15.48.0.179:
+
+| Input | Version / SHA-256 | Runtime result |
+|---|---|---|
+| Celestial Forge | `1.1.9` / `F2D80F27A2AA68F5B8E7EDE2543F775B6B43B1F51A77A98D831FA02C1D8FEE56` | Default cache and optional 3-family limiter both reached JEI startup. |
+| Celestial Core | `1.6.1` / `2D63D1BF4ED81B3F53E1DD35356DF39559C9764618EB01AB37C09D9E6DC1BF64` | Required by the exercised Celestial tooltip path. |
+| L2 Library | `2.5.3` / `866DAC367928C6A0B1FD64DDCD078F4F217309EE7DBECCFD18A96C2766207CFA` | Required by Celestial Forge; its nested libraries were supplied explicitly to the Loom runtime. |
+| L2 Damage Tracker | `0.3.8` / `95DF8A97CE66C9A1EB48CA7F5B01EA9B1EDD1FF31093B7643DE91F92BAC912D7` | Loaded from the official Celestial Core JarJar payload. |
+| Embers Rekindled | `1.4.7` / `D119455E74A8976AD3533A2C2B25FE942DF8A27A57FCF35DA1CD05177123477A` | Default compaction and optional representative limiting reached JEI startup. |
+| Super Factory Manager | `4.34.0` / `34EE6EAB2783B0B3A53450A6700C215E21DC653357862B24BE7888E95554EF56` | Default cache and optional representative limiting reached JEI startup. |
+| Ultimate Car Mod | `1.0.45` / `49648F66E9D0537AF2452C5C77AE402313A783E7E14166E64282B4A766E678F1` | Recipe builder and category compatibility mixins loaded in the combined smoke. |
+| Iron Furnaces | `4.1.8` / `E457052522CEF1F8644B6929A64EAB96DE04CE9E6E32A715F1D68D79DA26D66B` | JEI plugin and both generator category mixins loaded in the combined smoke. |
+| Generator Galore | `1.2.5` / `4AEBAEDFAFC1F4A7C6A1D88C59DCE17EDABE5AC549CBF99F35C47A11517EEC4A` | JEI plugin compatibility mixin loaded in the combined smoke. |
+| Productive Trees | `0.2.6` / `068B8185E0D6C82170FBA90FD615B4A97D294647029AEC7723AD40F7DFC06FE0` | Blocked before JEI startup by an upstream Forge registration crash. |
+| Productive Lib | `0.0.4` / `E91C001B3589F505B5A71A533137BC672C59DF68D515714FC4FAC42C57BEC8F0` | Official Productive Trees JarJar payload was supplied explicitly; it did not resolve the upstream crash. |
+
+Runtime matrix:
+
+| Case | Configuration | Result |
+|---|---|---|
+| Seven-mod default integration | Lossless integration features enabled; all aggressive modes and Tinkers prefilter disabled | Celestial Forge, Embers, SFM, Ultimate Car, Iron Furnaces, Generator Galore, and Tinkers reached JEI startup in 5.155 seconds; 7,623 ingredients were submitted in 16 chunks. All targeted compatibility mixins loaded with no missing class, injection, or ABI-disable marker. |
+| Explicit no-op paths | `cacheCelestialForgeReinforce=false`, `compactEmbersDawnstoneAnvil=false`, `cacheSfmFallingAnvil=false`; all three aggressive modes disabled | The three official mods still registered their original recipe types and reached JEI startup in 2.801 seconds. The target mixins loaded, so this exercises the configuration gates rather than absent targets. |
+| Celestial lossless cache | Cache enabled; aggressive mode disabled; complete official dependency chain supplied | `CelestialForgeReinforceRecipeMixin` loaded, `celestial_forge:reinforce` registered, and JEI started in 2.739 seconds with no missing class, injection, or ABI-disable marker. |
+| Celestial representative limit | `aggressiveCelestialForgeReinforce=true`, representative limit `3` | JEI started in 2.558 seconds with the reinforce wrapper and recipe type present and no missing class, injection, or ABI-disable marker. |
+| Embers and SFM representative limits | `aggressiveEmbersDawnstoneAnvil=true`, `aggressiveSfmFallingAnvil=true`; limits `3` and `16` | Both categories and recipe types loaded; JEI started in 2.505 seconds with no missing class, injection, or ABI-disable marker. Opening SFM's Falling Anvil category to execute its private layout method remains a manual check. |
+
+Productive Trees could not reach JEI registration. With its official nested Productive Lib loaded,
+the mod failed in `CapabilityContainerBlock.<init>` while reading `BlockStateProperties.AXIS` from
+`minecraft:air`, followed by a missing registry object for
+`productivetrees:time_traveller_display`. This occurs during the mod's Forge registration lifecycle,
+before JEI or the Productive Trees compatibility mixin can execute, so it is recorded as an upstream
+runtime blocker rather than a compatibility failure.
+
+Loom does not reliably discover JarJar dependencies nested in externally supplied runtime jars. The
+Celestial and Productive Trees smoke runs therefore extracted the unmodified nested jars from the
+official artifacts and passed them explicitly through `-RuntimeModJars`. This is a development-runtime
+constraint; the nested payloads are not repackaged into this project's release jar.
 
 ## 9. Failure Triage
 
@@ -228,3 +300,6 @@ When a validation run resolves a to-verify item:
 - 2026-07-10 — PH-1 updated validation with current compileJava/runClient evidence, generated config confirmation, implementation snapshot, and remaining manual equivalence checks.
 - 2026-07-10 — Final acceptance update: reflection scan is clean; compileJava and runClient pass after direct JEI compile-only dependency refactor.
 - 2026-08-07 — Verified single-flight startup cancellation and pre-publication abort on world stop; normal startup smoke passed on JEI 15.20, JEI 15.48, and NeoForge JEI 19.27.
+- 2026-08-27 — Added Tinkers 3.11.2.166 / Mantle 1.11.104 runtime evidence for casting compaction and the default-off global ingredient prefilter on JEI 15.20 and 15.48.
+- 2026-08-27 — Added released-jar smoke evidence for Celestial Forge, Embers, SFM, Ultimate Car, Iron Furnaces, Generator Galore, and the Productive Trees upstream registration blocker; verified default, explicit no-op, and aggressive startup paths.
+- 2026-08-29 — Replaced the global container mouse lock with a generation-aware JEED effect-click guard; verified released JEED jars on Forge JEI 15.20/15.48 and NeoForge JEI 19.27.

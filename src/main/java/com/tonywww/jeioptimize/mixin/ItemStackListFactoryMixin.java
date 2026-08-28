@@ -1,8 +1,11 @@
 package com.tonywww.jeioptimize.mixin;
 
+import com.llamalad7.mixinextras.injector.ModifyReturnValue;
 import com.tonywww.jeioptimize.content.CreativeTabFilter;
+import com.tonywww.jeioptimize.content.TinkersIngredientPrefilter;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.CreativeModeTabs;
+import net.minecraft.world.item.ItemStack;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
 import org.spongepowered.asm.mixin.injection.At;
@@ -13,6 +16,11 @@ import java.util.List;
 @Pseudo
 @Mixin(targets = "mezz.jei.library.plugins.vanilla.ingredients.ItemStackListFactory", remap = false)
 public abstract class ItemStackListFactoryMixin {
+    @ModifyReturnValue(method = "create", at = @At("RETURN"))
+    private static List<ItemStack> jeiopt$prefilterTinkersIngredients(List<ItemStack> original) {
+        return TinkersIngredientPrefilter.apply(original);
+    }
+
     // The target is a Minecraft method, so it still needs remapping inside this remap=false mixin.
     @Redirect(
         method = "create",

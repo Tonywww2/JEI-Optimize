@@ -71,6 +71,78 @@ public final class JeiOptFeatureFlags {
         return enabled() && JeiOptConfig.CONTENT_COMPACT_IRONS_SPELLS_IMBUING.get();
     }
 
+    public static boolean compactFuelRecipes() {
+        return enabled() && JeiOptConfig.CONTENT_COMPACT_FUEL_RECIPES.get();
+    }
+
+    public static boolean compactGeneratorGaloreFuels() {
+        return enabled() && JeiOptConfig.CONTENT_COMPACT_GENERATOR_GALORE_FUELS.get();
+    }
+
+    public static boolean compactMekanismNutritionalLiquifier() {
+        return enabled() && JeiOptConfig.CONTENT_COMPACT_MEKANISM_NUTRITIONAL_LIQUIFIER.get();
+    }
+
+    public static boolean compactThermalStirlingFuels() {
+        return enabled() && JeiOptConfig.CONTENT_COMPACT_THERMAL_STIRLING_FUELS.get();
+    }
+
+    public static boolean cacheCelestialForgeReinforce() {
+        return enabled() && JeiOptConfig.CONTENT_CACHE_CELESTIAL_FORGE_REINFORCE.get();
+    }
+
+    public static boolean compactUltimateCarWorkshop() {
+        return enabled() && JeiOptConfig.CONTENT_COMPACT_ULTIMATE_CAR_WORKSHOP.get();
+    }
+
+    public static boolean compactIronFurnacesGenerator() {
+        return enabled() && JeiOptConfig.CONTENT_COMPACT_IRON_FURNACES_GENERATOR.get();
+    }
+
+    public static boolean cacheSfmFallingAnvil() {
+        return enabled() && JeiOptConfig.CONTENT_CACHE_SFM_FALLING_ANVIL.get();
+    }
+
+    public static boolean compactEmbersDawnstoneAnvil() {
+        return enabled() && JeiOptConfig.CONTENT_COMPACT_EMBERS_DAWNSTONE_ANVIL.get();
+    }
+
+    public static boolean cacheProductiveTreesStripperTools() {
+        return enabled() && JeiOptConfig.CONTENT_CACHE_PRODUCTIVE_TREES_STRIPPER_TOOLS.get();
+    }
+
+    public static boolean compactTinkersCasting() {
+        return enabled() && JeiOptConfig.CONTENT_COMPACT_TINKERS_CASTING.get();
+    }
+
+    public static boolean aggressiveCelestialForgeReinforce() {
+        return enabled() && JeiOptConfig.CONTENT_AGGRESSIVE_CELESTIAL_FORGE_REINFORCE.get();
+    }
+
+    public static boolean aggressiveEmbersDawnstoneAnvil() {
+        return enabled() && JeiOptConfig.CONTENT_AGGRESSIVE_EMBERS_DAWNSTONE_ANVIL.get();
+    }
+
+    public static boolean aggressiveSfmFallingAnvil() {
+        return enabled() && JeiOptConfig.CONTENT_AGGRESSIVE_SFM_FALLING_ANVIL.get();
+    }
+
+    public static int aggressiveRepresentativesPerGroup() {
+        return configReady() ? JeiOptConfig.CONTENT_AGGRESSIVE_REPRESENTATIVES_PER_GROUP.get() : 3;
+    }
+
+    public static int aggressiveGenericRepairRepresentatives() {
+        return configReady() ? JeiOptConfig.CONTENT_AGGRESSIVE_GENERIC_REPAIR_REPRESENTATIVES.get() : 16;
+    }
+
+    public static boolean prefilterTinkersIngredients() {
+        return enabled() && JeiOptConfig.CONTENT_PREFILTER_TINKERS_INGREDIENTS.get();
+    }
+
+    public static String tinkersIngredientFilterAdditionalTags() {
+        return enabled() ? JeiOptConfig.CONTENT_TINKERS_INGREDIENT_FILTER_ADDITIONAL_TAGS.get() : "";
+    }
+
     public static boolean cacheScope() {
         return enabled() && JeiOptConfig.SYNC_CACHE_SCOPE.get();
     }

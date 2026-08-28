@@ -5,7 +5,6 @@ import com.tonywww.jeioptimize.recipe.CoveragePairPlanner;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 
-import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -24,7 +23,7 @@ public final class IronsSpellsRecipeCompactor {
     private static final String SPELL_CONTAINER_CLASS = "io.redspace.ironsspellbooks.api.spells.ISpellContainer";
     private static final String ITEM_REGISTRY_CLASS = "io.redspace.ironsspellbooks.registries.ItemRegistry";
 
-    private static final Map<Object, Variant> VARIANTS = Collections.synchronizedMap(new WeakHashMap<>());
+    private static final Map<Object, RecipePlan> PLANS = Collections.synchronizedMap(new WeakHashMap<>());
     private static final AtomicBoolean WARNING_LOGGED = new AtomicBoolean();
 
     private IronsSpellsRecipeCompactor() {
@@ -53,34 +52,32 @@ public final class IronsSpellsRecipeCompactor {
                 return recipes;
             }
 
-            List<Variant> variants = spellVariants(classLoader);
+            List<SpellVariant> variants = spellVariants(classLoader);
             List<CoveragePairPlanner.Pair> plan = CoveragePairPlanner.plan(imbueRecipes.size(), variants.size());
             if (plan.isEmpty()) {
                 return recipes;
             }
 
-            Constructor<?> recipeConstructor = findImbueConstructor(recipeClass);
-            List<Object> compacted = new ArrayList<>(recipes);
-            for (int index = 0; index < plan.size(); index++) {
-                CoveragePairPlanner.Pair pair = plan.get(index);
-                Object item = leftItemField.get(imbueRecipes.get(pair.itemIndex()));
-                Variant variant = variants.get(pair.variantIndex()).withItem(item);
-                Object recipe;
-                if (index < imbueRecipes.size()) {
-                    recipe = imbueRecipes.get(index);
-                } else {
-                    recipe = recipeConstructor.newInstance(item, variant.spell());
-                    compacted.add(recipe);
-                }
-                VARIANTS.put(recipe, variant);
+            List<List<SpellVariant>> variantsByRecipe = new ArrayList<>(imbueRecipes.size());
+            for (int index = 0; index < imbueRecipes.size(); index++) {
+                variantsByRecipe.add(new ArrayList<>());
+            }
+            for (CoveragePairPlanner.Pair pair : plan) {
+                variantsByRecipe.get(pair.itemIndex()).add(variants.get(pair.variantIndex()));
+            }
+            for (int index = 0; index < imbueRecipes.size(); index++) {
+                Object recipe = imbueRecipes.get(index);
+                Object item = leftItemField.get(recipe);
+                PLANS.put(recipe, new RecipePlan(item, List.copyOf(variantsByRecipe.get(index))));
             }
 
             JeiOptimize.LOGGER.debug(
-                "JEI Optimize compacted Iron's Spells imbuing from {} combinations to {} representative recipes",
+                "JEI Optimize compacted Iron's Spells imbuing from {} combinations to {} representative combinations across {} recipes",
                 (long) imbueRecipes.size() * variants.size(),
-                plan.size()
+                plan.size(),
+                imbueRecipes.size()
             );
-            return List.copyOf(compacted);
+            return recipes;
         } catch (ReflectiveOperationException | RuntimeException | LinkageError error) {
             warnOnce("Could not compact Iron's Spells Arcane Anvil recipes; keeping its original recipes", error);
             return recipes;
@@ -88,8 +85,8 @@ public final class IronsSpellsRecipeCompactor {
     }
 
     public static Object createRecipeItems(Object recipe) {
-        Variant variant = VARIANTS.get(recipe);
-        if (variant == null || !(variant.item() instanceof Item item)) {
+        RecipePlan plan = PLANS.get(recipe);
+        if (plan == null || !(plan.item() instanceof Item item) || plan.variants().isEmpty()) {
             return null;
         }
 
@@ -97,17 +94,23 @@ public final class IronsSpellsRecipeCompactor {
             ClassLoader classLoader = recipe.getClass().getClassLoader();
             Item scrollItem = findScrollItem(classLoader);
             ItemStack leftStack = new ItemStack(item);
-            ItemStack scrollStack = new ItemStack(scrollItem);
-            ItemStack resultStack = new ItemStack(item);
-            applySpell(classLoader, variant.spell(), variant.level(), scrollStack);
-            applySpell(classLoader, variant.spell(), variant.level(), resultStack);
+            List<ItemStack> scrollStacks = new ArrayList<>(plan.variants().size());
+            List<ItemStack> resultStacks = new ArrayList<>(plan.variants().size());
+            for (SpellVariant variant : plan.variants()) {
+                ItemStack scrollStack = new ItemStack(scrollItem);
+                ItemStack resultStack = new ItemStack(item);
+                applySpell(classLoader, variant.spell(), variant.level(), scrollStack);
+                applySpell(classLoader, variant.spell(), variant.level(), resultStack);
+                scrollStacks.add(scrollStack);
+                resultStacks.add(resultStack);
+            }
 
             Class<?> tupleClass = Class.forName(RECIPE_CLASS + "$Tuple", false, classLoader);
-            Constructor<?> tupleConstructor = findConstructor(tupleClass, 3);
+            var tupleConstructor = findConstructor(tupleClass, 3);
             return tupleConstructor.newInstance(
                 List.of(leftStack),
-                List.of(scrollStack),
-                List.of(resultStack)
+                List.copyOf(scrollStacks),
+                List.copyOf(resultStacks)
             );
         } catch (ReflectiveOperationException | RuntimeException | LinkageError error) {
             warnOnce("Could not materialize compact Iron's Spells recipe; using its original recipe", error);
@@ -115,7 +118,7 @@ public final class IronsSpellsRecipeCompactor {
         }
     }
 
-    private static List<Variant> spellVariants(ClassLoader classLoader) throws ReflectiveOperationException {
+    private static List<SpellVariant> spellVariants(ClassLoader classLoader) throws ReflectiveOperationException {
         Class<?> registryClass = Class.forName(SPELL_REGISTRY_CLASS, false, classLoader);
         Object enabledSpellsValue = registryClass.getMethod("getEnabledSpells").invoke(null);
         if (!(enabledSpellsValue instanceof List<?> enabledSpells)) {
@@ -124,14 +127,14 @@ public final class IronsSpellsRecipeCompactor {
 
         List<Object> sortedSpells = new ArrayList<>(enabledSpells);
         sortedSpells.sort(Comparator.comparing(IronsSpellsRecipeCompactor::spellId));
-        List<Variant> variants = new ArrayList<>();
+        List<SpellVariant> variants = new ArrayList<>();
         for (Object spell : sortedSpells) {
             Method getMinLevel = spell.getClass().getMethod("getMinLevel");
             Method getMaxLevel = spell.getClass().getMethod("getMaxLevel");
             int minimum = (int) getMinLevel.invoke(spell);
             int maximum = (int) getMaxLevel.invoke(spell);
             for (int level = minimum; level <= maximum; level++) {
-                variants.add(new Variant(null, spell, level));
+                variants.add(new SpellVariant(spell, level));
             }
         }
         return List.copyOf(variants);
@@ -143,18 +146,6 @@ public final class IronsSpellsRecipeCompactor {
         } catch (ReflectiveOperationException | RuntimeException error) {
             return spell.getClass().getName();
         }
-    }
-
-    private static Constructor<?> findImbueConstructor(Class<?> recipeClass) throws NoSuchMethodException {
-        for (Constructor<?> constructor : recipeClass.getConstructors()) {
-            Class<?>[] parameters = constructor.getParameterTypes();
-            if (parameters.length == 2
-                && Item.class.isAssignableFrom(parameters[0])
-                && parameters[1].getName().endsWith(".AbstractSpell")) {
-                return constructor;
-            }
-        }
-        throw new NoSuchMethodException(recipeClass.getName() + " imbue constructor");
     }
 
     private static Item findScrollItem(ClassLoader classLoader) throws ReflectiveOperationException {
@@ -193,8 +184,9 @@ public final class IronsSpellsRecipeCompactor {
         return field;
     }
 
-    private static Constructor<?> findConstructor(Class<?> type, int parameterCount) throws NoSuchMethodException {
-        for (Constructor<?> constructor : type.getDeclaredConstructors()) {
+    private static java.lang.reflect.Constructor<?> findConstructor(Class<?> type, int parameterCount)
+        throws NoSuchMethodException {
+        for (java.lang.reflect.Constructor<?> constructor : type.getDeclaredConstructors()) {
             if (constructor.getParameterCount() == parameterCount) {
                 constructor.setAccessible(true);
                 return constructor;
@@ -209,9 +201,9 @@ public final class IronsSpellsRecipeCompactor {
         }
     }
 
-    private record Variant(Object item, Object spell, int level) {
-        private Variant withItem(Object newItem) {
-            return new Variant(newItem, spell, level);
-        }
+    private record RecipePlan(Object item, List<SpellVariant> variants) {
+    }
+
+    private record SpellVariant(Object spell, int level) {
     }
 }
