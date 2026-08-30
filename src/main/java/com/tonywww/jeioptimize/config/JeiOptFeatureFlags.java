@@ -12,7 +12,8 @@ public final class JeiOptFeatureFlags {
     }
 
     public static boolean enabled() {
-        return configReady() && JeiOptConfig.GENERAL_ENABLED.get();
+        JeiOptConfigSnapshot.Snapshot snapshot = JeiOptConfigSnapshot.current();
+        return snapshot != null ? snapshot.enabled() : configReady() && JeiOptConfig.GENERAL_ENABLED.get();
     }
 
     public static boolean pluginTiming() {
@@ -115,6 +116,20 @@ public final class JeiOptFeatureFlags {
         return enabled() && JeiOptConfig.CONTENT_COMPACT_TINKERS_CASTING.get();
     }
 
+    public static boolean indexedBrewingLookup() {
+        JeiOptConfigSnapshot.Snapshot snapshot = JeiOptConfigSnapshot.current();
+        return enabled() && (snapshot != null
+            ? snapshot.indexedBrewingLookup()
+            : JeiOptConfig.CONTENT_INDEXED_BREWING_LOOKUP.get());
+    }
+
+    public static boolean skipRedundantMenuUpdates() {
+        JeiOptConfigSnapshot.Snapshot snapshot = JeiOptConfigSnapshot.current();
+        return enabled() && (snapshot != null
+            ? snapshot.skipRedundantMenuUpdates()
+            : JeiOptConfig.CONTENT_SKIP_REDUNDANT_MENU_UPDATES.get());
+    }
+
     public static boolean aggressiveCelestialForgeReinforce() {
         return enabled() && JeiOptConfig.CONTENT_AGGRESSIVE_CELESTIAL_FORGE_REINFORCE.get();
     }
@@ -159,55 +174,117 @@ public final class JeiOptFeatureFlags {
         return enabled() && JeiOptConfig.SYNC_DELAY_COMPACT.get();
     }
 
+    public static boolean lazyRecipeLayouts() {
+        JeiOptConfigSnapshot.Snapshot snapshot = JeiOptConfigSnapshot.current();
+        return enabled() && (snapshot != null
+            ? snapshot.lazyRecipeLayouts()
+            : JeiOptConfig.SYNC_LAZY_RECIPE_LAYOUTS.get());
+    }
+
+    public static int lazyRecipeLayoutThreshold() {
+        JeiOptConfigSnapshot.Snapshot snapshot = JeiOptConfigSnapshot.current();
+        return snapshot != null
+            ? snapshot.lazyRecipeLayoutThreshold()
+            : configReady() ? JeiOptConfig.SYNC_LAZY_RECIPE_LAYOUT_THRESHOLD.get() : 200;
+    }
+
     public static boolean searchPreheat() {
-        return enabled() && JeiOptConfig.ASYNC_SEARCH_PREHEAT.get();
+        JeiOptConfigSnapshot.Snapshot snapshot = JeiOptConfigSnapshot.current();
+        return enabled() && (snapshot != null ? snapshot.searchPreheat() : JeiOptConfig.ASYNC_SEARCH_PREHEAT.get());
     }
 
     public static boolean snapshotChunking() {
-        return enabled() && JeiOptConfig.ASYNC_SNAPSHOT_CHUNKING.get();
+        JeiOptConfigSnapshot.Snapshot snapshot = JeiOptConfigSnapshot.current();
+        return enabled() && (snapshot != null
+            ? snapshot.snapshotChunking()
+            : JeiOptConfig.ASYNC_SNAPSHOT_CHUNKING.get());
     }
 
     public static boolean sortPreheat() {
-        return enabled() && JeiOptConfig.ASYNC_SORT_PREHEAT.get();
+        JeiOptConfigSnapshot.Snapshot snapshot = JeiOptConfigSnapshot.current();
+        return enabled() && (snapshot != null ? snapshot.sortPreheat() : JeiOptConfig.ASYNC_SORT_PREHEAT.get());
     }
 
     public static boolean recipeFocusPreheat() {
-        return enabled() && JeiOptConfig.ASYNC_RECIPE_FOCUS_PREHEAT.get();
+        JeiOptConfigSnapshot.Snapshot snapshot = JeiOptConfigSnapshot.current();
+        return enabled() && (snapshot != null
+            ? snapshot.recipeFocusPreheat()
+            : JeiOptConfig.ASYNC_RECIPE_FOCUS_PREHEAT.get());
     }
 
     public static boolean catalystPreheat() {
-        return enabled() && JeiOptConfig.ASYNC_CATALYST_PREHEAT.get();
+        JeiOptConfigSnapshot.Snapshot snapshot = JeiOptConfigSnapshot.current();
+        return enabled() && (snapshot != null
+            ? snapshot.catalystPreheat()
+            : JeiOptConfig.ASYNC_CATALYST_PREHEAT.get());
     }
 
     public static int workerThreads() {
-        return configReady() ? JeiOptConfig.ASYNC_WORKER_THREADS.get() : DEFAULT_WORKER_THREADS;
+        JeiOptConfigSnapshot.Snapshot snapshot = JeiOptConfigSnapshot.current();
+        int configured = snapshot != null
+            ? snapshot.workerThreads()
+            : configReady() ? JeiOptConfig.ASYNC_WORKER_THREADS.get() : DEFAULT_WORKER_THREADS;
+        return resolveWorkerThreads(configured, Runtime.getRuntime().availableProcessors());
+    }
+
+    public static int parallelThreshold() {
+        JeiOptConfigSnapshot.Snapshot snapshot = JeiOptConfigSnapshot.current();
+        return snapshot != null
+            ? snapshot.parallelThreshold()
+            : configReady() ? JeiOptConfig.ASYNC_PARALLEL_THRESHOLD.get() : 250;
+    }
+
+    static int resolveWorkerThreads(int configured, int availableProcessors) {
+        if (configured != 0) {
+            return Math.max(1, Math.min(8, configured));
+        }
+        return Math.max(1, Math.min(8, Math.max(1, availableProcessors) - 2));
     }
 
     public static int snapshotBudgetMs() {
-        return configReady() ? JeiOptConfig.ASYNC_SNAPSHOT_BUDGET_MS.get() : DEFAULT_SNAPSHOT_BUDGET_MS;
+        JeiOptConfigSnapshot.Snapshot snapshot = JeiOptConfigSnapshot.current();
+        return snapshot != null
+            ? snapshot.snapshotBudgetMs()
+            : configReady() ? JeiOptConfig.ASYNC_SNAPSHOT_BUDGET_MS.get() : DEFAULT_SNAPSHOT_BUDGET_MS;
     }
 
     public static boolean deferredIngredientFilter() {
-        return enabled() && JeiOptConfig.ASYNC_DEFERRED_INGREDIENT_FILTER.get();
+        JeiOptConfigSnapshot.Snapshot snapshot = JeiOptConfigSnapshot.current();
+        return enabled() && (snapshot != null
+            ? snapshot.deferredIngredientFilter()
+            : JeiOptConfig.ASYNC_DEFERRED_INGREDIENT_FILTER.get());
     }
 
     public static boolean asyncIngredientFilter() {
-        return enabled() && JeiOptConfig.ASYNC_PARALLEL_INGREDIENT_FILTER.get();
+        JeiOptConfigSnapshot.Snapshot snapshot = JeiOptConfigSnapshot.current();
+        return enabled() && (snapshot != null
+            ? snapshot.asyncIngredientFilter()
+            : JeiOptConfig.ASYNC_PARALLEL_INGREDIENT_FILTER.get());
     }
 
     public static boolean parallelVanillaRecipes() {
-        return enabled() && JeiOptConfig.ASYNC_PARALLEL_VANILLA_RECIPES.get();
+        JeiOptConfigSnapshot.Snapshot snapshot = JeiOptConfigSnapshot.current();
+        return enabled() && (snapshot != null
+            ? snapshot.parallelVanillaRecipes()
+            : JeiOptConfig.ASYNC_PARALLEL_VANILLA_RECIPES.get());
     }
 
     public static boolean asyncStartup() {
-        return enabled() && JeiOptConfig.ASYNC_STARTUP.get();
+        JeiOptConfigSnapshot.Snapshot snapshot = JeiOptConfigSnapshot.current();
+        return enabled() && (snapshot != null ? snapshot.asyncStartup() : JeiOptConfig.ASYNC_STARTUP.get());
     }
 
     public static int ingredientFilterBudgetMs() {
-        return configReady() ? JeiOptConfig.ASYNC_INGREDIENT_FILTER_BUDGET_MS.get() : 10;
+        JeiOptConfigSnapshot.Snapshot snapshot = JeiOptConfigSnapshot.current();
+        return snapshot != null
+            ? snapshot.ingredientFilterBudgetMs()
+            : configReady() ? JeiOptConfig.ASYNC_INGREDIENT_FILTER_BUDGET_MS.get() : 10;
     }
 
     public static int ingredientFilterChunkSize() {
-        return configReady() ? JeiOptConfig.ASYNC_INGREDIENT_FILTER_CHUNK_SIZE.get() : 500;
+        JeiOptConfigSnapshot.Snapshot snapshot = JeiOptConfigSnapshot.current();
+        return snapshot != null
+            ? snapshot.ingredientFilterChunkSize()
+            : configReady() ? JeiOptConfig.ASYNC_INGREDIENT_FILTER_CHUNK_SIZE.get() : 500;
     }
 }

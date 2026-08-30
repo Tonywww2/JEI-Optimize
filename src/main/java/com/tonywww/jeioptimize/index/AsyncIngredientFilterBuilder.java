@@ -50,15 +50,20 @@ public final class AsyncIngredientFilterBuilder {
         JeiOptStartupProgressState.registerBuild(generation, chunkCount, safeElements.size());
 
         CompletableFuture<IElementSearch> future = JeiOptExecutors.supplyAsync(() -> {
-            IElementSearch search = emptySearchFactory.get();
+            AtomicReference<IElementSearch> searchHolder = new AtomicReference<>();
+            JeiOptExecutors.runOnMainThreadAndWait(() -> searchHolder.set(emptySearchFactory.get()));
+            IElementSearch search = searchHolder.get();
             for (int start = 0; start < safeElements.size(); start += chunkSize) {
                 checkActive(generation);
                 int end = Math.min(start + chunkSize, safeElements.size());
                 List<IListElementInfo<?>> chunk = safeElements.subList(start, end);
-                for (IListElementInfo<?> info : chunk) {
-                    updateHiddenState(info.getElement(), ingredientVisibility);
-                }
-                chunkAppender.add(search, chunk);
+                JeiOptExecutors.runOnMainThreadAndWait(() -> {
+                    checkActive(generation);
+                    for (IListElementInfo<?> info : chunk) {
+                        updateHiddenState(info.getElement(), ingredientVisibility);
+                    }
+                    chunkAppender.add(search, chunk);
+                });
                 JeiOptStartupProgressState.markChunkCompleted(generation);
             }
             checkActive(generation);

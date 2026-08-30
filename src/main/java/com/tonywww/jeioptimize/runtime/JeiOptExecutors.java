@@ -11,6 +11,8 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.FutureTask;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ForkJoinWorkerThread;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -38,6 +40,7 @@ public final class JeiOptExecutors {
 
     private static final Object LOCK = new Object();
     private static ExecutorService workerExecutor;
+    private static ForkJoinPool pureComputationPool;
     private static int workerThreadCount = DEFAULT_WORKER_THREADS;
 
     private static final Object JEI_START_LOCK = new Object();
@@ -155,21 +158,23 @@ public final class JeiOptExecutors {
     public static void runOnMainThreadAndWait(Runnable command) {
         Objects.requireNonNull(command, "command");
         JeiStartTask task = CURRENT_JEI_START.get();
-        if (task == null) {
-            command.run();
-            return;
+        if (task != null) {
+            ensureJeiStartActive(task);
         }
-        ensureJeiStartActive(task);
 
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.isSameThread()) {
-            ensureJeiStartActive(task);
+            if (task != null) {
+                ensureJeiStartActive(task);
+            }
             command.run();
             return;
         }
 
         FutureTask<Void> publication = new FutureTask<>(() -> {
-            ensureJeiStartActive(task);
+            if (task != null) {
+                ensureJeiStartActive(task);
+            }
             command.run();
             return null;
         });
@@ -192,7 +197,9 @@ public final class JeiOptExecutors {
             }
             throw new RuntimeException(cause != null ? cause : e);
         }
-        ensureJeiStartActive(task);
+        if (task != null) {
+            ensureJeiStartActive(task);
+        }
     }
 
     public static ExecutorService workerExecutor() {
@@ -212,6 +219,21 @@ public final class JeiOptExecutors {
             }
             workerThreadCount = boundedThreadCount;
             shutdownWorkerExecutorLocked();
+            shutdownPureComputationPoolLocked();
+        }
+    }
+
+    public static ForkJoinPool pureComputationPool() {
+        synchronized (LOCK) {
+            if (pureComputationPool == null || pureComputationPool.isShutdown()) {
+                pureComputationPool = new ForkJoinPool(
+                    workerThreadCount,
+                    newPureWorkerThreadFactory(),
+                    (thread, error) -> LOGGER.error("Uncaught exception in {}", thread.getName(), error),
+                    false
+                );
+            }
+            return pureComputationPool;
         }
     }
 
@@ -228,6 +250,7 @@ public final class JeiOptExecutors {
     public static void shutdownWorkerExecutor() {
         synchronized (LOCK) {
             shutdownWorkerExecutorLocked();
+            shutdownPureComputationPoolLocked();
         }
     }
 
@@ -235,6 +258,13 @@ public final class JeiOptExecutors {
         if (workerExecutor != null) {
             workerExecutor.shutdownNow();
             workerExecutor = null;
+        }
+    }
+
+    private static void shutdownPureComputationPoolLocked() {
+        if (pureComputationPool != null) {
+            pureComputationPool.shutdownNow();
+            pureComputationPool = null;
         }
     }
 
@@ -261,12 +291,31 @@ public final class JeiOptExecutors {
 
     private static ThreadFactory newWorkerThreadFactory() {
         AtomicInteger threadIndex = new AtomicInteger(1);
+        ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
         return runnable -> {
             Thread thread = new Thread(runnable, JeiOptimize.MOD_ID + "-worker-" + threadIndex.getAndIncrement());
             thread.setDaemon(true);
+            thread.setPriority(Math.max(Thread.MIN_PRIORITY, Thread.NORM_PRIORITY - 1));
+            if (contextClassLoader != null) {
+                thread.setContextClassLoader(contextClassLoader);
+            }
             thread.setUncaughtExceptionHandler((t, e) ->
                 LOGGER.error("Uncaught exception in {}", t.getName(), e)
             );
+            return thread;
+        };
+    }
+
+    private static ForkJoinPool.ForkJoinWorkerThreadFactory newPureWorkerThreadFactory() {
+        ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
+        return pool -> {
+            ForkJoinWorkerThread thread = ForkJoinPool.defaultForkJoinWorkerThreadFactory.newThread(pool);
+            thread.setName(JeiOptimize.MOD_ID + "-pure-" + thread.getPoolIndex());
+            thread.setDaemon(true);
+            thread.setPriority(Math.max(Thread.MIN_PRIORITY, Thread.NORM_PRIORITY - 1));
+            if (contextClassLoader != null) {
+                thread.setContextClassLoader(contextClassLoader);
+            }
             return thread;
         };
     }

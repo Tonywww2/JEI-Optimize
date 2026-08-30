@@ -41,7 +41,7 @@ public abstract class GrindstoneRepresentativeMixin {
                 JeiOptFeatureFlags.grindstoneRepresentativesPerEnchantment()
             );
         } else {
-            JeiRecipeGenerationLimiter.endGrindstone();
+            JeiRecipeGenerationLimiter.clearGrindstone();
         }
     }
 

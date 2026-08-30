@@ -1,5 +1,6 @@
 package com.tonywww.jeioptimize.integration;
 
+import com.tonywww.jeioptimize.runtime.JeiOptRuntimeState;
 import net.minecraft.world.item.crafting.Ingredient;
 
 import java.util.Arrays;
@@ -15,41 +16,59 @@ public final class CelestialForgeReinforceCache {
 
     public static Ingredient getInput(Object recipe) {
         CacheEntry entry = CACHE.get(recipe);
-        return entry == null ? null : copy(entry.input());
+        return isCurrent(entry) ? copyNonEmpty(entry.input()) : null;
     }
 
     public static Ingredient getResult(Object recipe) {
         CacheEntry entry = CACHE.get(recipe);
-        return entry == null ? null : copy(entry.result());
+        return isCurrent(entry) ? copyNonEmpty(entry.result()) : null;
     }
 
     public static void putInput(Object recipe, Ingredient input) {
-        if (recipe == null || input == null) {
+        Ingredient cachedInput = copyNonEmpty(input);
+        if (recipe == null || cachedInput == null) {
             return;
         }
         synchronized (CACHE) {
             CacheEntry entry = CACHE.get(recipe);
-            CACHE.put(recipe, new CacheEntry(copy(input), entry == null ? null : entry.result()));
+            long generation = JeiOptRuntimeState.currentGeneration();
+            Ingredient result = entry != null && entry.generation() == generation ? entry.result() : null;
+            CACHE.put(recipe, new CacheEntry(generation, cachedInput, result));
         }
     }
 
     public static void putResult(Object recipe, Ingredient result) {
-        if (recipe == null || result == null) {
+        Ingredient cachedResult = copyNonEmpty(result);
+        if (recipe == null || cachedResult == null) {
             return;
         }
         synchronized (CACHE) {
             CacheEntry entry = CACHE.get(recipe);
-            CACHE.put(recipe, new CacheEntry(entry == null ? null : entry.input(), copy(result)));
+            long generation = JeiOptRuntimeState.currentGeneration();
+            Ingredient input = entry != null && entry.generation() == generation ? entry.input() : null;
+            CACHE.put(recipe, new CacheEntry(generation, input, cachedResult));
         }
     }
 
-    private static Ingredient copy(Ingredient ingredient) {
+    private static boolean isCurrent(CacheEntry entry) {
+        return entry != null && entry.generation() == JeiOptRuntimeState.currentGeneration();
+    }
+
+    private static Ingredient copyNonEmpty(Ingredient ingredient) {
         if (ingredient == null) {
             return null;
         }
-        return Ingredient.of(Arrays.stream(ingredient.getItems()).map(net.minecraft.world.item.ItemStack::copy));
+        net.minecraft.world.item.ItemStack[] items = ingredient.getItems();
+        if (!isCacheableItemCount(items.length)) {
+            return null;
+        }
+        return Ingredient.of(Arrays.stream(items).map(net.minecraft.world.item.ItemStack::copy));
     }
 
-    private record CacheEntry(Ingredient input, Ingredient result) {
+    static boolean isCacheableItemCount(int itemCount) {
+        return itemCount > 0;
+    }
+
+    private record CacheEntry(long generation, Ingredient input, Ingredient result) {
     }
 }

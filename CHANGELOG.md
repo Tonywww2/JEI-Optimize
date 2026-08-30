@@ -4,6 +4,36 @@ All notable changes to Just Enough Threads are documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.13.0
+
+### Added
+
+- **Supported JEI versions use a generation-scoped brewing recipe index.** Repeated candidate
+  lookups use recipe identity hashing and automatically restore JEI's scan if collection identity,
+  size, or lifecycle generation diverges.
+- **JEI 15.20 can create large recipe categories one visible page at a time.** A bounded layout
+  cache avoids eagerly constructing thousands of widgets; affected categories skip
+  bookmark/craftable-first sorting and can opt out independently.
+- **Runtime diagnostics identify the installed JEI version and internal generation.** Verified
+  boundaries distinguish JEI 15.20 legacy, 15.24-15.48.0.178 intermediate, 15.48.0.179 modern, and
+  JEI 19+ paths while ASM member contracts remain the authority for applying mixins.
+
+### Changed
+
+- **Search extraction now runs in bounded client-thread chunks.** Workers coordinate publication
+  and parallelize only immutable snapshot strings, so third-party tooltip code is not invoked from
+  the pure ForkJoin pool. Failed derived prefixes fall back independently to JEI search, and a
+  failed ingredient extraction is retried once on the client thread.
+- **Worker execution is automatically sized and less intrusive.** `workerThreads=0` reserves two
+  processors (clamped to 1-8), workers inherit the mod class loader and run one priority level below
+  normal, and small immutable workloads remain sequential.
+- **Supported Forge JEI builds batch hidden anvil and grindstone menu updates.** Intermediate slot
+  updates are suppressed through a nested thread-local scope and the complete input pair is
+  evaluated once.
+- **Hot startup configuration is frozen per JEI lifecycle.** Feature-specific mixins with an
+  explicit disabled setting are skipped before application, while runtime reloads receive a fresh
+  generation snapshot.
+
 ## 0.12.0
 
 ### Added
@@ -43,6 +73,12 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - **Celestial Forge cached ingredients can no longer be mutated through third-party preview code.**
   Cached inputs and results are deep-copied, and aggressive modes no longer reuse lossless cache
   entries.
+- **Celestial Forge Item Reinforce no longer loses its main input and output slots.** Empty dynamic
+  ingredients are treated as cache misses instead of being stored permanently, and cached entries
+  are isolated by JEI generation so a reload cannot reuse stale slot contents.
+- **Embers Dawnstone Anvil aggressive mode now applies to the actual generated display pages.**
+  Legitimate recipes with an empty top ingredient no longer abort the whole compaction pass, and
+  the 16-example repair limit is shared across singleton pages with the same recipe ID.
 
 ## 0.11.0
 

@@ -31,7 +31,7 @@ public abstract class AnvilRepresentativeContextMixin {
                 JeiOptFeatureFlags.anvilRepresentativesPerEnchantment()
             );
         } else {
-            JeiRecipeGenerationLimiter.endAnvil();
+            JeiRecipeGenerationLimiter.clearAnvil();
         }
     }
 

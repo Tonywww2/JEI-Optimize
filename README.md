@@ -74,9 +74,10 @@ the new file does not exist. The legacy file is left untouched and never overwri
 |--------|---------|---------|-------------|
 | `enabled` | general | `true` | Master switch. When `false`, the mod does nothing and JEI behaves normally. |
 | `asyncStartup` | async | `true` | Run JEI startup serially on a dedicated background thread; cancel it on world exit, timeout, or server shutdown. |
-| `asyncIngredientFilter` | async | `true` | Build the ingredient search filter off-thread in chunks, then publish the complete sidebar once. |
+| `asyncIngredientFilter` | async | `true` | Build an isolated ingredient filter in client-thread-safe chunks, then publish the complete sidebar once. |
 | `parallelVanillaRecipes` | async | `false` | Experimentally pre-resolve recipe ingredients across worker threads. |
-| `workerThreads` | async | `4` | Worker-thread count for derived off-thread tasks (1-8). |
+| `workerThreads` | async | `0` | Worker count for derived tasks; `0` selects CPU cores minus two, clamped to 1-8. |
+| `parallelThreshold` | async | `250` | Minimum immutable snapshot count before pure index work uses multiple workers. |
 | `pluginTiming` | diagnostics | `false` | Log per-plugin, per-phase JEI startup timings (for measurement). |
 | `registrationCounts` | diagnostics | `false` | Log per-plugin recipe and ingredient registration counts. |
 | `stallWatchdog` | diagnostics | `true` | Sample and report code responsible for a JEI phase that exceeds the configured threshold. |
@@ -89,6 +90,10 @@ the new file does not exist. The legacy file is left untouched and never overwri
 | `grindstoneRepresentativesPerEnchantment` | jeiContent | `3` | Maximum distinct item families retained for each removable enchantment. |
 | `grindstoneRepairRepresentatives` | jeiContent | `16` | Maximum generic self-repair examples retained for the grindstone. |
 | `compactIronsSpellsImbuing` | jeiContent | `true` | Compact optional Iron's Spells Arcane Anvil imbuing combinations while preserving every item and spell level. |
+| `indexedBrewingLookup` | jeiContent | `true` | Replace repeated brewing recipe scans with a generation-scoped hash index that falls back if it diverges. |
+| `skipRedundantMenuUpdates` | jeiContent | `true` | On supported JEI builds, calculate hidden anvil/grindstone results once after both inputs are installed. |
+| `lazyRecipeLayouts` | syncOptimizations | `true` | On legacy eager-layout JEI builds, create large categories one visible page at a time. |
+| `lazyRecipeLayoutThreshold` | syncOptimizations | `200` | Recipe count above which legacy lazy layouts activate; affected categories skip bookmark/craftable-first sorting. |
 | `aggressiveCelestialForgeReinforce` | jeiContent | `false` | Limit Celestial Forge reinforce previews to representative item families. This can remove direct focus hits. |
 | `aggressiveEmbersDawnstoneAnvil` | jeiContent | `false` | Limit compacted Embers anvil groups to representative tools. This can remove direct focus hits. |
 | `aggressiveSfmFallingAnvil` | jeiContent | `false` | Limit SFM's unfiltered disenchantment overview per enchantment; focused queries retain the original path. |
@@ -132,10 +137,13 @@ The mod is Mixin-based and hooks JEI's own internal classes (`@Pseudo` mixins wi
 `IngredientFilterMixin` targets JEI's `IngredientFilter`:
 
 1. **Skip the on-thread indexing.** A `@Redirect` on the per-ingredient `addIngredient` call inside the `IngredientFilter` constructor suppresses JEI's normal indexing loop when the feature is on, so the constructor returns almost immediately instead of building the search index on the main thread.
-2. **Build real chunks off-thread.** An `@Inject` at the end of the constructor calls `AsyncIngredientFilterBuilder.buildChunkedAsync(...)`. The worker creates a fresh, isolated search index and adds `ingredientFilterChunkSize` elements per chunk, updating the visible progress only after each complete chunk. JEI 15.20/19.27 use their bulk `addAll` API; JEI 15.48 uses its compatible per-element `add` API.
+2. **Build an isolated index in safe chunks.** An `@Inject` at the end of the constructor calls `AsyncIngredientFilterBuilder.buildChunkedAsync(...)`. A worker coordinates the build, but each JEI string extraction and insertion chunk runs on the client thread so third-party tooltip code never runs in the pure worker pool. JEI 15.20/19.27 use their bulk `addAll` API; JEI 15.48 uses its compatible per-element `add` API.
 3. **Publish once on the main thread.** A finalize task in `JeiOptClientTickQueue` polls the build without blocking. At 100%, it assigns the finished index to the filter and calls `invalidateCache()` exactly once. The JEI startup thread waits for this publication before runtime-available callbacks and final runtime publication, while the render thread keeps ticking and drawing the progress bar.
 
-Because the new index is never shared with the main thread until the swap, JEI never serves a partially built sidebar. The deferred client-tick path follows the same isolated-index rule and no longer invalidates the sidebar after every chunk.
+Because the new index is never published until the swap, JEI never serves a partially built sidebar.
+Derived prefix indexes operate only on immutable strings after client-thread extraction. The deferred
+client-tick path follows the same isolated-index rule and no longer invalidates the sidebar after
+every chunk.
 
 JEI installs its container input listeners before `Internal.setRuntime(...)`. `JeiClientInputGuardMixin`
 returns "not handled" from those listeners while startup progress is active, preventing early R/U,
@@ -166,10 +174,19 @@ Iron's Spells support is loaded only when its JEI classes are present. Its item-
 is reduced from $W \times S$ combinations to $\max(W, S)$ representative recipes while covering all
 $W$ eligible items and all $S$ spell levels. No hard dependency on Iron's Spells is added.
 
+Supported JEI builds use a generation-scoped hash index for repeated brewing recipe lookups. The
+index checks its collection identity and size on every lookup; any mismatch disables it for that
+lifecycle and restores JEI's scan. Forge JEI 15.48 also suppresses redundant hidden anvil and
+grindstone slot updates and calculates one final result after both inputs are installed.
+
+JEI 15.20 categories above `lazyRecipeLayoutThreshold` create layouts only when their page is
+viewed, using a bounded 512-layout cache. This avoids large GUI-opening stalls but skips that
+category's bookmark-first and craftable-first sorting. Newer JEI keeps its upstream layout path.
+
 ### Shared infrastructure
 
 - **Startup executor** (`JeiOptExecutors`) — a single-flight daemon executor for serial JEI startup. Each start has a generation token; stop cancels and interrupts it. Runtime callbacks and publication are generation-checked on the client thread.
-- **Worker pool** (`JeiOptExecutors`) — a small fixed pool of daemon threads (`workerThreads`, default 4) for derived off-thread builds, plus a helper for running work back on the main thread.
+- **Worker pools** (`JeiOptExecutors`) — low-priority daemon workers inherit the mod class loader. A bounded fixed pool coordinates lifecycle work; a dedicated ForkJoin pool handles only immutable snapshot computation. `workerThreads=0` chooses an automatically bounded size.
 - **Client-tick work queue** (`JeiOptClientTickQueue` + `ClientTickHookMixin`) — a queue drained a little each client tick under a time budget, used to run main-thread finalize work (such as the index swap) a piece at a time instead of blocking a single frame.
 - **Mixin registration** — all hooks are listed in `justenoughthreads.mixins.json`. On Forge they are registered through Architectury Loom's `forge.mixinConfig`; on NeoForge through the `[[mixins]]` entry in `neoforge.mods.toml`. Either way this is what actually loads them in both the development and production environments.
 

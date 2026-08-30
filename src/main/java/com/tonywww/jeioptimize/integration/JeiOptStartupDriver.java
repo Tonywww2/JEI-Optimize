@@ -36,7 +36,13 @@ public final class JeiOptStartupDriver {
         }
         try {
             JeiOptDiagnostics.reportRegistrationCounts();
-            JeiOptExecutors.configureWorkerThreads(JeiOptFeatureFlags.workerThreads());
+            int workerThreads = JeiOptFeatureFlags.workerThreads();
+            JeiOptExecutors.configureWorkerThreads(workerThreads);
+            JeiOptimize.LOGGER.info(
+                "JEI Optimize worker configuration: {} threads, parallel threshold {}",
+                workerThreads,
+                JeiOptFeatureFlags.parallelThreshold()
+            );
             driveSearchPreheat();
         } catch (RuntimeException | LinkageError e) {
             JeiOptimize.LOGGER.warn("JEI Optimize preheat wiring failed; JEI baseline remains active", e);

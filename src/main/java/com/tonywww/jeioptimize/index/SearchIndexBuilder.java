@@ -1,8 +1,10 @@
 package com.tonywww.jeioptimize.index;
 
+import com.tonywww.jeioptimize.runtime.JeiOptExecutors;
 import com.tonywww.jeioptimize.snapshot.IngredientSearchSnapshot;
 
 import java.util.Collection;
+import java.util.EnumSet;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -12,38 +14,105 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 
 public final class SearchIndexBuilder {
     private SearchIndexBuilder() {
     }
 
     public static BuiltSearchIndex build(Collection<IngredientSearchSnapshot> snapshots) {
+        return build(snapshots, false, Integer.MAX_VALUE);
+    }
+
+    public static BuiltSearchIndex build(
+        Collection<IngredientSearchSnapshot> snapshots,
+        boolean parallel,
+        int parallelThreshold
+    ) {
         if (snapshots == null || snapshots.isEmpty()) {
             return BuiltSearchIndex.empty();
         }
 
+        List<IngredientSearchSnapshot> safeSnapshots = List.copyOf(snapshots);
         Map<Object, IngredientSearchSnapshot> byUid = new LinkedHashMap<>();
-        Map<SearchPrefix, Map<String, Set<Object>>> indexes = new EnumMap<>(SearchPrefix.class);
-        for (SearchPrefix prefix : SearchPrefix.values()) {
-            indexes.put(prefix, new HashMap<>());
-        }
-
-        for (IngredientSearchSnapshot snapshot : snapshots) {
+        for (IngredientSearchSnapshot snapshot : safeSnapshots) {
             if (snapshot == null || snapshot.uid() == null) {
                 continue;
             }
             byUid.put(snapshot.uid(), snapshot);
-            indexStrings(indexes.get(SearchPrefix.NAME), snapshot.uid(), snapshot.names());
-            indexStrings(indexes.get(SearchPrefix.MOD), snapshot.uid(), snapshot.modNames());
-            indexStrings(indexes.get(SearchPrefix.MOD), snapshot.uid(), snapshot.modIds());
-            indexStrings(indexes.get(SearchPrefix.TOOLTIP), snapshot.uid(), snapshot.tooltipStrings());
-            indexStrings(indexes.get(SearchPrefix.TAG), snapshot.uid(), snapshot.tagStrings());
-            indexStrings(indexes.get(SearchPrefix.CREATIVE_TAB), snapshot.uid(), snapshot.creativeTabStrings());
-            indexStrings(indexes.get(SearchPrefix.COLOR), snapshot.uid(), snapshot.colorStrings());
-            indexString(indexes.get(SearchPrefix.RESOURCE_LOCATION), snapshot.uid(), snapshot.resourceLocation());
         }
 
-        return new BuiltSearchIndex(freeze(byUid), freezeIndexes(indexes));
+        Map<SearchPrefix, Map<String, Set<Object>>> indexes = new EnumMap<>(SearchPrefix.class);
+        EnumSet<SearchPrefix> failedPrefixes = EnumSet.noneOf(SearchPrefix.class);
+        boolean useParallel = parallel
+            && safeSnapshots.size() >= Math.max(1, parallelThreshold)
+            && JeiOptExecutors.pureComputationPool().getParallelism() > 1;
+        if (useParallel) {
+            Map<SearchPrefix, Future<Map<String, Set<Object>>>> tasks = new EnumMap<>(SearchPrefix.class);
+            for (SearchPrefix prefix : SearchPrefix.values()) {
+                tasks.put(prefix, JeiOptExecutors.pureComputationPool().submit(
+                    () -> buildPrefix(prefix, safeSnapshots)
+                ));
+            }
+            for (SearchPrefix prefix : SearchPrefix.values()) {
+                try {
+                    indexes.put(prefix, tasks.get(prefix).get());
+                } catch (InterruptedException error) {
+                    Thread.currentThread().interrupt();
+                    failedPrefixes.add(prefix);
+                } catch (ExecutionException | RuntimeException error) {
+                    failedPrefixes.add(prefix);
+                }
+            }
+        } else {
+            for (SearchPrefix prefix : SearchPrefix.values()) {
+                try {
+                    indexes.put(prefix, buildPrefix(prefix, safeSnapshots));
+                } catch (RuntimeException error) {
+                    failedPrefixes.add(prefix);
+                }
+            }
+        }
+
+        return new BuiltSearchIndex(
+            freeze(byUid),
+            freezeIndexes(indexes),
+            failedPrefixes.isEmpty() ? Set.of() : Set.copyOf(failedPrefixes)
+        );
+    }
+
+    private static Map<String, Set<Object>> buildPrefix(
+        SearchPrefix prefix,
+        Collection<IngredientSearchSnapshot> snapshots
+    ) {
+        Map<String, Set<Object>> index = new HashMap<>();
+        for (IngredientSearchSnapshot snapshot : snapshots) {
+            if (snapshot == null || snapshot.uid() == null) {
+                continue;
+            }
+            Collection<String> values = switch (prefix) {
+                case NAME -> snapshot.names();
+                case MOD -> combine(snapshot.modNames(), snapshot.modIds());
+                case TOOLTIP -> snapshot.tooltipStrings();
+                case TAG -> snapshot.tagStrings();
+                case CREATIVE_TAB -> snapshot.creativeTabStrings();
+                case COLOR -> snapshot.colorStrings();
+                case RESOURCE_LOCATION -> List.of(snapshot.resourceLocation());
+            };
+            if (values == null) {
+                throw new IllegalArgumentException("Search snapshot has no " + prefix + " values");
+            }
+            indexStrings(index, snapshot.uid(), values);
+        }
+        return index;
+    }
+
+    private static Collection<String> combine(Collection<String> first, Collection<String> second) {
+        java.util.ArrayList<String> combined = new java.util.ArrayList<>(first.size() + second.size());
+        combined.addAll(first);
+        combined.addAll(second);
+        return combined;
     }
 
     private static void indexStrings(Map<String, Set<Object>> index, Object uid, Collection<String> strings) {
@@ -98,10 +167,15 @@ public final class SearchIndexBuilder {
 
     public record BuiltSearchIndex(
         Map<Object, IngredientSearchSnapshot> byUid,
-        Map<SearchPrefix, Map<String, Set<Object>>> indexes
+        Map<SearchPrefix, Map<String, Set<Object>>> indexes,
+        Set<SearchPrefix> failedPrefixes
     ) {
         public static BuiltSearchIndex empty() {
-            return new BuiltSearchIndex(Map.of(), Map.of());
+            return new BuiltSearchIndex(Map.of(), Map.of(), Set.of());
+        }
+
+        public boolean failed(SearchPrefix prefix) {
+            return failedPrefixes.contains(prefix);
         }
 
         public List<IngredientSearchSnapshot> allVisible() {
@@ -113,6 +187,9 @@ public final class SearchIndexBuilder {
 
         public List<IngredientSearchSnapshot> search(SearchPrefix prefix, String token) {
             Objects.requireNonNull(prefix, "prefix");
+            if (failed(prefix)) {
+                return List.of();
+            }
             String normalized = normalize(token);
             if (normalized.isEmpty()) {
                 return List.of();

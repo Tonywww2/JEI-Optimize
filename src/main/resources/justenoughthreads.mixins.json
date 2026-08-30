@@ -31,6 +31,15 @@
     "GrindstoneRepresentativeMixin",
     "FuelRecipeMakerMixin",
     "BrewingRecipeMakerTimingMixin",
+    "BrewingRecipeIndexForgeMixin",
+    "BrewingRecipeIndexNeoMixin",
+    "ForgeMenuBatchMixin${'$'}Anvil",
+    "ForgeMenuBatchMixin${'$'}Grindstone",
+    "MenuSlotUpdateGuardMixin${'$'}ItemCombiner",
+    "MenuSlotUpdateGuardMixin${'$'}Grindstone",
+    //? if forge {
+    "RecipeGuiLogicLegacyMixin",
+    //?}
     "compat.AliGenericUtilsMixin",
     "compat.CelestialForgeReinforceRecipeMixin",
     "compat.EmbersDawnstoneAnvilCategoryMixin",

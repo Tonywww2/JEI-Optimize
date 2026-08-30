@@ -3,6 +3,7 @@ package com.tonywww.jeioptimize.integration;
 import com.tonywww.jeioptimize.JeiOptimize;
 import com.tonywww.jeioptimize.config.JeiOptFeatureFlags;
 import com.tonywww.jeioptimize.recipe.ItemStackRepresentativeSelector;
+import com.tonywww.jeioptimize.recipe.RepresentativeExampleBudget;
 import mezz.jei.api.constants.VanillaTypes;
 import mezz.jei.api.gui.builder.IRecipeLayoutBuilder;
 import mezz.jei.api.gui.builder.IRecipeSlotBuilder;
@@ -34,7 +35,9 @@ public final class EmbersDawnstoneAnvilCompactor {
     }
 
     public static List<?> compact(List<?> recipes, IIngredientManager ingredientManager) {
-        if (!JeiOptFeatureFlags.compactEmbersDawnstoneAnvil() || recipes == null || recipes.size() < 2) {
+        boolean compact = JeiOptFeatureFlags.compactEmbersDawnstoneAnvil();
+        boolean aggressive = JeiOptFeatureFlags.aggressiveEmbersDawnstoneAnvil();
+        if ((!compact && !aggressive) || recipes == null || recipes.isEmpty()) {
             return recipes;
         }
         Object first = recipes.get(0);
@@ -71,9 +74,6 @@ public final class EmbersDawnstoneAnvilCompactor {
                     return recipes;
                 }
                 List<ItemStack> topInputs = Arrays.asList(ingredient.getItems());
-                if (topInputs.isEmpty()) {
-                    return recipes;
-                }
                 List<String> topUids = topInputs.stream()
                     .map(stack -> helper.getUniqueId(stack, UidContext.Recipe))
                     .distinct()
@@ -88,31 +88,43 @@ public final class EmbersDawnstoneAnvilCompactor {
                 group.recipes().add(recipe);
             }
 
-            if (groups.size() == recipes.size()) {
+            if (!aggressive && groups.size() == recipes.size()) {
                 return recipes;
             }
             List<Object> compacted = new ArrayList<>(groups.size());
+            RepresentativeExampleBudget<ResourceLocation> genericRepairExamples =
+                new RepresentativeExampleBudget<>(JeiOptFeatureFlags.aggressiveGenericRepairRepresentatives());
             for (Group group : groups.values()) {
-                if (group.recipes().size() == 1) {
-                    compacted.add(group.firstRecipe());
-                    continue;
-                }
                 List<ItemStack> inputs = List.copyOf(group.inputs());
                 List<ItemStack> outputs = List.copyOf(group.outputs());
-                if (JeiOptFeatureFlags.aggressiveEmbersDawnstoneAnvil()) {
-                    ItemStackRepresentativeSelector.ParallelSelection selection = isGenericRepair(group.id())
-                        ? ItemStackRepresentativeSelector.selectParallelExamples(
-                            inputs,
-                            outputs,
-                            JeiOptFeatureFlags.aggressiveGenericRepairRepresentatives()
-                        )
-                        : ItemStackRepresentativeSelector.selectParallelFamilies(
-                            inputs,
-                            outputs,
-                            JeiOptFeatureFlags.aggressiveRepresentativesPerGroup()
-                        );
-                    inputs = selection.inputs();
-                    outputs = selection.outputs();
+                if (aggressive) {
+                    if (isGenericRepair(group.id())) {
+                        int selectedCount = genericRepairExamples.take(group.id(), inputs.size());
+                        if (selectedCount == 0) {
+                            continue;
+                        }
+                        ItemStackRepresentativeSelector.ParallelSelection selection =
+                            ItemStackRepresentativeSelector.selectParallelExamples(
+                                inputs,
+                                outputs,
+                                selectedCount
+                            );
+                        inputs = selection.inputs();
+                        outputs = selection.outputs();
+                    } else {
+                        ItemStackRepresentativeSelector.ParallelSelection selection =
+                            ItemStackRepresentativeSelector.selectParallelFamilies(
+                                inputs,
+                                outputs,
+                                JeiOptFeatureFlags.aggressiveRepresentativesPerGroup()
+                            );
+                        inputs = selection.inputs();
+                        outputs = selection.outputs();
+                    }
+                }
+                if (group.recipes().size() == 1 && inputs.size() == group.inputs().size()) {
+                    compacted.add(group.firstRecipe());
+                    continue;
                 }
                 Object recipe = constructor.newInstance(group.id(), outputs, inputs, group.ingredient());
                 LAYOUTS.put(recipe, new Layout(group.topInputs(), inputs, outputs));

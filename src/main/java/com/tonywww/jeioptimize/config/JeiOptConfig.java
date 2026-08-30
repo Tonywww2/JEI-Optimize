@@ -57,6 +57,8 @@ public final class JeiOptConfig {
     static final BooleanValue CONTENT_COMPACT_EMBERS_DAWNSTONE_ANVIL;
     static final BooleanValue CONTENT_CACHE_PRODUCTIVE_TREES_STRIPPER_TOOLS;
     static final BooleanValue CONTENT_COMPACT_TINKERS_CASTING;
+    static final BooleanValue CONTENT_INDEXED_BREWING_LOOKUP;
+    static final BooleanValue CONTENT_SKIP_REDUNDANT_MENU_UPDATES;
     static final BooleanValue CONTENT_AGGRESSIVE_CELESTIAL_FORGE_REINFORCE;
     static final BooleanValue CONTENT_AGGRESSIVE_EMBERS_DAWNSTONE_ANVIL;
     static final BooleanValue CONTENT_AGGRESSIVE_SFM_FALLING_ANVIL;
@@ -75,6 +77,8 @@ public final class JeiOptConfig {
     static final BooleanValue SYNC_BATCH_INGREDIENT_FILTER_INIT;
     static final BooleanValue SYNC_SORT_KEY_CACHE;
     static final BooleanValue SYNC_DELAY_COMPACT;
+    static final BooleanValue SYNC_LAZY_RECIPE_LAYOUTS;
+    static final IntValue SYNC_LAZY_RECIPE_LAYOUT_THRESHOLD;
 
     static final BooleanValue ASYNC_SEARCH_PREHEAT;
     static final BooleanValue ASYNC_SNAPSHOT_CHUNKING;
@@ -83,6 +87,7 @@ public final class JeiOptConfig {
     static final BooleanValue ASYNC_CATALYST_PREHEAT;
 
     static final IntValue ASYNC_WORKER_THREADS;
+    static final IntValue ASYNC_PARALLEL_THRESHOLD;
     static final IntValue ASYNC_SNAPSHOT_BUDGET_MS;
 
     static final BooleanValue ASYNC_DEFERRED_INGREDIENT_FILTER;
@@ -196,6 +201,16 @@ public final class JeiOptConfig {
                 "Merge Tinkers' Construct casting display pages only when they share one parent recipe and display parameters.",
                 "Every cast/output pair remains position-linked; ambiguous recipes keep their original pages.")
             .define("compactTinkersCasting", true);
+        CONTENT_INDEXED_BREWING_LOOKUP = builder
+            .comment(
+                "Use a generation-scoped hash index for JEI's repeated brewing recipe lookup.",
+                "If the index ever differs from JEI's recipe collection, this optimization disables itself for that lifecycle.")
+            .define("indexedBrewingLookup", true);
+        CONTENT_SKIP_REDUNDANT_MENU_UPDATES = builder
+            .comment(
+                "Suppress redundant hidden anvil and grindstone menu updates while JEI fills both inputs.",
+                "The result is computed once after the complete input pair is installed.")
+            .define("skipRedundantMenuUpdates", true);
         CONTENT_AGGRESSIVE_CELESTIAL_FORGE_REINFORCE = builder
             .comment(
                 "Lossy: limit Celestial Forge Item Reinforce input previews to representative item families.",
@@ -273,6 +288,14 @@ public final class JeiOptConfig {
                 "Move JEI's recipe list compaction off the blocking startup path onto a later client tick.",
                 "It still runs on the main thread, so JEI never serves queries from a list being trimmed.")
             .define("delayCompact", true);
+        SYNC_LAZY_RECIPE_LAYOUTS = builder
+            .comment(
+                "Build large recipe category layouts one visible page at a time on older JEI versions.",
+                "Only applies when the installed JEI still eagerly creates every layout.")
+            .define("lazyRecipeLayouts", true);
+        SYNC_LAZY_RECIPE_LAYOUT_THRESHOLD = builder
+            .comment("Recipe count above which legacy JEI uses per-page lazy layouts.")
+            .defineInRange("lazyRecipeLayoutThreshold", 200, 0, 1000000);
         builder.pop();
 
         builder.push("async");
@@ -299,8 +322,13 @@ public final class JeiOptConfig {
             .comment("Enable async catalyst index preheat.")
             .define("catalystPreheat", true);
         ASYNC_WORKER_THREADS = builder
-            .comment("Worker thread count. Ignored when all async features are disabled.")
-            .defineInRange("workerThreads", 4, 1, 8);
+            .comment(
+                "Worker thread count. 0 selects available processors minus two, clamped to 1-8.",
+                "Ignored when all async features are disabled.")
+            .defineInRange("workerThreads", 0, 0, 8);
+        ASYNC_PARALLEL_THRESHOLD = builder
+            .comment("Minimum input size before pure indexing and warmup work uses multiple worker threads.")
+            .defineInRange("parallelThreshold", 250, 1, 1000000);
         ASYNC_SNAPSHOT_BUDGET_MS = builder
             .comment("Per-client-tick snapshot extraction budget in milliseconds. Ignored when snapshotChunking is disabled.")
             .defineInRange("snapshotBudgetMs", 2, 1, 10);

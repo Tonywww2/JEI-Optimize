@@ -168,12 +168,15 @@ Feature facade: `com.tonywww.jeioptimize.config.JeiOptFeatureFlags`.
 | `diagnostics.pluginTiming` | `false` | Plugin timing mixin records nothing and emits no timing logs. |
 | `diagnostics.registrationCounts` | `false` | Registration count mixins record nothing. |
 | `diagnostics.stallWatchdog` | `true` | No long-phase stack sampling is performed. |
-| `jeiContent.disableAnvilRepairRecipes` | `true` | JEI generates and displays material-repair recipes. |
-| `jeiContent.disableAnvilEnchantRecipes` | `true` | JEI generates and displays enchanted-book recipes. |
+| `jeiContent.disableAnvilRepairRecipes` | `false` | JEI generates and displays material-repair recipes. |
+| `jeiContent.disableAnvilEnchantRecipes` | `false` | JEI generates and displays enchanted-book recipes. |
 | `syncOptimizations.cacheScope` | `true` | UID/string/sort caches are bypassed. |
 | `syncOptimizations.batchIngredientFilterInit` | `true` | `IngredientFilter` constructor uses JEI baseline behavior. |
 | `syncOptimizations.sortKeyCache` | `true` | Sort/tag helper cache is bypassed. |
 | `syncOptimizations.delayCompact` | `true` | JEI compact runs at original timing. |
+| `syncOptimizations.lazyRecipeLayouts` | `true` | Legacy JEI eagerly creates and sorts every recipe layout. |
+| `jeiContent.indexedBrewingLookup` | `true` | JEI scans its brewing recipe collection for every candidate. |
+| `jeiContent.skipRedundantMenuUpdates` | `true` | JEI runs all intermediate hidden-menu result updates. |
 | `async.searchPreheat` | `false` | Search uses JEI baseline search path. |
 | `async.snapshotChunking` | `true` | No tick-budgeted snapshot queue is scheduled. |
 | `async.sortPreheat` | `true` | Sorting uses JEI baseline path. |
@@ -191,7 +194,8 @@ default change still requires a CR.
 
 | Key | Default | Bounds | Disable relation |
 |---|---|---|---|
-| `async.workerThreads` | `4` | `1..8` | Ignored when all async features are disabled. |
+| `async.workerThreads` | `0` | `0..8` | `0` selects CPU cores minus two, clamped to `1..8`. |
+| `async.parallelThreshold` | `250` | `1..1000000` | Pure snapshot indexing stays sequential below this size. |
 | `async.snapshotBudgetMs` | `2` | `1..10` | Ignored when `async.snapshotChunking=false`. |
 
 ### 5.3 Feature flag facade
@@ -212,6 +216,10 @@ public final class JeiOptFeatureFlags {
     public static boolean batchIngredientFilterInit();
     public static boolean sortKeyCache();
     public static boolean delayCompact();
+    public static boolean indexedBrewingLookup();
+    public static boolean skipRedundantMenuUpdates();
+    public static boolean lazyRecipeLayouts();
+    public static int lazyRecipeLayoutThreshold();
     public static boolean searchPreheat();
     public static boolean snapshotChunking();
     public static boolean sortPreheat();
@@ -222,6 +230,7 @@ public final class JeiOptFeatureFlags {
     public static boolean parallelVanillaRecipes();
     public static boolean asyncStartup();
     public static int workerThreads();
+    public static int parallelThreshold();
     public static int snapshotBudgetMs();
 }
 ```
@@ -247,6 +256,7 @@ Worker threads must not call:
 - `IRecipeCategory`.
 - `IIngredientHelper`.
 - `IIngredientRenderer`.
+- Third-party tooltip, tag, color, or ingredient-helper callbacks.
 - `Minecraft`, `ClientLevel`, `Screen`.
 - Mutable `ItemStack` logic.
 - JEI registration objects.
@@ -260,8 +270,10 @@ pool and does not run plugin callbacks concurrently. The exception requires all 
 - Every start owns a generation token and checks cancellation between plugin callbacks.
 - Stop invalidates the generation, interrupts the startup thread, and cancels derived tasks.
 - The final `IModPlugin.onRuntimeAvailable` callback batch executes serially on the client thread.
-- Ingredient-filter chunks build only into an isolated search index. Chunk completion may update
-    progress, but must not mutate the live filter or invalidate its sidebar cache.
+- Ingredient-filter chunks build only into an isolated search index. JEI string extraction and
+    insertion execute in bounded client-thread chunks; worker pools may only coordinate them or
+    process immutable snapshot strings. Chunk completion may update progress, but must not mutate
+    the live filter or invalidate its sidebar cache.
 - The client thread swaps the completed search index and invalidates the sidebar exactly once
     before `onRuntimeAvailable` callbacks and runtime publication.
 - JEI screen input callbacks must return "not handled" while startup progress is active because
@@ -283,6 +295,10 @@ Publish rules:
 - Every publish checks `JeiOptRuntimeState.isCurrent(generation)`.
 - Stop/reload invalidates generation and cancels pending tasks.
 - Disabled features must cancel or ignore existing feature-specific tasks.
+- A failed derived prefix index must fall through to JEI's native prefix search. Successful prefixes
+    may remain available, but no partial or failed prefix may return an authoritative empty result.
+- Legacy lazy recipe layouts are allowed to skip bookmark/craftable-first sorting only when their
+    dedicated config is enabled and the category exceeds its configured threshold.
 
 ## 7. Cache Contract
 

@@ -3,6 +3,8 @@ package com.tonywww.jeioptimize.mixin;
 import com.tonywww.jeioptimize.JeiOptimize;
 import com.tonywww.jeioptimize.config.JeiOptFeatureFlags;
 import com.tonywww.jeioptimize.integration.JeiOptStartupDriver;
+import com.tonywww.jeioptimize.instrumentation.JeiRuntimeGeneration;
+import com.tonywww.jeioptimize.instrumentation.JeiRuntimeVersion;
 import com.tonywww.jeioptimize.runtime.JeiOptExecutors;
 import com.tonywww.jeioptimize.runtime.JeiOptRuntimeState;
 import com.tonywww.jeioptimize.runtime.JeiOptStartupProgressState;
@@ -34,6 +36,13 @@ public abstract class JeiStarterMixin {
         }
 
         long generation = JeiOptRuntimeState.beginStart();
+        String jeiVersion = JeiRuntimeVersion.detect();
+        JeiOptimize.LOGGER.info(
+            "JEI Optimize starting generation {} with JEI {} ({})",
+            generation,
+            jeiVersion,
+            JeiRuntimeGeneration.classify(jeiVersion)
+        );
         Minecraft minecraft = Minecraft.getInstance();
         if (!JeiOptFeatureFlags.asyncStartup() || !minecraft.isSameThread()) {
             return;

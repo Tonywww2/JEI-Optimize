@@ -6,9 +6,12 @@ import mezz.jei.api.ingredients.IIngredientHelper;
 import mezz.jei.api.runtime.IIngredientManager;
 import net.minecraft.world.item.ItemStack;
 
+import java.util.ArrayDeque;
+import java.util.Deque;
+
 public final class JeiRecipeGenerationLimiter {
-    private static final ThreadLocal<Context> ANVIL = new ThreadLocal<>();
-    private static final ThreadLocal<Context> GRINDSTONE = new ThreadLocal<>();
+    private static final ThreadLocal<Deque<Context>> ANVIL = ThreadLocal.withInitial(ArrayDeque::new);
+    private static final ThreadLocal<Deque<Context>> GRINDSTONE = ThreadLocal.withInitial(ArrayDeque::new);
 
     private JeiRecipeGenerationLimiter() {
     }
@@ -25,6 +28,10 @@ public final class JeiRecipeGenerationLimiter {
         end(ANVIL, "anvil");
     }
 
+    public static void clearAnvil() {
+        ANVIL.remove();
+    }
+
     public static void beginGrindstone(IIngredientManager ingredientManager, int limitPerEnchantment) {
         begin(GRINDSTONE, ingredientManager, limitPerEnchantment);
     }
@@ -37,25 +44,28 @@ public final class JeiRecipeGenerationLimiter {
         end(GRINDSTONE, "grindstone");
     }
 
+    public static void clearGrindstone() {
+        GRINDSTONE.remove();
+    }
+
     private static void begin(
-        ThreadLocal<Context> contextHolder,
+        ThreadLocal<Deque<Context>> contextHolder,
         IIngredientManager ingredientManager,
         int limitPerEnchantment
     ) {
-        contextHolder.remove();
         try {
             IIngredientHelper<ItemStack> ingredientHelper = ingredientManager.getIngredientHelper(VanillaTypes.ITEM_STACK);
-            contextHolder.set(new Context(ingredientHelper, new RepresentativeItemLimiter(limitPerEnchantment)));
+            contextHolder.get().push(new Context(ingredientHelper, new RepresentativeItemLimiter(limitPerEnchantment)));
         } catch (RuntimeException ignored) {
         }
     }
 
     private static boolean shouldKeep(
-        ThreadLocal<Context> contextHolder,
+        ThreadLocal<Deque<Context>> contextHolder,
         Object enchantmentGroup,
         ItemStack stack
     ) {
-        Context context = contextHolder.get();
+        Context context = contextHolder.get().peek();
         if (context == null || enchantmentGroup == null || stack == null) {
             return true;
         }
@@ -69,9 +79,12 @@ public final class JeiRecipeGenerationLimiter {
         return context.limiter().shouldKeep(enchantmentGroup, itemKey);
     }
 
-    private static void end(ThreadLocal<Context> contextHolder, String category) {
-        Context context = contextHolder.get();
-        contextHolder.remove();
+    private static void end(ThreadLocal<Deque<Context>> contextHolder, String category) {
+        Deque<Context> contexts = contextHolder.get();
+        Context context = contexts.poll();
+        if (contexts.isEmpty()) {
+            contextHolder.remove();
+        }
         if (context != null) {
             RepresentativeItemLimiter limiter = context.limiter();
             JeiOptimize.LOGGER.debug(

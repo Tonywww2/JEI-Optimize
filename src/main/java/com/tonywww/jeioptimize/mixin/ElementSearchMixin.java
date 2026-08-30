@@ -51,7 +51,7 @@ public abstract class ElementSearchMixin {
 
         SearchIndexBuilder.BuiltSearchIndex index = asyncSearchIndex.readyValue()
             .orElseGet(() -> asyncSearchIndex.awaitOrFallback(() -> null));
-        if (index == null) {
+        if (index == null || index.failed(prefix)) {
             return;
         }
         List<IngredientSearchSnapshot> snapshots = index.search(prefix, token);

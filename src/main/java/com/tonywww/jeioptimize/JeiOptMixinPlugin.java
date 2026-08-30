@@ -11,6 +11,8 @@ import org.spongepowered.asm.service.IClassBytecodeProvider;
 import org.spongepowered.asm.service.MixinService;
 
 import java.util.HashMap;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -45,6 +47,13 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
         MIXIN_PACKAGE + "compat.SfmFallingAnvilCategoryMixin";
     private static final String JEED_EFFECT_CLICK_MIXIN =
         MIXIN_PACKAGE + "compat.JeedEffectClickGuardMixin";
+    private static final String BREWING_INDEX_FORGE_MIXIN = MIXIN_PACKAGE + "BrewingRecipeIndexForgeMixin";
+    private static final String BREWING_INDEX_NEO_MIXIN = MIXIN_PACKAGE + "BrewingRecipeIndexNeoMixin";
+    private static final String FORGE_ANVIL_BATCH_MIXIN = MIXIN_PACKAGE + "ForgeMenuBatchMixin$Anvil";
+    private static final String FORGE_GRINDSTONE_BATCH_MIXIN = MIXIN_PACKAGE + "ForgeMenuBatchMixin$Grindstone";
+    private static final String MENU_COMBINER_GUARD_MIXIN = MIXIN_PACKAGE + "MenuSlotUpdateGuardMixin$ItemCombiner";
+    private static final String MENU_GRINDSTONE_GUARD_MIXIN = MIXIN_PACKAGE + "MenuSlotUpdateGuardMixin$Grindstone";
+    private static final String LEGACY_RECIPE_LAYOUT_MIXIN = MIXIN_PACKAGE + "RecipeGuiLogicLegacyMixin";
 
     private static final Map<String, Requirement> REQUIREMENTS = Map.ofEntries(
         Map.entry(MIXIN_PACKAGE + "IngredientFilterMixin", Requirement.method(
@@ -87,6 +96,35 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
             "fuel recipe compaction",
             "getFuelRecipes",
             "(Lmezz/jei/api/runtime/IIngredientManager;)Ljava/util/List;")),
+        Map.entry(BREWING_INDEX_FORGE_MIXIN, Requirement.method(
+            "indexed brewing lookup",
+            "getNewPotions",
+            "(Lmezz/jei/api/recipe/vanilla/IVanillaRecipeFactory;"
+                + "Lmezz/jei/api/ingredients/IIngredientHelper;Ljava/util/Collection;"
+                + "Ljava/util/Collection;Ljava/util/Collection;)Ljava/util/List;")),
+        Map.entry(BREWING_INDEX_NEO_MIXIN, Requirement.method(
+            "indexed brewing lookup",
+            "getNewPotions",
+            "(Lnet/minecraft/world/item/alchemy/PotionBrewing;"
+                + "Lmezz/jei/api/recipe/vanilla/IVanillaRecipeFactory;"
+                + "Lmezz/jei/api/ingredients/IIngredientHelper;Ljava/util/Collection;"
+                + "Ljava/util/Collection;Ljava/util/Collection;)Ljava/util/List;")),
+        Map.entry(FORGE_ANVIL_BATCH_MIXIN, Requirement.method(
+            "batched hidden anvil updates",
+            "setAnvilMenu",
+            "(Lnet/minecraft/world/inventory/AnvilMenu;Lnet/minecraft/world/item/ItemStack;"
+                + "Lnet/minecraft/world/item/ItemStack;)Lnet/minecraft/world/inventory/AnvilMenu;")),
+        Map.entry(FORGE_GRINDSTONE_BATCH_MIXIN, Requirement.method(
+            "batched hidden grindstone updates",
+            "getGrindstoneResult",
+            "(Lnet/minecraft/world/inventory/GrindstoneMenu;Lnet/minecraft/world/item/ItemStack;"
+                + "Lnet/minecraft/world/item/ItemStack;)Lnet/minecraft/world/item/ItemStack;")),
+        Map.entry(LEGACY_RECIPE_LAYOUT_MIXIN, Requirement.method(
+            "legacy lazy recipe layouts",
+            "createRecipeLayoutsWithButtons",
+            "(Ljava/util/Set;Lmezz/jei/gui/recipes/lookups/IFocusedRecipes;"
+                + "Lnet/minecraft/world/inventory/AbstractContainerMenu;Lnet/minecraft/world/entity/player/Player;)"
+                + "Lmezz/jei/gui/recipes/layouts/IRecipeLayoutList;")),
         Map.entry(MIXIN_PACKAGE + "compat.IronsSpellsArcaneAnvilMakerMixin", Requirement.method(
             "Iron's Spells Arcane Anvil compaction",
             "getRecipes")),
@@ -183,6 +221,18 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
             "(Lnet/minecraft/client/gui/screens/Screen;"
                 + "Lnet/minecraft/client/gui/GuiGraphics;II)V"))
     );
+    private static final Map<String, ConfigGate> CONFIG_GATES = Map.ofEntries(
+        Map.entry(BREWING_INDEX_FORGE_MIXIN, new ConfigGate("indexedBrewingLookup", true)),
+        Map.entry(BREWING_INDEX_NEO_MIXIN, new ConfigGate("indexedBrewingLookup", true)),
+        Map.entry(FORGE_ANVIL_BATCH_MIXIN, new ConfigGate("skipRedundantMenuUpdates", true)),
+        Map.entry(FORGE_GRINDSTONE_BATCH_MIXIN, new ConfigGate("skipRedundantMenuUpdates", true)),
+        Map.entry(MENU_COMBINER_GUARD_MIXIN, new ConfigGate("skipRedundantMenuUpdates", true)),
+        Map.entry(MENU_GRINDSTONE_GUARD_MIXIN, new ConfigGate("skipRedundantMenuUpdates", true)),
+        Map.entry(LEGACY_RECIPE_LAYOUT_MIXIN, new ConfigGate("lazyRecipeLayouts", true)),
+        Map.entry(MIXIN_PACKAGE + "ElementSearchMixin", new ConfigGate("searchPreheat", false)),
+        Map.entry(MIXIN_PACKAGE + "VanillaRecipesMixin", new ConfigGate("parallelVanillaRecipes", false))
+    );
+    private static final Map<String, Boolean> EARLY_CONFIG_VALUES = new HashMap<>();
 
     private static final AtomicFeature CELESTIAL_REINFORCE_FEATURE = new AtomicFeature(
         "Celestial Forge Item Reinforce caching",
@@ -290,6 +340,68 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
             )
         ))
     );
+    private static final AtomicFeature BREWING_INDEX_FORGE_FEATURE = new AtomicFeature(
+        "indexed brewing lookup",
+        List.of(
+            new TargetRequirement(
+                "mezz.jei.library.util.BrewingRecipeMakerCommon",
+                List.of(Requirement.method(
+                    "",
+                    "getNewPotions",
+                    "(Lmezz/jei/api/recipe/vanilla/IVanillaRecipeFactory;"
+                        + "Lmezz/jei/api/ingredients/IIngredientHelper;Ljava/util/Collection;"
+                        + "Ljava/util/Collection;Ljava/util/Collection;)Ljava/util/List;"
+                ))
+            ),
+            new TargetRequirement(
+                "mezz.jei.library.plugins.vanilla.anvil.AnvilHelper",
+                List.of(Requirement.method("", "setAnvilMenu"))
+            )
+        )
+    );
+    private static final AtomicFeature BREWING_INDEX_NEO_FEATURE = new AtomicFeature(
+        "indexed brewing lookup",
+        List.of(new TargetRequirement(
+            "mezz.jei.library.util.BrewingRecipeMakerCommon",
+            List.of(Requirement.method(
+                "",
+                "getNewPotions",
+                "(Lnet/minecraft/world/item/alchemy/PotionBrewing;"
+                    + "Lmezz/jei/api/recipe/vanilla/IVanillaRecipeFactory;"
+                    + "Lmezz/jei/api/ingredients/IIngredientHelper;Ljava/util/Collection;"
+                    + "Ljava/util/Collection;Ljava/util/Collection;)Ljava/util/List;"
+            ))
+        ))
+    );
+    private static final AtomicFeature FORGE_MENU_BATCH_FEATURE = new AtomicFeature(
+        "batched hidden menu updates",
+        List.of(
+            new TargetRequirement(
+                "mezz.jei.library.plugins.vanilla.anvil.AnvilHelper",
+                List.of(Requirement.method("", "setAnvilMenu"))
+            ),
+            new TargetRequirement(
+                "mezz.jei.forge.platform.RecipeHelper",
+                List.of(Requirement.method("", "getGrindstoneResult"))
+            ),
+            new TargetRequirement(
+                "net.minecraft.world.inventory.ItemCombinerMenu",
+                List.of(Requirement.method(
+                    "",
+                    "slotsChanged",
+                    "(Lnet/minecraft/world/Container;)V"
+                ))
+            ),
+            new TargetRequirement(
+                "net.minecraft.world.inventory.GrindstoneMenu",
+                List.of(Requirement.method(
+                    "",
+                    "slotsChanged",
+                    "(Lnet/minecraft/world/Container;)V"
+                ))
+            )
+        )
+    );
     private static final Map<String, AtomicFeature> ATOMIC_FEATURES = Map.ofEntries(
         Map.entry(CELESTIAL_REINFORCE_MIXIN, CELESTIAL_REINFORCE_FEATURE),
         Map.entry(ULTIMATE_CAR_BUILDER_MIXIN, ULTIMATE_CAR_FEATURE),
@@ -299,7 +411,13 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
         Map.entry(EMBERS_PLUGIN_MIXIN, EMBERS_DAWNSTONE_ANVIL_FEATURE),
         Map.entry(EMBERS_CATEGORY_MIXIN, EMBERS_DAWNSTONE_ANVIL_FEATURE),
         Map.entry(SFM_FALLING_ANVIL_MIXIN, SFM_FALLING_ANVIL_FEATURE),
-        Map.entry(JEED_EFFECT_CLICK_MIXIN, JEED_EFFECT_CLICK_FEATURE)
+        Map.entry(JEED_EFFECT_CLICK_MIXIN, JEED_EFFECT_CLICK_FEATURE),
+        Map.entry(BREWING_INDEX_FORGE_MIXIN, BREWING_INDEX_FORGE_FEATURE),
+        Map.entry(BREWING_INDEX_NEO_MIXIN, BREWING_INDEX_NEO_FEATURE),
+        Map.entry(FORGE_ANVIL_BATCH_MIXIN, FORGE_MENU_BATCH_FEATURE),
+        Map.entry(FORGE_GRINDSTONE_BATCH_MIXIN, FORGE_MENU_BATCH_FEATURE),
+        Map.entry(MENU_COMBINER_GUARD_MIXIN, FORGE_MENU_BATCH_FEATURE),
+        Map.entry(MENU_GRINDSTONE_GUARD_MIXIN, FORGE_MENU_BATCH_FEATURE)
     );
 
     private final Map<String, ClassNode> targetCache = new HashMap<>();
@@ -318,6 +436,13 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
         MIXIN_PACKAGE + "IngredientFilterMixin",
         MIXIN_PACKAGE + "IngredientFilterModernMixin",
         MIXIN_PACKAGE + "GrindstoneRepresentativeMixin",
+        BREWING_INDEX_FORGE_MIXIN,
+        BREWING_INDEX_NEO_MIXIN,
+        LEGACY_RECIPE_LAYOUT_MIXIN,
+        FORGE_ANVIL_BATCH_MIXIN,
+        FORGE_GRINDSTONE_BATCH_MIXIN,
+        MENU_COMBINER_GUARD_MIXIN,
+        MENU_GRINDSTONE_GUARD_MIXIN,
         STARTER_PUBLISH_LEGACY_MIXIN,
         STARTER_PUBLISH_MODERN_MIXIN
     );
@@ -353,6 +478,18 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
 
     @Override
     public boolean shouldApplyMixin(String targetClassName, String mixinClassName) {
+        if (!readEarlyBoolean("enabled", true)) {
+            return false;
+        }
+        ConfigGate configGate = CONFIG_GATES.get(mixinClassName);
+        if (configGate != null && !readEarlyBoolean(configGate.key(), configGate.defaultValue())) {
+            LOGGER.debug(
+                "JEI Optimize skipped {} because {} is disabled before mixin application.",
+                mixinClassName,
+                configGate.key()
+            );
+            return false;
+        }
         if (STARTER_PUBLISH_LEGACY_MIXIN.equals(mixinClassName)) {
             ClassNode target = readTarget(targetClassName);
             if (target == null) {
@@ -372,7 +509,8 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
         }
 
         AtomicFeature atomicFeature = ATOMIC_FEATURES.get(mixinClassName);
-        if (atomicFeature != null && !isAtomicFeatureCompatible(atomicFeature)) {
+        if (atomicFeature != null
+            && !isAtomicFeatureCompatible(atomicFeature, VARIANTS.contains(mixinClassName))) {
             return false;
         }
 
@@ -421,7 +559,7 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
         return false;
     }
 
-    private boolean isAtomicFeatureCompatible(AtomicFeature feature) {
+    private boolean isAtomicFeatureCompatible(AtomicFeature feature, boolean variant) {
         Boolean cached = atomicFeatureCompatibility.get(feature);
         if (cached != null) {
             return cached;
@@ -448,7 +586,11 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
         boolean compatible = missing == null;
         atomicFeatureCompatibility.put(feature, compatible);
         if (!compatible) {
-            if (sawTarget) {
+            if (variant) {
+                LOGGER.debug(
+                    "JEI Optimize skipped optional {} variant because its complete ABI contract is missing {}.",
+                    feature.name(), missing);
+            } else if (sawTarget) {
                 LOGGER.warn(
                     "JEI Optimize turned off its {} optimization because its complete ABI contract is missing {}. "
                         + "The target mod keeps its normal behavior.",
@@ -481,6 +623,38 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
         return node;
     }
 
+    private static boolean readEarlyBoolean(String key, boolean defaultValue) {
+        Boolean cached = EARLY_CONFIG_VALUES.get(key);
+        if (cached != null) {
+            return cached;
+        }
+        boolean value = defaultValue;
+        Path config = Path.of("config", JeiOptimize.MOD_ID + "-client.toml");
+        if (Files.isReadable(config)) {
+            try {
+                for (String line : Files.readAllLines(config)) {
+                    String trimmed = line.trim();
+                    if (trimmed.isEmpty() || trimmed.startsWith("#")) {
+                        continue;
+                    }
+                    int equals = trimmed.indexOf('=');
+                    if (equals < 0 || !trimmed.substring(0, equals).trim().equals(key)) {
+                        continue;
+                    }
+                    String raw = trimmed.substring(equals + 1).split("#", 2)[0].trim();
+                    if ("true".equalsIgnoreCase(raw) || "false".equalsIgnoreCase(raw)) {
+                        value = Boolean.parseBoolean(raw);
+                    }
+                    break;
+                }
+            } catch (Exception error) {
+                LOGGER.debug("JEI Optimize could not pre-read {} from {}", key, config, error);
+            }
+        }
+        EARLY_CONFIG_VALUES.put(key, value);
+        return value;
+    }
+
     @Override
     public void acceptTargets(Set<String> myTargets, Set<String> otherTargets) {
     }
@@ -502,6 +676,9 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
     }
 
     private record AtomicFeature(String name, List<TargetRequirement> targets) {
+    }
+
+    private record ConfigGate(String key, boolean defaultValue) {
     }
 
     private record TargetRequirement(String className, List<Requirement> requirements) {

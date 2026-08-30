@@ -1,6 +1,7 @@
 package com.tonywww.jeioptimize.snapshot;
 
 import com.tonywww.jeioptimize.config.JeiOptFeatureFlags;
+import com.tonywww.jeioptimize.runtime.JeiOptExecutors;
 import mezz.jei.api.ingredients.IIngredientHelper;
 import mezz.jei.api.ingredients.ITypedIngredient;
 import mezz.jei.api.ingredients.subtypes.UidContext;
@@ -11,6 +12,7 @@ import mezz.jei.api.helpers.IColorHelper;
 import mezz.jei.gui.ingredients.IListElement;
 import mezz.jei.gui.ingredients.IListElementInfo;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.client.Minecraft;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -20,6 +22,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 
 public final class IngredientSearchSnapshotBuilder {
@@ -66,9 +69,13 @@ public final class IngredientSearchSnapshotBuilder {
 
         List<IngredientSearchSnapshot> snapshots = new ArrayList<>(elementInfos.size());
         for (IListElementInfo<?> elementInfo : elementInfos) {
-            createSnapshot(elementInfo).ifPresent(snapshots::add);
+            createSnapshotWithRetry(elementInfo).ifPresent(snapshots::add);
         }
         return List.copyOf(snapshots);
+    }
+
+    public Optional<IngredientSearchSnapshot> fromElementInfo(IListElementInfo<?> elementInfo) {
+        return elementInfo == null ? Optional.empty() : createSnapshotWithRetry(elementInfo);
     }
 
     public List<IngredientSearchSnapshot> buildFromElements(Collection<? extends IListElement<?>> elements, ElementInfoFactory elementInfoFactory) {
@@ -83,38 +90,59 @@ public final class IngredientSearchSnapshotBuilder {
         List<IngredientSearchSnapshot> snapshots = new ArrayList<>(elements.size());
         for (IListElement<?> element : elements) {
             Optional<? extends IListElementInfo<?>> elementInfo = elementInfoFactory.create(element, ingredientManager);
-            elementInfo.flatMap(this::createSnapshot).ifPresent(snapshots::add);
+            elementInfo.flatMap(this::createSnapshotWithRetry).ifPresent(snapshots::add);
         }
         return List.copyOf(snapshots);
     }
 
-    private Optional<IngredientSearchSnapshot> createSnapshot(IListElementInfo<?> elementInfo) {
-        try {
-            ITypedIngredient<?> typedIngredient = elementInfo.getTypedIngredient();
-            Object ingredient = typedIngredient.getIngredient();
-            IIngredientHelper<Object> ingredientHelper = getIngredientHelper(typedIngredient);
-            Object uid = ingredientHelper.getUniqueId(ingredient, UidContext.Ingredient);
-
-            IListElement<?> element = elementInfo.getElement();
-            boolean visible = element.isVisible();
-
-            return Optional.of(new IngredientSearchSnapshot(
-                uid,
-                immutableStringList(elementInfo.getNames()),
-                immutableStringList(elementInfo.getModNames()),
-                immutableStringList(elementInfo.getModIds()),
-                immutableStringList(elementInfo.getTooltipStrings(ingredientFilterConfig, ingredientManager)),
-                immutableStringList(elementInfo.getTagStrings(ingredientManager)),
-                immutableStringList(elementInfo.getCreativeTabsStrings(ingredientManager)),
-                colorStrings(elementInfo),
-                resourceLocationString(elementInfo.getResourceLocation()),
-                visible,
-                elementInfo.getCreatedIndex()
-            ));
-        } catch (RuntimeException e) {
-            LOGGER.warn("Failed to create JEI ingredient search snapshot", e);
-            return Optional.empty();
+    private Optional<IngredientSearchSnapshot> createSnapshotWithRetry(IListElementInfo<?> elementInfo) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (!minecraft.isSameThread()) {
+            AtomicReference<Optional<IngredientSearchSnapshot>> result = new AtomicReference<>(Optional.empty());
+            JeiOptExecutors.runOnMainThreadAndWait(() -> result.set(createSnapshotWithRetryOnCurrentThread(elementInfo)));
+            return result.get();
         }
+        return createSnapshotWithRetryOnCurrentThread(elementInfo);
+    }
+
+    private Optional<IngredientSearchSnapshot> createSnapshotWithRetryOnCurrentThread(
+        IListElementInfo<?> elementInfo
+    ) {
+        try {
+            return Optional.of(createSnapshot(elementInfo));
+        } catch (RuntimeException | LinkageError firstError) {
+            try {
+                return Optional.of(createSnapshot(elementInfo));
+            } catch (RuntimeException | LinkageError secondError) {
+                secondError.addSuppressed(firstError);
+                LOGGER.warn("Failed to create JEI ingredient search snapshot after one retry", secondError);
+                return Optional.empty();
+            }
+        }
+    }
+
+    private IngredientSearchSnapshot createSnapshot(IListElementInfo<?> elementInfo) {
+        ITypedIngredient<?> typedIngredient = elementInfo.getTypedIngredient();
+        Object ingredient = typedIngredient.getIngredient();
+        IIngredientHelper<Object> ingredientHelper = getIngredientHelper(typedIngredient);
+        Object uid = ingredientHelper.getUniqueId(ingredient, UidContext.Ingredient);
+
+        IListElement<?> element = elementInfo.getElement();
+        boolean visible = element.isVisible();
+
+        return new IngredientSearchSnapshot(
+            uid,
+            immutableStringList(elementInfo.getNames()),
+            immutableStringList(elementInfo.getModNames()),
+            immutableStringList(elementInfo.getModIds()),
+            immutableStringList(elementInfo.getTooltipStrings(ingredientFilterConfig, ingredientManager)),
+            immutableStringList(elementInfo.getTagStrings(ingredientManager)),
+            immutableStringList(elementInfo.getCreativeTabsStrings(ingredientManager)),
+            colorStrings(elementInfo),
+            resourceLocationString(elementInfo.getResourceLocation()),
+            visible,
+            elementInfo.getCreatedIndex()
+        );
     }
 
     @SuppressWarnings({ "unchecked", "rawtypes" })

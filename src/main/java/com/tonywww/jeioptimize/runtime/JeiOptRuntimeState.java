@@ -1,5 +1,6 @@
 package com.tonywww.jeioptimize.runtime;
 
+import com.tonywww.jeioptimize.config.JeiOptConfigSnapshot;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -36,6 +37,7 @@ public final class JeiOptRuntimeState {
     public static long beginStart() {
         synchronized (LOCK) {
             cancelPendingTasksLocked();
+            JeiOptConfigSnapshot.capture();
             currentGeneration = NEXT_GENERATION.incrementAndGet();
             return currentGeneration;
         }
@@ -56,6 +58,7 @@ public final class JeiOptRuntimeState {
     public static void invalidate() {
         synchronized (LOCK) {
             cancelPendingTasksLocked();
+            JeiOptConfigSnapshot.clear();
             currentGeneration = NEXT_GENERATION.incrementAndGet();
         }
     }

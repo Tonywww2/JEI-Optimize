@@ -1,6 +1,9 @@
 package com.tonywww.jeioptimize.index;
 
+import com.tonywww.jeioptimize.JeiOptimize;
 import com.tonywww.jeioptimize.config.JeiOptFeatureFlags;
+import com.tonywww.jeioptimize.runtime.JeiOptClientTickQueue;
+import com.tonywww.jeioptimize.runtime.JeiOptExecutors;
 import com.tonywww.jeioptimize.runtime.JeiOptRuntimeState;
 import com.tonywww.jeioptimize.runtime.JeiOptTaskRegistry;
 import com.tonywww.jeioptimize.snapshot.IngredientSearchSnapshot;
@@ -11,11 +14,14 @@ import mezz.jei.common.config.IIngredientFilterConfig;
 import mezz.jei.gui.ingredients.IListElementInfo;
 
 import java.util.Collection;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
 public final class AsyncSearchIndex implements AsyncIndex<SearchIndexBuilder.BuiltSearchIndex> {
@@ -42,7 +48,11 @@ public final class AsyncSearchIndex implements AsyncIndex<SearchIndexBuilder.Bui
         return JeiOptTaskRegistry.submitIfEnabled(
             taskId,
             JeiOptFeatureFlags::searchPreheat,
-            () -> SearchIndexBuilder.build(safeSnapshots),
+            () -> SearchIndexBuilder.build(
+                safeSnapshots,
+                true,
+                JeiOptFeatureFlags.parallelThreshold()
+            ),
             ignored -> {
             }
         ).map(future -> new AsyncSearchIndex(generation, future));
@@ -61,20 +71,94 @@ public final class AsyncSearchIndex implements AsyncIndex<SearchIndexBuilder.Bui
             return Optional.empty();
         }
         List<? extends IListElementInfo<?>> safeElementInfos = List.copyOf(elementInfos);
+        if (JeiOptFeatureFlags.snapshotChunking()) {
+            return Optional.of(buildChunkedFromElementInfos(
+                safeElementInfos,
+                ingredientManager,
+                ingredientFilterConfig,
+                colorHelper
+            ));
+        }
+        List<IngredientSearchSnapshot> snapshots = IngredientSearchSnapshotBuilder.fromElementInfos(
+            safeElementInfos,
+            ingredientManager,
+            ingredientFilterConfig,
+            colorHelper
+        );
+        return buildAsync(DEFAULT_TASK_ID, snapshots);
+    }
+
+    private static AsyncSearchIndex buildChunkedFromElementInfos(
+        List<? extends IListElementInfo<?>> elementInfos,
+        IIngredientManager ingredientManager,
+        IIngredientFilterConfig ingredientFilterConfig,
+        IColorHelper colorHelper
+    ) {
         long generation = JeiOptRuntimeState.currentGeneration();
-        return JeiOptTaskRegistry.submitIfEnabled(
-            DEFAULT_TASK_ID,
-            JeiOptFeatureFlags::searchPreheat,
-            () -> SearchIndexBuilder.build(IngredientSearchSnapshotBuilder.fromElementInfos(
-                safeElementInfos, ingredientManager, ingredientFilterConfig, colorHelper)),
-            ignored -> {
+        CompletableFuture<SearchIndexBuilder.BuiltSearchIndex> result = new CompletableFuture<>();
+        JeiOptRuntimeState.track(result);
+        IngredientSearchSnapshotBuilder snapshotBuilder = new IngredientSearchSnapshotBuilder(
+            ingredientManager,
+            ingredientFilterConfig,
+            colorHelper
+        );
+        List<IngredientSearchSnapshot> snapshots = new ArrayList<>(elementInfos.size());
+        AtomicInteger nextIndex = new AtomicInteger();
+        JeiOptClientTickQueue.enqueue(() -> {
+            if (!JeiOptRuntimeState.isCurrent(generation) || !JeiOptFeatureFlags.searchPreheat()) {
+                result.cancel(false);
+                return true;
             }
-        ).map(future -> new AsyncSearchIndex(generation, future));
+            long deadline = System.nanoTime()
+                + TimeUnit.MILLISECONDS.toNanos(JeiOptFeatureFlags.snapshotBudgetMs());
+            while (nextIndex.get() < elementInfos.size() && System.nanoTime() < deadline) {
+                int index = nextIndex.getAndIncrement();
+                snapshotBuilder.fromElementInfo(elementInfos.get(index)).ifPresent(snapshots::add);
+            }
+            if (nextIndex.get() < elementInfos.size()) {
+                return false;
+            }
+            JeiOptimize.LOGGER.info(
+                "JEI Optimize captured {} of {} search snapshots on client ticks; submitting pure prefix indexing",
+                snapshots.size(),
+                elementInfos.size()
+            );
+            CompletableFuture<SearchIndexBuilder.BuiltSearchIndex> worker = CompletableFuture.supplyAsync(
+                () -> SearchIndexBuilder.build(
+                    List.copyOf(snapshots),
+                    true,
+                    JeiOptFeatureFlags.parallelThreshold()
+                ),
+                JeiOptExecutors.pureComputationPool()
+            );
+            JeiOptRuntimeState.track(worker);
+            worker.whenComplete((built, error) -> {
+                if (error != null) {
+                    result.completeExceptionally(error);
+                } else if (JeiOptRuntimeState.isCurrent(generation)) {
+                    JeiOptimize.LOGGER.info(
+                        "JEI Optimize pure prefix index completed: {} ingredients, failed prefixes {}",
+                        built.size(),
+                        built.failedPrefixes()
+                    );
+                    result.complete(built);
+                } else {
+                    result.cancel(false);
+                }
+            });
+            return true;
+        });
+        return new AsyncSearchIndex(generation, result);
     }
 
     public static AsyncSearchIndex completed(Collection<IngredientSearchSnapshot> snapshots) {
         SearchIndexBuilder.BuiltSearchIndex index = SearchIndexBuilder.build(snapshots);
         return new AsyncSearchIndex(JeiOptRuntimeState.currentGeneration(), CompletableFuture.completedFuture(index));
+    }
+
+    static AsyncSearchIndex buildFromSnapshots(List<IngredientSearchSnapshot> snapshots, long generation) {
+        SearchIndexBuilder.BuiltSearchIndex index = SearchIndexBuilder.build(snapshots, false, Integer.MAX_VALUE);
+        return new AsyncSearchIndex(generation, CompletableFuture.completedFuture(index));
     }
 
     @Override
