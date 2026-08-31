@@ -21,6 +21,9 @@ class JeiOptStartupProgressStateTest {
         assertStageAndBlocked(JeiOptStartupProgressState.Stage.INDEXING);
 
         JeiOptStartupProgressState.markChunkCompleted(generation);
+        assertStageAndBlocked(JeiOptStartupProgressState.Stage.INDEXING);
+
+        JeiOptStartupProgressState.markReady(generation);
         assertStageAndBlocked(JeiOptStartupProgressState.Stage.READY);
 
         JeiOptStartupProgressState.markPublished(generation);

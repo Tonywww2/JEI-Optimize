@@ -273,6 +273,7 @@ public final class JeiOptExecutors {
             jeiStartExecutor = Executors.newSingleThreadExecutor(runnable -> {
                 Thread thread = new Thread(runnable, JeiOptimize.MOD_ID + "-start");
                 thread.setDaemon(true);
+                thread.setPriority(Math.max(Thread.MIN_PRIORITY, Thread.NORM_PRIORITY - 1));
                 thread.setUncaughtExceptionHandler((t, e) ->
                     LOGGER.error("Uncaught exception on {}", t.getName(), e));
                 return thread;

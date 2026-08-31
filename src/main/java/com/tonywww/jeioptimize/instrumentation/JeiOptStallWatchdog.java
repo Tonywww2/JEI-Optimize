@@ -21,6 +21,7 @@ import java.util.concurrent.TimeUnit;
  */
 public final class JeiOptStallWatchdog {
     private static final long SAMPLE_INTERVAL_MS = 250L;
+    private static final long LIVE_REPORT_INTERVAL_NANOS = TimeUnit.SECONDS.toNanos(10L);
     private static final int REPORTED_FRAMES = 6;
 
     private static final Object LOCK = new Object();
@@ -53,9 +54,7 @@ public final class JeiOptStallWatchdog {
     }
 
     private static void end(Watch watch) {
-        List<String> frames;
-        int samples;
-        long elapsedNanos;
+        Report report;
         synchronized (LOCK) {
             if (active == watch) {
                 active = null;
@@ -63,21 +62,9 @@ public final class JeiOptStallWatchdog {
             if (watch.samples == 0) {
                 return;
             }
-            samples = watch.samples;
-            elapsedNanos = System.nanoTime() - watch.startNanos;
-            frames = watch.topFrames();
+            report = watch.report(System.nanoTime(), false);
         }
-
-        JeiOptimize.LOGGER.warn(
-            "JEI Optimize stall watchdog: '{}' took {}. Sampled {} stack(s); that thread was most often in:",
-            watch.label,
-            String.format(Locale.ROOT, "%.1f s", elapsedNanos / 1_000_000_000.0),
-            samples);
-        for (String frame : frames) {
-            JeiOptimize.LOGGER.warn("    {}", frame);
-        }
-        JeiOptimize.LOGGER.warn(
-            "    That is where the time went. Report it to the owner of that code, not to JEI or Just Enough Threads.");
+        logReport(report);
     }
 
     private static void sampleLoop() {
@@ -92,10 +79,20 @@ public final class JeiOptStallWatchdog {
                 }
                 Thread.sleep(SAMPLE_INTERVAL_MS);
                 long thresholdNanos = TimeUnit.SECONDS.toNanos(JeiOptFeatureFlags.stallThresholdSeconds());
+                Report report = null;
                 synchronized (LOCK) {
-                    if (active == watch && System.nanoTime() - watch.startNanos >= thresholdNanos) {
+                    long now = System.nanoTime();
+                    if (active == watch && now - watch.startNanos >= thresholdNanos) {
                         watch.sample();
+                        if (watch.lastLiveReportNanos == 0L
+                            || now - watch.lastLiveReportNanos >= LIVE_REPORT_INTERVAL_NANOS) {
+                            watch.lastLiveReportNanos = now;
+                            report = watch.report(now, true);
+                        }
                     }
+                }
+                if (report != null) {
+                    logReport(report);
                 }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
@@ -112,6 +109,7 @@ public final class JeiOptStallWatchdog {
         private final long startNanos = System.nanoTime();
         private final Map<String, Integer> frameCounts = new HashMap<>();
         private int samples;
+        private long lastLiveReportNanos;
 
         private Watch(String label, Thread thread) {
             this.label = label;
@@ -135,6 +133,43 @@ public final class JeiOptStallWatchdog {
                     Locale.ROOT, "%3d%%  %s", entry.getValue() * 100 / samples, entry.getKey())));
             return lines;
         }
+
+        private Report report(long now, boolean live) {
+            return new Report(
+                label,
+                now - startNanos,
+                samples,
+                topFrames(),
+                live ? applicationFrames(thread.getStackTrace()) : List.of(),
+                live
+            );
+        }
+    }
+
+    private static void logReport(Report report) {
+        if (report.live()) {
+            JeiOptimize.LOGGER.warn(
+                "JEI Optimize stall watchdog: '{}' is still running after {}. Current thread stack:",
+                report.label(),
+                formatElapsed(report.elapsedNanos()));
+            for (String frame : report.liveFrames()) {
+                JeiOptimize.LOGGER.warn("    {}", frame);
+            }
+            return;
+        }
+
+        JeiOptimize.LOGGER.warn(
+            "JEI Optimize stall watchdog: '{}' took {}. Sampled {} stack(s); that thread was most often in:",
+            report.label(),
+            formatElapsed(report.elapsedNanos()),
+            report.samples());
+        for (String frame : report.topFrames()) {
+            JeiOptimize.LOGGER.warn("    {}", frame);
+        }
+    }
+
+    private static String formatElapsed(long elapsedNanos) {
+        return String.format(Locale.ROOT, "%.1f s", elapsedNanos / 1_000_000_000.0);
     }
 
     /**
@@ -163,5 +198,36 @@ public final class JeiOptStallWatchdog {
             return className + "#" + element.getMethodName();
         }
         return null;
+    }
+
+    private static List<String> applicationFrames(StackTraceElement[] stack) {
+        List<String> frames = new ArrayList<>();
+        for (StackTraceElement element : stack) {
+            String className = element.getClassName();
+            boolean ignored = false;
+            for (String prefix : IGNORED_FRAME_PREFIXES) {
+                if (className.startsWith(prefix)) {
+                    ignored = true;
+                    break;
+                }
+            }
+            if (!ignored) {
+                frames.add(element.toString());
+                if (frames.size() == REPORTED_FRAMES) {
+                    break;
+                }
+            }
+        }
+        return frames;
+    }
+
+    private record Report(
+        String label,
+        long elapsedNanos,
+        int samples,
+        List<String> topFrames,
+        List<String> liveFrames,
+        boolean live
+    ) {
     }
 }

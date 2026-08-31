@@ -6,12 +6,14 @@ import com.tonywww.jeioptimize.config.JeiOptFeatureFlags;
 import java.util.ArrayDeque;
 import java.util.Objects;
 import java.util.Queue;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
 
 public final class JeiOptClientTickQueue {
     private static final Object LOCK = new Object();
     private static final Queue<BooleanSupplier> WORK = new ArrayDeque<>();
+    private static final ThreadLocal<Long> CURRENT_DEADLINE_NANOS = new ThreadLocal<>();
 
     private JeiOptClientTickQueue() {
     }
@@ -29,6 +31,17 @@ public final class JeiOptClientTickQueue {
             work.run();
             return true;
         });
+    }
+
+    public static void awaitNextClientTick() {
+        CompletableFuture<Void> barrier = new CompletableFuture<>();
+        enqueue(() -> barrier.complete(null));
+        JeiOptExecutors.awaitJeiStartTask(barrier);
+    }
+
+    public static boolean hasTimeRemaining() {
+        Long deadlineNanos = CURRENT_DEADLINE_NANOS.get();
+        return deadlineNanos == null || System.nanoTime() < deadlineNanos;
     }
 
     public static int size() {
@@ -56,27 +69,31 @@ public final class JeiOptClientTickQueue {
 
         int budgetMs = Math.max(JeiOptFeatureFlags.ingredientFilterBudgetMs(), JeiOptFeatureFlags.snapshotBudgetMs());
         long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(budgetMs);
+        CURRENT_DEADLINE_NANOS.set(deadline);
+        try {
+            while (remaining > 0 && hasTimeRemaining()) {
+                BooleanSupplier work = poll();
+                if (work == null) {
+                    return;
+                }
+                remaining--;
 
-        while (remaining > 0 && System.nanoTime() < deadline) {
-            BooleanSupplier work = poll();
-            if (work == null) {
-                return;
-            }
-            remaining--;
+                boolean complete;
+                try {
+                    complete = work.getAsBoolean();
+                } catch (RuntimeException | LinkageError e) {
+                    JeiOptimize.LOGGER.error("JEI Optimize client tick work failed; dropping task", e);
+                    continue;
+                }
 
-            boolean complete;
-            try {
-                complete = work.getAsBoolean();
-            } catch (RuntimeException | LinkageError e) {
-                JeiOptimize.LOGGER.error("JEI Optimize client tick work failed; dropping task", e);
-                continue;
-            }
-
-            if (!complete) {
-                synchronized (LOCK) {
-                    WORK.add(work);
+                if (!complete) {
+                    synchronized (LOCK) {
+                        WORK.add(work);
+                    }
                 }
             }
+        } finally {
+            CURRENT_DEADLINE_NANOS.remove();
         }
     }
 

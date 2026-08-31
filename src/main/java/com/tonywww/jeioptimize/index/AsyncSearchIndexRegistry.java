@@ -28,6 +28,10 @@ public final class AsyncSearchIndexRegistry {
         }
     }
 
+    public static void clear() {
+        INDEXES.clear();
+    }
+
     public static AsyncSearchIndex get(Object elementSearch) {
         if (elementSearch == null) {
             return null;

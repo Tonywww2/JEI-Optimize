@@ -2,6 +2,7 @@ package com.tonywww.jeioptimize.mixin;
 
 import com.tonywww.jeioptimize.instrumentation.JeiOptDiagnostics;
 import com.tonywww.jeioptimize.instrumentation.JeiPluginCallContext;
+import com.tonywww.jeioptimize.runtime.JeiOptClientTickQueue;
 import com.tonywww.jeioptimize.runtime.JeiOptExecutors;
 import mezz.jei.api.IModPlugin;
 import org.spongepowered.asm.mixin.Mixin;
@@ -16,6 +17,8 @@ import java.util.function.Consumer;
 @Mixin(targets = "mezz.jei.library.load.PluginCaller", remap = false)
 public abstract class PluginCallerMixin {
     private static final String JER_PLUGIN_CLASS = "jeresources.jei.JEIConfig";
+    private static final String ALI_PLUGIN_CLASS = "com.yanny.ali.jei.compatibility.JeiCompatibility";
+    private static final String REGISTERING_RECIPES = "Registering recipes";
 
     @Redirect(
         method = "callOnPlugins",
@@ -34,12 +37,20 @@ public abstract class PluginCallerMixin {
         JeiOptExecutors.checkJeiStartActive();
         IModPlugin modPlugin = (IModPlugin) plugin;
         boolean isJerPlugin = JER_PLUGIN_CLASS.equals(modPlugin.getClass().getName());
+        boolean isAliPlugin = ALI_PLUGIN_CLASS.equals(modPlugin.getClass().getName());
         Runnable pluginCall = () -> JeiOptDiagnostics.callPluginWithTiming(title, modPlugin, () ->
             JeiPluginCallContext.runWithPlugin(modPlugin, () -> consumer.accept(modPlugin)));
         try {
             if (JeiOptExecutors.isJeiStartThread() && isJerPlugin) {
                 JeiOptExecutors.runOnMainThreadAndWait(pluginCall);
             } else {
+                if (JeiOptExecutors.isJeiStartThread()
+                    && isAliPlugin
+                    && REGISTERING_RECIPES.equals(title)) {
+                    com.tonywww.jeioptimize.JeiOptimize.LOGGER.info(
+                        "JEI Optimize waiting for queued ALI client work before recipe registration");
+                    JeiOptClientTickQueue.awaitNextClientTick();
+                }
                 pluginCall.run();
             }
         } finally {

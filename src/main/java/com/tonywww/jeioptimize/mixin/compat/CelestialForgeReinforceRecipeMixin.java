@@ -2,6 +2,7 @@ package com.tonywww.jeioptimize.mixin.compat;
 
 import com.tonywww.jeioptimize.config.JeiOptFeatureFlags;
 import com.tonywww.jeioptimize.integration.CelestialForgeReinforceCache;
+import com.tonywww.jeioptimize.integration.CelestialForgeReinforceInputPool;
 import com.tonywww.jeioptimize.recipe.ItemStackRepresentativeSelector;
 import net.minecraft.world.item.crafting.Ingredient;
 import org.spongepowered.asm.mixin.Mixin;
@@ -15,8 +16,20 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public abstract class CelestialForgeReinforceRecipeMixin {
     @Inject(method = "input", at = @At("HEAD"), cancellable = true)
     private void jeiOptimize$useCachedInput(CallbackInfoReturnable<Ingredient> callbackInfo) {
-        if (!JeiOptFeatureFlags.cacheCelestialForgeReinforce()
-            || JeiOptFeatureFlags.aggressiveCelestialForgeReinforce()) {
+        boolean aggressive = JeiOptFeatureFlags.aggressiveCelestialForgeReinforce();
+        if (!JeiOptFeatureFlags.cacheCelestialForgeReinforce() && !aggressive) {
+            return;
+        }
+        Ingredient pooled = CelestialForgeReinforceInputPool.getOrCreate(
+            this,
+            aggressive,
+            JeiOptFeatureFlags.aggressiveRepresentativesPerGroup()
+        );
+        if (pooled != null) {
+            callbackInfo.setReturnValue(pooled);
+            return;
+        }
+        if (aggressive) {
             return;
         }
         Ingredient cached = CelestialForgeReinforceCache.getInput(this);

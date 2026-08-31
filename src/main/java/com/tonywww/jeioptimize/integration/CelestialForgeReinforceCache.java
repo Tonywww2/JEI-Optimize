@@ -14,6 +14,10 @@ public final class CelestialForgeReinforceCache {
     private CelestialForgeReinforceCache() {
     }
 
+    public static void clear() {
+        CACHE.clear();
+    }
+
     public static Ingredient getInput(Object recipe) {
         CacheEntry entry = CACHE.get(recipe);
         return isCurrent(entry) ? copyNonEmpty(entry.input()) : null;

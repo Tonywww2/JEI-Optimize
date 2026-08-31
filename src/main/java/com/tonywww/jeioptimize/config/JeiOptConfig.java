@@ -333,19 +333,20 @@ public final class JeiOptConfig {
             .comment("Per-client-tick snapshot extraction budget in milliseconds. Ignored when snapshotChunking is disabled.")
             .defineInRange("snapshotBudgetMs", 2, 1, 10);
         ASYNC_DEFERRED_INGREDIENT_FILTER = builder
-            .comment("Build the JEI ingredient search filter in client-tick chunks, then publish the complete sidebar once.")
+            .comment("Prepare ingredient visibility in client-tick chunks, then use JEI's native batch search builder.")
             .define("deferredIngredientFilter", true);
         ASYNC_INGREDIENT_FILTER_BUDGET_MS = builder
-            .comment("Per-client-tick budget in milliseconds for the deferred ingredient filter build. Higher fills faster but costs more per tick.")
+            .comment("Per-client-tick budget in milliseconds for ingredient visibility preparation.")
             .defineInRange("ingredientFilterBudgetMs", 10, 1, 40);
         ASYNC_INGREDIENT_FILTER_CHUNK_SIZE = builder
-            .comment("Number of ingredients added per work unit during the deferred ingredient filter build.")
+            .comment("Number of ingredients represented by one progress step. The frame deadline is checked after every ingredient.")
             .defineInRange("ingredientFilterChunkSize", 500, 50, 4000);
         ASYNC_PARALLEL_INGREDIENT_FILTER = builder
             .comment(
-                "Build the JEI ingredient search filter on worker threads after entering the world, then atomically swap it in.",
-                "Progress reports completed chunks. JEI waits for the complete isolated index, then publishes the sidebar once",
-                "instead of repeatedly refreshing a partial list. Falls back to a synchronous build if the worker build fails.",
+                "Prepare ingredient visibility incrementally on client ticks, then atomically publish JEI's native batch index.",
+                "JEI and mod visibility helpers stay on their required client thread, with a deadline check after every item.",
+                "The search storage is never populated one item at a time, avoiding excessive memory use on newer JEI versions.",
+                "JEI waits for the complete isolated index and publishes the sidebar once.",
                 "Enabled by default.")
             .define("asyncIngredientFilter", true);
         ASYNC_PARALLEL_VANILLA_RECIPES = builder

@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.Supplier;
 
 @Pseudo
 @Mixin(targets = "mezz.jei.gui.search.ElementSearch", remap = false)
@@ -49,8 +48,7 @@ public abstract class ElementSearchMixin {
             return;
         }
 
-        SearchIndexBuilder.BuiltSearchIndex index = asyncSearchIndex.readyValue()
-            .orElseGet(() -> asyncSearchIndex.awaitOrFallback(() -> null));
+        SearchIndexBuilder.BuiltSearchIndex index = asyncSearchIndex.readyValue().orElse(null);
         if (index == null || index.failed(prefix)) {
             return;
         }

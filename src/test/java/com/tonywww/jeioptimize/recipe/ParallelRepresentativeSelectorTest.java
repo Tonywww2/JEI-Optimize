@@ -6,9 +6,26 @@ import java.util.List;
 import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class ParallelRepresentativeSelectorTest {
+    @Test
+    void familySelectionKeepsSmallSetsWithoutDeduplicatingFamilies() {
+        String diamondSword = "minecraft:diamond_sword";
+        String netheriteSword = "minecraft:netherite_sword";
+
+        List<String> selection = ParallelRepresentativeSelector.selectFamilies(
+            List.of(diamondSword, netheriteSword),
+            value -> value,
+            3
+        );
+
+        assertEquals(2, selection.size());
+        assertSame(diamondSword, selection.get(0));
+        assertSame(netheriteSword, selection.get(1));
+    }
+
     @Test
     void familySelectionPreservesParallelOutputIndexes() {
         List<String> inputs = List.of(

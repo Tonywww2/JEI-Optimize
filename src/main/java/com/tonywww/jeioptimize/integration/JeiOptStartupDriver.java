@@ -32,6 +32,7 @@ public final class JeiOptStartupDriver {
 
     public static void onRuntimeAvailable() {
         if (!JeiOptFeatureFlags.enabled()) {
+            JeiOptStartupContext.clear();
             return;
         }
         try {
@@ -46,6 +47,8 @@ public final class JeiOptStartupDriver {
             driveSearchPreheat();
         } catch (RuntimeException | LinkageError e) {
             JeiOptimize.LOGGER.warn("JEI Optimize preheat wiring failed; JEI baseline remains active", e);
+        } finally {
+            JeiOptStartupContext.clear();
         }
     }
 
@@ -109,12 +112,11 @@ public final class JeiOptStartupDriver {
     private static void clearRuntimeWork() {
         JeiOptTaskRegistry.cancelAll();
         AsyncIngredientFilterBuilder.cancelInFlight();
+        CelestialForgeReinforceCache.clear();
+        CelestialForgeReinforceInputPool.clear();
         JeiOptFilterBootstrap.clear();
         JeiOptClientTickQueue.clear();
-        Object elementSearch = JeiOptStartupContext.elementSearch();
-        if (elementSearch != null) {
-            AsyncSearchIndexRegistry.detach(elementSearch);
-        }
+        AsyncSearchIndexRegistry.clear();
         JeiOptStartupContext.clear();
         JeiOptExecutors.shutdownWorkerExecutor();
     }

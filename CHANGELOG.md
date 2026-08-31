@@ -4,6 +4,36 @@ All notable changes to Just Enough Threads are documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.13.1
+
+### Changed
+
+- **Ingredient-filter preparation is now client-tick budgeted, followed by JEI's native batch
+  index build.** JEI and mod visibility helpers stay on the client thread, while async startup
+  performs the indivisible search build on its dedicated thread. This avoids incrementally growing
+  every search storage and prevents the index from overlapping the rest of JEI runtime allocation.
+- **Celestial Forge reinforce inputs are pooled before the mod expands its wrapper ingredients.**
+  Recipes with the same modifier-type set share one candidate scan, and aggressive mode stops as
+  soon as both overflow and a complete representative set have been established.
+
+### Fixed
+
+- **Advanced Loot Info recipe registration waits for queued client-tick integrations before it
+  consumes shared loot data.** This prevents its background JEI plugin from racing JEI Tetra's
+  scheduled loot-data callback during integrated-server startup.
+- **Prefix search never waits for an unfinished preheat index on the Render thread.** Queries use
+  the ready snapshot index or immediately fall back to JEI's original search.
+- **The startup stall watchdog reports live stacks while a plugin is still stuck.** It emits the
+  first stack at the configured threshold and refreshes it every ten seconds, so a call that never
+  returns still leaves actionable diagnostics.
+- **JEI 15.20.0.119 and newer no longer receive one ingredient at a time from the deferred filter.**
+  These versions retain a UID map alongside their search storages; extending all of them over many
+  client ticks caused severe peak-memory growth in large packs. The deferred path now invokes
+  JEI's own `addAll` or full-search factory exactly once.
+- **Celestial Forge aggressive previews no longer discard same-family items from small inputs.**
+  Representative filtering now begins only after the complete match count is known to exceed the
+  configured limit.
+
 ## 0.13.0
 
 ### Added

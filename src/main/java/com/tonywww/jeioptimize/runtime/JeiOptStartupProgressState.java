@@ -56,9 +56,6 @@ public final class JeiOptStartupProgressState {
                 return;
             }
             completedChunks = Math.min(totalChunks, completedChunks + 1);
-            if (completedChunks == totalChunks) {
-                stage = Stage.READY;
-            }
         }
     }
 
