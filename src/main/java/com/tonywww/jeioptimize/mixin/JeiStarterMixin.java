@@ -36,6 +36,7 @@ public abstract class JeiStarterMixin {
         }
 
         long generation = JeiOptRuntimeState.beginStart();
+    JeiOptStartupDriver.onJeiStarting();
         String jeiVersion = JeiRuntimeVersion.detect();
         JeiOptimize.LOGGER.info(
             "JEI Optimize starting generation {} with JEI {} ({})",

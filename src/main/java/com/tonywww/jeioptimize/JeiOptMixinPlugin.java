@@ -4,6 +4,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.FieldNode;
+import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.MethodNode;
 import org.spongepowered.asm.mixin.extensibility.IMixinConfigPlugin;
 import org.spongepowered.asm.mixin.extensibility.IMixinInfo;
@@ -54,6 +55,70 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
     private static final String MENU_COMBINER_GUARD_MIXIN = MIXIN_PACKAGE + "MenuSlotUpdateGuardMixin$ItemCombiner";
     private static final String MENU_GRINDSTONE_GUARD_MIXIN = MIXIN_PACKAGE + "MenuSlotUpdateGuardMixin$Grindstone";
     private static final String LEGACY_RECIPE_LAYOUT_MIXIN = MIXIN_PACKAGE + "RecipeGuiLogicLegacyMixin";
+    private static final String GRINDSTONE_REPRESENTATIVE_MIXIN = MIXIN_PACKAGE + "GrindstoneRepresentativeMixin";
+    private static final String GRINDSTONE_DISENCHANT_LEGACY_MIXIN =
+        MIXIN_PACKAGE + "GrindstoneDisenchantLegacyMixin";
+    private static final String GRINDSTONE_DISENCHANT_MODERN_MIXIN =
+        MIXIN_PACKAGE + "GrindstoneDisenchantModernMixin";
+
+    private static final Requirement GRINDSTONE_ENTRY_POINT = Requirement.method(
+        "grindstone representative recipes",
+        "getGrindstoneRecipes",
+        "(Lmezz/jei/api/runtime/IIngredientManager;"
+            + "Lmezz/jei/common/platform/IPlatformRecipeHelper;)Ljava/util/List;"
+    );
+    private static final List<Requirement> GRINDSTONE_REPAIR_METHODS = List.of(
+        Requirement.method(
+            "",
+            "getRepairRecipes",
+            "(Lmezz/jei/common/platform/IPlatformRecipeHelper;"
+                + "Lmezz/jei/api/runtime/IIngredientManager;"
+                + "Lnet/minecraft/world/inventory/GrindstoneMenu;)Ljava/util/stream/Stream;"
+        ),
+        Requirement.method(
+            "",
+            "getRepairRecipes",
+            "(Lmezz/jei/common/platform/IPlatformRecipeHelper;"
+                + "Lmezz/jei/api/runtime/IIngredientManager;)Ljava/util/stream/Stream;"
+        )
+    );
+    private static final Requirement GRINDSTONE_MODERN_CAN_ENCHANT = Requirement.method(
+        "",
+        "canEnchant",
+        "(Lmezz/jei/common/platform/IPlatformRecipeHelper;"
+            + "Lnet/minecraft/world/item/ItemStack;"
+            + "Lnet/minecraft/world/item/enchantment/Enchantment;"
+            + "Lnet/minecraft/resources/ResourceLocation;)Z"
+    );
+    private static final InvocationRequirement GRINDSTONE_MODERN_INVOCATION = new InvocationRequirement(
+        "getDisenchantRecipes",
+        "(Lmezz/jei/common/platform/IPlatformRecipeHelper;"
+            + "Lnet/minecraft/world/inventory/GrindstoneMenu;)Ljava/util/stream/Stream;",
+        "mezz/jei/library/plugins/vanilla/grindstone/GrindstoneRecipeMaker",
+        "canEnchant",
+        "(Lmezz/jei/common/platform/IPlatformRecipeHelper;"
+            + "Lnet/minecraft/world/item/ItemStack;"
+            + "Lnet/minecraft/world/item/enchantment/Enchantment;"
+            + "Lnet/minecraft/resources/ResourceLocation;)Z"
+    );
+    private static final List<InvocationRequirement> GRINDSTONE_LEGACY_INVOCATIONS = List.of(
+        new InvocationRequirement(
+            "getDisenchantRecipes",
+            "(Lmezz/jei/common/platform/IPlatformRecipeHelper;"
+                + "Lnet/minecraft/world/inventory/GrindstoneMenu;)Ljava/util/stream/Stream;",
+            "mezz/jei/common/platform/IPlatformRecipeHelper",
+            "isItemEnchantable",
+            "(Lnet/minecraft/world/item/ItemStack;"
+                + "Lnet/minecraft/world/item/enchantment/Enchantment;)Z"
+        ),
+        new InvocationRequirement(
+            "getDisenchantRecipes",
+            "(Lmezz/jei/common/platform/IPlatformRecipeHelper;)Ljava/util/stream/Stream;",
+            "mezz/jei/common/platform/IPlatformRecipeHelper",
+            "isItemEnchantable",
+            "(Lnet/minecraft/world/item/ItemStack;Lnet/minecraft/core/Holder;)Z"
+        )
+    );
 
     private static final Map<String, Requirement> REQUIREMENTS = Map.ofEntries(
         Map.entry(MIXIN_PACKAGE + "IngredientFilterMixin", Requirement.method(
@@ -87,11 +152,6 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
             "anvil representative recipes",
             "canEnchant",
             "(Lnet/minecraft/world/item/ItemStack;)Z")),
-        Map.entry(MIXIN_PACKAGE + "GrindstoneRepresentativeMixin", Requirement.method(
-            "grindstone representative recipes",
-            "getGrindstoneRecipes",
-            "(Lmezz/jei/api/runtime/IIngredientManager;"
-                + "Lmezz/jei/common/platform/IPlatformRecipeHelper;)Ljava/util/List;")),
         Map.entry(MIXIN_PACKAGE + "FuelRecipeMakerMixin", Requirement.method(
             "fuel recipe compaction",
             "getFuelRecipes",
@@ -188,10 +248,6 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
             "async JEI runtime publication",
             "running",
             "Z")),
-        Map.entry(MIXIN_PACKAGE + "ElementSearchMixin", Requirement.field(
-            "async search preheat",
-            "allElements",
-            "Ljava/util/Map;")),
         Map.entry(MIXIN_PACKAGE + "RecipeManagerInternalCompactMixin", Requirement.method(
             "delayed recipe list compaction",
             "compact",
@@ -229,7 +285,6 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
         Map.entry(MENU_COMBINER_GUARD_MIXIN, new ConfigGate("skipRedundantMenuUpdates", true)),
         Map.entry(MENU_GRINDSTONE_GUARD_MIXIN, new ConfigGate("skipRedundantMenuUpdates", true)),
         Map.entry(LEGACY_RECIPE_LAYOUT_MIXIN, new ConfigGate("lazyRecipeLayouts", true)),
-        Map.entry(MIXIN_PACKAGE + "ElementSearchMixin", new ConfigGate("searchPreheat", false)),
         Map.entry(MIXIN_PACKAGE + "VanillaRecipesMixin", new ConfigGate("parallelVanillaRecipes", false))
     );
     private static final Map<String, Boolean> EARLY_CONFIG_VALUES = new HashMap<>();
@@ -423,19 +478,12 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
     private final Map<String, ClassNode> targetCache = new HashMap<>();
     private final Map<AtomicFeature, Boolean> atomicFeatureCompatibility = new HashMap<>();
 
-    /** Types a mixin names in its own signatures; Mixin fails hard if one of them has moved. */
-    private static final Map<String, RequiredClass> REQUIRED_CLASSES = Map.of(
-        MIXIN_PACKAGE + "ElementSearchMixin",
-        new RequiredClass("async search preheat", "mezz.jei.core.search.PrefixInfo")
-    );
-
     /** One of these covers each JEI generation, so the one that does not match is not a problem. */
     private static final Set<String> VARIANTS = Set.of(
         MIXIN_PACKAGE + "AnvilRecipeControlMixin",
         MIXIN_PACKAGE + "AnvilRecipeControlModernMixin",
         MIXIN_PACKAGE + "IngredientFilterMixin",
         MIXIN_PACKAGE + "IngredientFilterModernMixin",
-        MIXIN_PACKAGE + "GrindstoneRepresentativeMixin",
         BREWING_INDEX_FORGE_MIXIN,
         BREWING_INDEX_NEO_MIXIN,
         LEGACY_RECIPE_LAYOUT_MIXIN,
@@ -448,7 +496,6 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
     );
 
     private static final Set<String> OPTIONAL_MIXINS = Set.of(
-        MIXIN_PACKAGE + "GrindstoneRepresentativeMixin",
         MIXIN_PACKAGE + "compat.CelestialForgeReinforceRecipeMixin",
         EMBERS_CATEGORY_MIXIN,
         EMBERS_PLUGIN_MIXIN,
@@ -481,6 +528,9 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
         if (!readEarlyBoolean("enabled", true)) {
             return false;
         }
+        if (isGrindstoneRepresentativeMixin(mixinClassName)) {
+            return shouldApplyGrindstoneRepresentativeMixin(targetClassName, mixinClassName);
+        }
         ConfigGate configGate = CONFIG_GATES.get(mixinClassName);
         if (configGate != null && !readEarlyBoolean(configGate.key(), configGate.defaultValue())) {
             LOGGER.debug(
@@ -511,15 +561,6 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
         AtomicFeature atomicFeature = ATOMIC_FEATURES.get(mixinClassName);
         if (atomicFeature != null
             && !isAtomicFeatureCompatible(atomicFeature, VARIANTS.contains(mixinClassName))) {
-            return false;
-        }
-
-        RequiredClass requiredClass = REQUIRED_CLASSES.get(mixinClassName);
-        if (requiredClass != null && readTarget(requiredClass.className()) == null) {
-            LOGGER.warn(
-                "JEI Optimize turned off its {} optimization: this JEI build no longer has {}. "
-                    + "JEI keeps its normal behavior; the mod needs an update for this JEI version.",
-                requiredClass.feature(), requiredClass.className());
             return false;
         }
 
@@ -557,6 +598,65 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
                 + "JEI keeps its normal behavior; the mod needs an update for this JEI version.",
             requirement.feature(), targetClassName, requirement.describe());
         return false;
+    }
+
+    private static boolean isGrindstoneRepresentativeMixin(String mixinClassName) {
+        return GRINDSTONE_REPRESENTATIVE_MIXIN.equals(mixinClassName)
+            || GRINDSTONE_DISENCHANT_LEGACY_MIXIN.equals(mixinClassName)
+            || GRINDSTONE_DISENCHANT_MODERN_MIXIN.equals(mixinClassName);
+    }
+
+    private boolean shouldApplyGrindstoneRepresentativeMixin(
+        String targetClassName,
+        String mixinClassName
+    ) {
+        ClassNode target = readTarget(targetClassName);
+        if (target == null) {
+            LOGGER.debug(
+                "JEI Optimize skipped optional {} because {} is not available.",
+                mixinClassName,
+                targetClassName
+            );
+            return false;
+        }
+
+        GrindstoneVariant variant = detectGrindstoneVariant(target);
+        boolean hasRepairMethod = GRINDSTONE_REPAIR_METHODS.stream()
+            .anyMatch(requirement -> requirement.isPresentIn(target));
+        boolean compatible = GRINDSTONE_ENTRY_POINT.isPresentIn(target)
+            && hasRepairMethod
+            && variant != GrindstoneVariant.NONE;
+        if (!compatible) {
+            if (GRINDSTONE_REPRESENTATIVE_MIXIN.equals(mixinClassName)) {
+                LOGGER.warn(
+                    "JEI Optimize turned off grindstone representative recipes: {} has no supported complete ABI. "
+                        + "JEI keeps its original grindstone recipes.",
+                    targetClassName
+                );
+            }
+            return false;
+        }
+        if (GRINDSTONE_DISENCHANT_LEGACY_MIXIN.equals(mixinClassName)) {
+            return variant == GrindstoneVariant.LEGACY;
+        }
+        if (GRINDSTONE_DISENCHANT_MODERN_MIXIN.equals(mixinClassName)) {
+            return variant == GrindstoneVariant.MODERN;
+        }
+        return true;
+    }
+
+    static GrindstoneVariant detectGrindstoneVariant(ClassNode target) {
+        boolean modern = GRINDSTONE_MODERN_CAN_ENCHANT.isPresentIn(target)
+            && GRINDSTONE_MODERN_INVOCATION.isPresentIn(target);
+        boolean legacy = GRINDSTONE_LEGACY_INVOCATIONS.stream()
+            .anyMatch(requirement -> requirement.isPresentIn(target));
+        if (modern == legacy) {
+            return GrindstoneVariant.NONE;
+        }
+        if (modern) {
+            return GrindstoneVariant.MODERN;
+        }
+        return GrindstoneVariant.LEGACY;
     }
 
     private boolean isAtomicFeatureCompatible(AtomicFeature feature, boolean variant) {
@@ -672,9 +772,6 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
     public void postApply(String targetClassName, ClassNode targetClass, String mixinClassName, IMixinInfo mixinInfo) {
     }
 
-    private record RequiredClass(String feature, String className) {
-    }
-
     private record AtomicFeature(String name, List<TargetRequirement> targets) {
     }
 
@@ -682,6 +779,39 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
     }
 
     private record TargetRequirement(String className, List<Requirement> requirements) {
+    }
+
+    enum GrindstoneVariant {
+        LEGACY,
+        MODERN,
+        NONE
+    }
+
+    private record InvocationRequirement(
+        String enclosingMethod,
+        String enclosingDescriptor,
+        String owner,
+        String invokedMethod,
+        String invokedDescriptor
+    ) {
+        boolean isPresentIn(ClassNode target) {
+            for (MethodNode method : target.methods) {
+                if (!enclosingMethod.equals(method.name) || !enclosingDescriptor.equals(method.desc)) {
+                    continue;
+                }
+                for (org.objectweb.asm.tree.AbstractInsnNode instruction = method.instructions.getFirst();
+                     instruction != null;
+                     instruction = instruction.getNext()) {
+                    if (instruction instanceof MethodInsnNode invocation
+                        && owner.equals(invocation.owner)
+                        && invokedMethod.equals(invocation.name)
+                        && invokedDescriptor.equals(invocation.desc)) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
     }
 
     private record Requirement(String feature, String memberName, String descriptor, boolean isField) {

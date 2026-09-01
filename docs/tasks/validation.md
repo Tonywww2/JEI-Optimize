@@ -325,3 +325,15 @@ When a validation run resolves a to-verify item:
 - 2026-08-27 — Added Tinkers 3.11.2.166 / Mantle 1.11.104 runtime evidence for casting compaction and the default-off global ingredient prefilter on JEI 15.20 and 15.48.
 - 2026-08-27 — Added released-jar smoke evidence for Celestial Forge, Embers, SFM, Ultimate Car, Iron Furnaces, Generator Galore, and the Productive Trees upstream registration blocker; verified default, explicit no-op, and aggressive startup paths.
 - 2026-08-29 — Replaced the global container mouse lock with a generation-aware JEED effect-click guard; verified released JEED jars on Forge JEI 15.20/15.48 and NeoForge JEI 19.27.
+- 2026-09-01 — Rechecked the reported JEI boundary where `15.20.0.119` is the last unaffected
+	version and `15.20.0.120` is the first affected version. Official Maven source and binary diffs
+	show identical Java classes; only manifests/version metadata and `pl_pl.json` differ. With the
+	duplicate project-owned preheat indexes retired, both versions completed the same 2,670-element,
+	six-chunk filter path without OOM or fallback in local quick-play smoke tests. Large-pack retained
+	heap comparison remains required because the local fixture cannot reproduce the reported 2 GiB.
+- 2026-09-01 — Compared released Forge JEI `15.49.0.199` and `15.49.0.200` jars. Only manifests
+	and `GrindstoneRecipeMaker.class` differ. Version `.200` moved `isItemEnchantable` into
+	`canEnchant`, bypassing the old call-site Mixin. Added mutually exclusive instruction-checked
+	legacy/modern variants. Both released class hashes matched the Maven runtime artifacts; quick-play
+	smoke selected legacy on `.199` and modern on `.200`, with both retaining 73 of 621 compatible
+	items across 39 enchantments and completing JEI startup without injection errors or OOM.

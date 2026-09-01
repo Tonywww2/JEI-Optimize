@@ -162,7 +162,7 @@ Feature facade: `com.tonywww.jeioptimize.config.JeiOptFeatureFlags`.
 
 ### 5.1 Boolean feature gates
 
-| Key | Default before full validation | Disable semantics |
+| Key | Shipped default | Disable semantics |
 |---|---|---|
 | `general.enabled` | `true` | If false, all mixin behavior no-ops or falls back to JEI baseline. |
 | `diagnostics.pluginTiming` | `false` | Plugin timing mixin records nothing and emits no timing logs. |
@@ -177,11 +177,11 @@ Feature facade: `com.tonywww.jeioptimize.config.JeiOptFeatureFlags`.
 | `syncOptimizations.lazyRecipeLayouts` | `true` | Legacy JEI eagerly creates and sorts every recipe layout. |
 | `jeiContent.indexedBrewingLookup` | `true` | JEI scans its brewing recipe collection for every candidate. |
 | `jeiContent.skipRedundantMenuUpdates` | `true` | JEI runs all intermediate hidden-menu result updates. |
-| `async.searchPreheat` | `false` | Search uses JEI baseline search path. |
-| `async.snapshotChunking` | `true` | No tick-budgeted snapshot queue is scheduled. |
-| `async.sortPreheat` | `true` | Sorting uses JEI baseline path. |
-| `async.recipeFocusPreheat` | `true` | R/U focus lookup uses JEI baseline path. |
-| `async.catalystPreheat` | `true` | Catalyst lookup uses JEI baseline path. |
+| `async.searchPreheat` | `false` | Retired compatibility key; always ignored. |
+| `async.snapshotChunking` | `false` | Retired compatibility key; always ignored. |
+| `async.sortPreheat` | `false` | Retired compatibility key; always ignored. |
+| `async.recipeFocusPreheat` | `false` | Retired compatibility key; always ignored. |
+| `async.catalystPreheat` | `false` | Retired compatibility key; always ignored. |
 | `async.deferredIngredientFilter` | `true` | Ingredient-filter construction is not deferred. |
 | `async.asyncIngredientFilter` | `true` | JEI builds its ingredient filter synchronously. |
 | `async.parallelVanillaRecipes` | `false` | Recipe ingredients are not pre-resolved on workers. |
@@ -196,7 +196,7 @@ default change still requires a CR.
 |---|---|---|---|
 | `async.workerThreads` | `0` | `0..8` | `0` selects CPU cores minus two, clamped to `1..8`. |
 | `async.parallelThreshold` | `250` | `1..1000000` | Pure snapshot indexing stays sequential below this size. |
-| `async.snapshotBudgetMs` | `2` | `1..10` | Ignored when `async.snapshotChunking=false`. |
+| `async.snapshotBudgetMs` | `2` | `1..10` | Retired compatibility key; always ignored. |
 
 ### 5.3 Feature flag facade
 
@@ -221,7 +221,6 @@ public final class JeiOptFeatureFlags {
     public static boolean lazyRecipeLayouts();
     public static int lazyRecipeLayoutThreshold();
     public static boolean searchPreheat();
-    public static boolean snapshotChunking();
     public static boolean sortPreheat();
     public static boolean recipeFocusPreheat();
     public static boolean catalystPreheat();
@@ -231,7 +230,6 @@ public final class JeiOptFeatureFlags {
     public static boolean asyncStartup();
     public static int workerThreads();
     public static int parallelThreshold();
-    public static int snapshotBudgetMs();
 }
 ```
 

@@ -4,6 +4,36 @@ All notable changes to Just Enough Threads are documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.13.2
+
+### Changed
+
+- **Ingredient-filter indexing now mutates one isolated search on budgeted client ticks.**
+  Visibility, tooltip, tag, creative-tab, and color helpers stay on the client thread. The JEI
+  startup thread only waits for completion, and the finished filter is published once.
+- **Unused asynchronous preheat indexes have been retired.** Legacy `searchPreheat`,
+  `snapshotChunking`, `sortPreheat`, `recipeFocusPreheat`, and `catalystPreheat` keys remain valid
+  for config compatibility but can no longer allocate duplicate search or recipe indexes.
+
+### Fixed
+
+- **Legacy configs can no longer enable the duplicate prefix-search index.** The old index copied
+  tooltip, tag, tab, color, name, and UID data into project-owned maps and could consume gigabytes
+  in large packs alongside JEI's authoritative search tree.
+- **A failed ingredient-filter build no longer allocates a second full search tree while the
+  partial tree is still reachable.** Startup now fails visibly and releases the isolated tree.
+- **JEI startup and compatibility caches have deterministic lifetimes.** The dedicated startup
+  executor exits after each build, and generation caches are cleared both before a new start and
+  during teardown so thread locals and prior-world item lists cannot remain rooted.
+- **Celestial Forge aggressive previews no longer discard same-family items from small inputs.**
+  Representative filtering now begins only after the complete match count is known to exceed the
+  configured limit.
+- **JEI 15.49.0.200 no longer bypasses grindstone representative limits.** JEI moved its
+  `isItemEnchantable` call into a new `canEnchant` helper, which made the previous call-site Mixin
+  silently miss and restored the full item-by-enchantment-by-level recipe expansion. Instruction-
+  checked legacy and modern variants now cover both 15.49.0.199 and 15.49.0.200, and the selected
+  critical injection must match exactly once.
+
 ## 0.13.1
 
 ### Changed

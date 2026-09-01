@@ -7,6 +7,7 @@ import mezz.jei.api.ingredients.ITypedIngredient;
 import mezz.jei.api.runtime.IIngredientVisibility;
 import mezz.jei.gui.ingredients.IListElement;
 import mezz.jei.gui.ingredients.IListElementInfo;
+import mezz.jei.gui.search.IElementSearch;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -14,20 +15,22 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Updates ingredient visibility incrementally on client ticks, then delegates index construction
- * to JEI's native batch path. JEI and mod ingredient helpers are not thread-safe, so all work stays
- * on the client thread and the queue deadline is checked after every element.
+ * Populates one isolated JEI search incrementally on client ticks. Visibility, tooltip, tag,
+ * creative-tab, and color helpers all stay on the client thread, and the deadline is checked after
+ * every element.
  */
 public final class AsyncIngredientFilterBuilder {
 
-    private static final AtomicReference<CompletableFuture<Void>> IN_FLIGHT = new AtomicReference<>();
+    private static final AtomicReference<CompletableFuture<IElementSearch>> IN_FLIGHT = new AtomicReference<>();
 
     private AsyncIngredientFilterBuilder() {
     }
 
-    public static CompletableFuture<Void> prepareBudgetedAsync(
+    public static CompletableFuture<IElementSearch> buildBudgetedAsync(
         List<? extends IListElementInfo<?>> elements,
         IIngredientVisibility ingredientVisibility,
+        IElementSearch search,
+        ElementAppender elementAppender,
         int requestedChunkSize,
         long generation
     ) {
@@ -35,9 +38,9 @@ public final class AsyncIngredientFilterBuilder {
         int chunkCount = (elements.size() + chunkSize - 1) / chunkSize;
         JeiOptStartupProgressState.registerBuild(generation, chunkCount, elements.size());
 
-        CompletableFuture<Void> future = new CompletableFuture<>();
+        CompletableFuture<IElementSearch> future = new CompletableFuture<>();
         AtomicInteger nextIndex = new AtomicInteger();
-        CompletableFuture<Void> previous = IN_FLIGHT.getAndSet(future);
+        CompletableFuture<IElementSearch> previous = IN_FLIGHT.getAndSet(future);
         if (previous != null) {
             previous.cancel(true);
         }
@@ -55,6 +58,7 @@ public final class AsyncIngredientFilterBuilder {
                     int index = nextIndex.getAndIncrement();
                     IListElementInfo<?> info = elements.get(index);
                     updateHiddenState(info.getElement(), ingredientVisibility);
+                    elementAppender.add(search, info);
                     int completed = index + 1;
                     if (completed % chunkSize == 0 || completed == elements.size()) {
                         JeiOptStartupProgressState.markChunkCompleted(generation);
@@ -65,7 +69,8 @@ public final class AsyncIngredientFilterBuilder {
                 if (nextIndex.get() < elements.size()) {
                     return false;
                 }
-                future.complete(null);
+                JeiOptStartupProgressState.markReady(generation);
+                future.complete(search);
                 IN_FLIGHT.compareAndSet(future, null);
                 return true;
             } catch (RuntimeException | LinkageError e) {
@@ -79,7 +84,7 @@ public final class AsyncIngredientFilterBuilder {
 
     /** Drops a build that is still running for a JEI runtime that is going away. */
     public static void cancelInFlight() {
-        CompletableFuture<Void> future = IN_FLIGHT.getAndSet(null);
+        CompletableFuture<IElementSearch> future = IN_FLIGHT.getAndSet(null);
         if (future != null) {
             future.cancel(true);
         }
@@ -91,6 +96,11 @@ public final class AsyncIngredientFilterBuilder {
         if (element.isVisible() != visible) {
             element.setVisible(visible);
         }
+    }
+
+    @FunctionalInterface
+    public interface ElementAppender {
+        void add(IElementSearch search, IListElementInfo<?> element);
     }
 
 }

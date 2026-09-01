@@ -15,7 +15,7 @@ In large modpacks, JEI spends several seconds building its ingredient search ind
   world, timing out, or losing the server cancels the active generation, interrupts its build, and
   prevents stale publication.
 
-- **Off-thread ingredient filter build** — `asyncIngredientFilter` (on by default)
+- **Client-tick-budgeted ingredient filter build** — `asyncIngredientFilter` (on by default)
 
   JEI's "Building ingredient filter" step (its search index over every item and fluid) normally runs on the main thread and blocks loading for several seconds in large packs. This mod builds an isolated index in real chunks on worker threads after world entry. The inventory shows completed chunks in a progress bar; at 100%, the client atomically swaps the finished index and refreshes the sidebar once. If the worker build fails, it falls back to JEI's synchronous build.
 
@@ -132,18 +132,17 @@ The upload token is read from the `CURSEFORGE_TOKEN` environment variable, or `c
 
 The mod is Mixin-based and hooks JEI's own internal classes (`@Pseudo` mixins with `remap = false`), so it is tied to a specific JEI version. Every hook checks its config flag (and the master `enabled`) first; when a flag is off the hook is inert and JEI runs unchanged.
 
-### Off-thread ingredient filter build (`asyncIngredientFilter`)
+### Budgeted ingredient filter build (`asyncIngredientFilter`)
 
 `IngredientFilterMixin` targets JEI's `IngredientFilter`:
 
-1. **Skip the on-thread indexing.** A `@Redirect` on the per-ingredient `addIngredient` call inside the `IngredientFilter` constructor suppresses JEI's normal indexing loop when the feature is on, so the constructor returns almost immediately instead of building the search index on the main thread.
-2. **Build an isolated index in safe chunks.** An `@Inject` at the end of the constructor calls `AsyncIngredientFilterBuilder.buildChunkedAsync(...)`. A worker coordinates the build, but each JEI string extraction and insertion chunk runs on the client thread so third-party tooltip code never runs in the pure worker pool. JEI 15.20/19.27 use their bulk `addAll` API; JEI 15.48 uses its compatible per-element `add` API.
-3. **Publish once on the main thread.** A finalize task in `JeiOptClientTickQueue` polls the build without blocking. At 100%, it assigns the finished index to the filter and calls `invalidateCache()` exactly once. The JEI startup thread waits for this publication before runtime-available callbacks and final runtime publication, while the render thread keeps ticking and drawing the progress bar.
+1. **Skip the constructor's eager indexing loop.** A `@Redirect` suppresses JEI's normal per-ingredient insertion while the dedicated startup path is active.
+2. **Populate one isolated index in safe steps.** `AsyncIngredientFilterBuilder.buildBudgetedAsync(...)` runs visibility and search insertion work from the client tick queue, checking the deadline after every ingredient. Third-party tooltip, tag, creative-tab, and color helpers never run on the startup or worker threads.
+3. **Publish only the complete filter.** The JEI startup thread waits while the render thread keeps ticking. Once the isolated index is complete, the constructor installs it and JEI later publishes the whole runtime on the client thread.
 
-Because the new index is never published until the swap, JEI never serves a partially built sidebar.
-Derived prefix indexes operate only on immutable strings after client-thread extraction. The deferred
-client-tick path follows the same isolated-index rule and no longer invalidates the sidebar after
-every chunk.
+Because the index is unreachable from a published runtime until completion, JEI never serves a
+partially built sidebar. Project-owned duplicate search, sort, and recipe preheat indexes have been
+retired; their old config keys are accepted but ignored.
 
 JEI installs its container input listeners before `Internal.setRuntime(...)`. `JeiClientInputGuardMixin`
 returns "not handled" from those listeners while startup progress is active, preventing early R/U,

@@ -301,26 +301,22 @@ public final class JeiOptConfig {
         builder.push("async");
         ASYNC_SEARCH_PREHEAT = builder
             .comment(
-                "Async search prefix index preheat. Default OFF (disabled).",
-                "Reason: this builds a separate, approximate search index that can override JEI's",
-                "own results for prefixed queries (@ mod, # tooltip, $ tag, % tab, ^ color, & id).",
-                "It is redundant with asyncIngredientFilter, which already rebuilds JEI's real",
-                "ElementSearch off-thread; the shadow index can return incomplete results and may",
-                "block the render thread if a prefixed search runs before it finishes building.",
-                "Enable only if you specifically need it and accept these trade-offs.")
+                "Retired compatibility key. This option is always disabled.",
+                "The old implementation duplicated JEI's search strings and prefix maps, could use",
+                "gigabytes in large packs, and was not authoritative for empty search results.")
             .define("searchPreheat", false);
         ASYNC_SNAPSHOT_CHUNKING = builder
-            .comment("Enable client-tick chunked snapshot extraction.")
-            .define("snapshotChunking", true);
+            .comment("Retired compatibility key. This option is always disabled.")
+            .define("snapshotChunking", false);
         ASYNC_SORT_PREHEAT = builder
-            .comment("Enable async sort computation.")
-            .define("sortPreheat", true);
+            .comment("Retired compatibility key. This option is always disabled.")
+            .define("sortPreheat", false);
         ASYNC_RECIPE_FOCUS_PREHEAT = builder
-            .comment("Enable async recipe focus index preheat.")
-            .define("recipeFocusPreheat", true);
+            .comment("Retired compatibility key. This option is always disabled.")
+            .define("recipeFocusPreheat", false);
         ASYNC_CATALYST_PREHEAT = builder
-            .comment("Enable async catalyst index preheat.")
-            .define("catalystPreheat", true);
+            .comment("Retired compatibility key. This option is always disabled.")
+            .define("catalystPreheat", false);
         ASYNC_WORKER_THREADS = builder
             .comment(
                 "Worker thread count. 0 selects available processors minus two, clamped to 1-8.",
@@ -330,23 +326,22 @@ public final class JeiOptConfig {
             .comment("Minimum input size before pure indexing and warmup work uses multiple worker threads.")
             .defineInRange("parallelThreshold", 250, 1, 1000000);
         ASYNC_SNAPSHOT_BUDGET_MS = builder
-            .comment("Per-client-tick snapshot extraction budget in milliseconds. Ignored when snapshotChunking is disabled.")
+            .comment("Retired compatibility key. This value is ignored.")
             .defineInRange("snapshotBudgetMs", 2, 1, 10);
         ASYNC_DEFERRED_INGREDIENT_FILTER = builder
-            .comment("Prepare ingredient visibility in client-tick chunks, then use JEI's native batch search builder.")
+            .comment("Populate one isolated JEI ingredient search in client-tick-budgeted steps.")
             .define("deferredIngredientFilter", true);
         ASYNC_INGREDIENT_FILTER_BUDGET_MS = builder
-            .comment("Per-client-tick budget in milliseconds for ingredient visibility preparation.")
+            .comment("Per-client-tick budget in milliseconds for isolated ingredient search construction.")
             .defineInRange("ingredientFilterBudgetMs", 10, 1, 40);
         ASYNC_INGREDIENT_FILTER_CHUNK_SIZE = builder
             .comment("Number of ingredients represented by one progress step. The frame deadline is checked after every ingredient.")
             .defineInRange("ingredientFilterChunkSize", 500, 50, 4000);
         ASYNC_PARALLEL_INGREDIENT_FILTER = builder
             .comment(
-                "Prepare ingredient visibility incrementally on client ticks, then atomically publish JEI's native batch index.",
-                "JEI and mod visibility helpers stay on their required client thread, with a deadline check after every item.",
-                "The search storage is never populated one item at a time, avoiding excessive memory use on newer JEI versions.",
-                "JEI waits for the complete isolated index and publishes the sidebar once.",
+                "Populate one isolated JEI ingredient search incrementally on client ticks.",
+                "Visibility, tooltip, tag, creative-tab, and color helpers stay on the client thread.",
+                "JEI waits for the complete index and publishes the sidebar once.",
                 "Enabled by default.")
             .define("asyncIngredientFilter", true);
         ASYNC_PARALLEL_VANILLA_RECIPES = builder

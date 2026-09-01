@@ -3,8 +3,17 @@ package com.tonywww.jeioptimize.config;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 class JeiOptFeatureFlagsTest {
+    @Test
+    void retiredSearchPreheatCannotBeReenabledByLegacyConfig() {
+        assertFalse(JeiOptFeatureFlags.searchPreheat());
+        assertFalse(JeiOptFeatureFlags.sortPreheat());
+        assertFalse(JeiOptFeatureFlags.recipeFocusPreheat());
+        assertFalse(JeiOptFeatureFlags.catalystPreheat());
+    }
+
     @Test
     void automaticWorkerCountLeavesTwoProcessorsFreeAndClampsToBounds() {
         assertEquals(1, JeiOptFeatureFlags.resolveWorkerThreads(0, 1));

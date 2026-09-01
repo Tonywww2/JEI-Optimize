@@ -117,11 +117,11 @@ sortKeyCache = $feature
 delayCompact = $feature
 
 [async]
-searchPreheat = $feature
-snapshotChunking = $feature
-sortPreheat = $feature
-recipeFocusPreheat = $feature
-catalystPreheat = $feature
+searchPreheat = false
+snapshotChunking = false
+sortPreheat = false
+recipeFocusPreheat = false
+catalystPreheat = false
 workerThreads = 2
 snapshotBudgetMs = 2
 "@

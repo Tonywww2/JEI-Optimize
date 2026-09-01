@@ -29,6 +29,11 @@ public final class IronsSpellsRecipeCompactor {
     private IronsSpellsRecipeCompactor() {
     }
 
+    public static void clear() {
+        PLANS.clear();
+        WARNING_LOGGED.set(false);
+    }
+
     public static List<?> compact(List<?> recipes) {
         if (recipes == null || recipes.isEmpty()) {
             return recipes;

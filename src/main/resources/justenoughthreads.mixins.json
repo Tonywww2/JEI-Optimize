@@ -29,6 +29,8 @@
     "AnvilRepresentativeContextMixin",
     "AnvilEnchantmentRepresentativeMixin",
     "GrindstoneRepresentativeMixin",
+    "GrindstoneDisenchantLegacyMixin",
+    "GrindstoneDisenchantModernMixin",
     "FuelRecipeMakerMixin",
     "BrewingRecipeMakerTimingMixin",
     "BrewingRecipeIndexForgeMixin",
@@ -56,9 +58,7 @@
     "compat.TinkersJeiPluginMixin",
     "compat.UltimateCarRecipeBuilderMixin",
     "compat.UltimateCarRecipeCategoryMixin",
-    "accessor.SophisticatedStorageShulkerRecipeAccessor",
-    "ElementSearchMixin",
-    "RecipeMapCatalystMixin"
+    "accessor.SophisticatedStorageShulkerRecipeAccessor"
   ],
   "client": [
     "ClientDisconnectHookMixin",

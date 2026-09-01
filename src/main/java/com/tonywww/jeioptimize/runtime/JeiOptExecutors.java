@@ -10,6 +10,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinWorkerThread;
@@ -59,34 +60,31 @@ public final class JeiOptExecutors {
         MAIN_THREAD.execute(command);
     }
 
-    public static void runJeiStartAsync(long generation, Runnable runnable) {
+    public static Future<?> runJeiStartAsync(long generation, Runnable runnable) {
         Objects.requireNonNull(runnable, "runnable");
         JeiStartTask task = new JeiStartTask(generation);
-        FutureTask<Void> future = new FutureTask<>(() -> {
-            CURRENT_JEI_START.set(task);
-            try {
-                checkJeiStartActive();
-                runnable.run();
-                checkJeiStartActive();
-            } finally {
-                JeiOptRuntimePublication.clearPendingCallbacks();
-                CURRENT_JEI_START.remove();
-                synchronized (JEI_START_LOCK) {
-                    if (latestJeiStart == task) {
-                        latestJeiStart = null;
-                    }
-                }
-            }
-            return null;
-        });
-        task.attach(future);
-
         synchronized (JEI_START_LOCK) {
             if (latestJeiStart != null) {
                 latestJeiStart.cancel();
             }
+            ExecutorService executor = jeiStartExecutorLocked();
+            FutureTask<Void> future = new FutureTask<>(() -> {
+                CURRENT_JEI_START.set(task);
+                try {
+                    checkJeiStartActive();
+                    runnable.run();
+                    checkJeiStartActive();
+                } finally {
+                    JeiOptRuntimePublication.clearPendingCallbacks();
+                    CURRENT_JEI_START.remove();
+                    retireJeiStartExecutor(task, executor);
+                }
+                return null;
+            });
+            task.attach(future);
             latestJeiStart = task;
-            jeiStartExecutorLocked().execute(future);
+            executor.execute(future);
+            return future;
         }
     }
 
@@ -95,8 +93,14 @@ public final class JeiOptExecutors {
             if (latestJeiStart == null) {
                 return false;
             }
-            latestJeiStart.cancel();
-            latestJeiStart = null;
+            JeiStartTask cancelledTask = latestJeiStart;
+            cancelledTask.cancel();
+            ExecutorService executor = jeiStartExecutor;
+            if (executor == null || executor.isShutdown()) {
+                latestJeiStart = null;
+            } else {
+                executor.execute(() -> retireJeiStartExecutor(cancelledTask, executor));
+            }
             return true;
         }
     }
@@ -280,6 +284,25 @@ public final class JeiOptExecutors {
             });
         }
         return jeiStartExecutor;
+    }
+
+    private static void retireJeiStartExecutor(JeiStartTask task, ExecutorService executor) {
+        synchronized (JEI_START_LOCK) {
+            if (latestJeiStart != task) {
+                return;
+            }
+            latestJeiStart = null;
+            if (jeiStartExecutor == executor) {
+                jeiStartExecutor = null;
+                executor.shutdown();
+            }
+        }
+    }
+
+    static boolean hasJeiStartExecutor() {
+        synchronized (JEI_START_LOCK) {
+            return jeiStartExecutor != null;
+        }
     }
 
     private static void ensureJeiStartActive(JeiStartTask task) {

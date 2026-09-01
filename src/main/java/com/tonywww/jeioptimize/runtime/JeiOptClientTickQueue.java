@@ -67,7 +67,7 @@ public final class JeiOptClientTickQueue {
             return;
         }
 
-        int budgetMs = Math.max(JeiOptFeatureFlags.ingredientFilterBudgetMs(), JeiOptFeatureFlags.snapshotBudgetMs());
+        int budgetMs = JeiOptFeatureFlags.ingredientFilterBudgetMs();
         long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(budgetMs);
         CURRENT_DEADLINE_NANOS.set(deadline);
         try {

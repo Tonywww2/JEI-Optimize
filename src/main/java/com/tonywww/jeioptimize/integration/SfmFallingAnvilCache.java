@@ -18,6 +18,11 @@ public final class SfmFallingAnvilCache {
     private SfmFallingAnvilCache() {
     }
 
+    public static void clear() {
+        CAPTURE.remove();
+        cachedLayout = null;
+    }
+
     public static void beginCapture(boolean enabled) {
         CAPTURE.remove();
         if (enabled && !hasCurrentLayout()) {

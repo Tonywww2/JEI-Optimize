@@ -2,7 +2,6 @@ package com.tonywww.jeioptimize.config;
 
 public final class JeiOptFeatureFlags {
     private static final int DEFAULT_WORKER_THREADS = 2;
-    private static final int DEFAULT_SNAPSHOT_BUDGET_MS = 2;
 
     private JeiOptFeatureFlags() {
     }
@@ -189,34 +188,19 @@ public final class JeiOptFeatureFlags {
     }
 
     public static boolean searchPreheat() {
-        JeiOptConfigSnapshot.Snapshot snapshot = JeiOptConfigSnapshot.current();
-        return enabled() && (snapshot != null ? snapshot.searchPreheat() : JeiOptConfig.ASYNC_SEARCH_PREHEAT.get());
-    }
-
-    public static boolean snapshotChunking() {
-        JeiOptConfigSnapshot.Snapshot snapshot = JeiOptConfigSnapshot.current();
-        return enabled() && (snapshot != null
-            ? snapshot.snapshotChunking()
-            : JeiOptConfig.ASYNC_SNAPSHOT_CHUNKING.get());
+        return false;
     }
 
     public static boolean sortPreheat() {
-        JeiOptConfigSnapshot.Snapshot snapshot = JeiOptConfigSnapshot.current();
-        return enabled() && (snapshot != null ? snapshot.sortPreheat() : JeiOptConfig.ASYNC_SORT_PREHEAT.get());
+        return false;
     }
 
     public static boolean recipeFocusPreheat() {
-        JeiOptConfigSnapshot.Snapshot snapshot = JeiOptConfigSnapshot.current();
-        return enabled() && (snapshot != null
-            ? snapshot.recipeFocusPreheat()
-            : JeiOptConfig.ASYNC_RECIPE_FOCUS_PREHEAT.get());
+        return false;
     }
 
     public static boolean catalystPreheat() {
-        JeiOptConfigSnapshot.Snapshot snapshot = JeiOptConfigSnapshot.current();
-        return enabled() && (snapshot != null
-            ? snapshot.catalystPreheat()
-            : JeiOptConfig.ASYNC_CATALYST_PREHEAT.get());
+        return false;
     }
 
     public static int workerThreads() {
@@ -239,13 +223,6 @@ public final class JeiOptFeatureFlags {
             return Math.max(1, Math.min(8, configured));
         }
         return Math.max(1, Math.min(8, Math.max(1, availableProcessors) - 2));
-    }
-
-    public static int snapshotBudgetMs() {
-        JeiOptConfigSnapshot.Snapshot snapshot = JeiOptConfigSnapshot.current();
-        return snapshot != null
-            ? snapshot.snapshotBudgetMs()
-            : configReady() ? JeiOptConfig.ASYNC_SNAPSHOT_BUDGET_MS.get() : DEFAULT_SNAPSHOT_BUDGET_MS;
     }
 
     public static boolean deferredIngredientFilter() {

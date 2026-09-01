@@ -53,7 +53,8 @@ Run each side two or three times; JEI startup timings vary from run to run, so l
 ## Correctness checks
 
 - `RECIPES=N` for `jei:minecraft` is identical baseline vs optimized.
-- No `async ingredient filter fell back to synchronous build` line (would mean the off-thread ingredient build failed and degraded to JEI's behavior).
+- No `ingredient filter build failed` or JEI startup exception. A partial index is discarded instead
+        of constructing a second full search tree while the first remains reachable.
 - No `falling back to sequential` line for recipes (would mean a recipe threw during parallel validation and degraded to JEI's behavior).
 - The JEI item list looks the same and searches (name, `@mod`, `#tooltip`, `$tag`) return the same results in both runs.
 

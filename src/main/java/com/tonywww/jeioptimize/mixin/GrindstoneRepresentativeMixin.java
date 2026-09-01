@@ -1,16 +1,9 @@
 package com.tonywww.jeioptimize.mixin;
 
-import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
-import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.tonywww.jeioptimize.config.JeiOptFeatureFlags;
 import com.tonywww.jeioptimize.recipe.JeiRecipeGenerationLimiter;
 import mezz.jei.api.runtime.IIngredientManager;
 import mezz.jei.common.platform.IPlatformRecipeHelper;
-//? if neoforge {
-/*import net.minecraft.core.Holder;
-*///?}
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.enchantment.Enchantment;
 //? if forge {
 import net.minecraft.world.inventory.GrindstoneMenu;
 //?}
@@ -46,23 +39,6 @@ public abstract class GrindstoneRepresentativeMixin {
     }
 
     //? if forge {
-    @WrapOperation(
-        method = "getDisenchantRecipes(Lmezz/jei/common/platform/IPlatformRecipeHelper;Lnet/minecraft/world/inventory/GrindstoneMenu;)Ljava/util/stream/Stream;",
-        at = @At(
-            value = "INVOKE",
-            target = "Lmezz/jei/common/platform/IPlatformRecipeHelper;isItemEnchantable(Lnet/minecraft/world/item/ItemStack;Lnet/minecraft/world/item/enchantment/Enchantment;)Z"
-        )
-    )
-    private static boolean jeiOptimize$limitDisenchantmentItems(
-        IPlatformRecipeHelper platformHelper,
-        ItemStack stack,
-        Enchantment enchantment,
-        Operation<Boolean> original
-    ) {
-        return original.call(platformHelper, stack, enchantment)
-            && JeiRecipeGenerationLimiter.shouldKeepGrindstone(enchantment, stack);
-    }
-
     @Inject(
         method = "getRepairRecipes(Lmezz/jei/common/platform/IPlatformRecipeHelper;Lmezz/jei/api/runtime/IIngredientManager;Lnet/minecraft/world/inventory/GrindstoneMenu;)Ljava/util/stream/Stream;",
         at = @At("RETURN"),
@@ -77,24 +53,7 @@ public abstract class GrindstoneRepresentativeMixin {
         jeiOptimize$limitRepairExamples(callbackInfo);
     }
     //?} else {
-    /*@WrapOperation(
-        method = "getDisenchantRecipes(Lmezz/jei/common/platform/IPlatformRecipeHelper;)Ljava/util/stream/Stream;",
-        at = @At(
-            value = "INVOKE",
-            target = "Lmezz/jei/common/platform/IPlatformRecipeHelper;isItemEnchantable(Lnet/minecraft/world/item/ItemStack;Lnet/minecraft/core/Holder;)Z"
-        )
-    )
-    private static boolean jeiOptimize$limitDisenchantmentItems(
-        IPlatformRecipeHelper platformHelper,
-        ItemStack stack,
-        Holder<Enchantment> enchantment,
-        Operation<Boolean> original
-    ) {
-        return original.call(platformHelper, stack, enchantment)
-            && JeiRecipeGenerationLimiter.shouldKeepGrindstone(enchantment, stack);
-    }
-
-    @Inject(
+    /*@Inject(
         method = "getRepairRecipes(Lmezz/jei/common/platform/IPlatformRecipeHelper;Lmezz/jei/api/runtime/IIngredientManager;)Ljava/util/stream/Stream;",
         at = @At("RETURN"),
         cancellable = true

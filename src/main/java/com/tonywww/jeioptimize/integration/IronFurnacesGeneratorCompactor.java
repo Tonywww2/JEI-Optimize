@@ -28,6 +28,11 @@ public final class IronFurnacesGeneratorCompactor {
     private IronFurnacesGeneratorCompactor() {
     }
 
+    public static void clear() {
+        INPUTS.clear();
+        WARNING_LOGGED.set(false);
+    }
+
     public static List<?> compact(List<?> recipes, IIngredientManager ingredientManager) {
         if (!JeiOptFeatureFlags.compactIronFurnacesGenerator() || recipes == null || recipes.size() < 2) {
             return recipes;

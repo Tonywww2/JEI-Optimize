@@ -7,7 +7,6 @@ import mezz.jei.api.recipe.RecipeIngredientRole;
 import net.minecraft.world.item.ItemStack;
 
 import java.lang.reflect.Constructor;
-import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -23,6 +22,11 @@ public final class UltimateCarWorkshopCompactor {
     private static final AtomicBoolean WARNING_LOGGED = new AtomicBoolean();
 
     private UltimateCarWorkshopCompactor() {
+    }
+
+    public static void clear() {
+        SLOT_INPUTS.clear();
+        WARNING_LOGGED.set(false);
     }
 
     public static List<?> createCompactRecipes(ClassLoader classLoader) {

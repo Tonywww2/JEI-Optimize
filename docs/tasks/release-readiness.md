@@ -69,11 +69,11 @@ equivalence gaps are called out explicitly below.
 | IngredientFilter batch init | `syncOptimizations.batchIngredientFilterInit` | true | Shipped default; manual search matrix remains open. |
 | Sort key cache | `syncOptimizations.sortKeyCache` | true | Shipped default; manual ordering check remains open. |
 | Delayed compact | `syncOptimizations.delayCompact` | true | Shipped default; manual R/U check remains open. |
-| Search preheat | `async.searchPreheat` | false | Not release-enabled until search matrix passes. |
-| Snapshot chunking | `async.snapshotChunking` | true | Shipped default; world-stop cancellation passes. Reload/second-world checks remain open. |
-| Sort preheat | `async.sortPreheat` | true | Shipped default; manual sort equivalence remains open. |
-| Recipe focus preheat | `async.recipeFocusPreheat` | true | Shipped default; manual R/U equivalence remains open. |
-| Catalyst preheat | `async.catalystPreheat` | true | Shipped default; manual catalyst equivalence remains open. |
+| Search preheat | `async.searchPreheat` | false | Retired; compatibility key is always ignored. |
+| Snapshot chunking | `async.snapshotChunking` | false | Retired with the duplicate search index. |
+| Sort preheat | `async.sortPreheat` | false | Retired; it had no production consumer. |
+| Recipe focus preheat | `async.recipeFocusPreheat` | false | Retired; it had no production attachment path. |
+| Catalyst preheat | `async.catalystPreheat` | false | Retired; the registered hook was a no-op. |
 | Parallel recipe pre-resolution | `async.parallelVanillaRecipes` | false | Keep disabled; modded recipes and lazy caches may be unsafe. |
 | Serial background startup | `async.asyncStartup` | true | Cross-version smoke and deterministic stop-cancellation pass. A large-pack run exposed off-thread runtime callbacks; client-thread routing is fixed locally and the large-pack rerun is pending. |
 

@@ -78,10 +78,10 @@ delayCompact = true
 
 [async]
 searchPreheat = false
-snapshotChunking = true
-sortPreheat = true
-recipeFocusPreheat = true
-catalystPreheat = true
+snapshotChunking = false
+sortPreheat = false
+recipeFocusPreheat = false
+catalystPreheat = false
 workerThreads = 4
 snapshotBudgetMs = 2
 deferredIngredientFilter = true

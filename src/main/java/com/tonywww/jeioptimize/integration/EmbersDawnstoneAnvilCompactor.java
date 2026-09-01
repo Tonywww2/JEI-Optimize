@@ -34,6 +34,11 @@ public final class EmbersDawnstoneAnvilCompactor {
     private EmbersDawnstoneAnvilCompactor() {
     }
 
+    public static void clear() {
+        LAYOUTS.clear();
+        WARNING_LOGGED.set(false);
+    }
+
     public static List<?> compact(List<?> recipes, IIngredientManager ingredientManager) {
         boolean compact = JeiOptFeatureFlags.compactEmbersDawnstoneAnvil();
         boolean aggressive = JeiOptFeatureFlags.aggressiveEmbersDawnstoneAnvil();
