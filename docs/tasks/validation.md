@@ -211,6 +211,25 @@ Current status: matrices are intentionally not auto-filled by compile/run smoke.
 | Forge JEI `15.48.0.179` | `JEI_15_MODERN`; indexed brewing lookup and hidden anvil/grindstone menu batching | The brewing index reported active for generation 2; JEI started in 2.397 seconds and published 2,670 ingredients in 6 chunks with no fallback. Auto worker selection resolved to 8 threads. |
 | NeoForge JEI `19.27.0.340` | `JEI_19_PLUS`; PotionBrewing-aware indexed lookup; upstream direct grindstone computation retained | The brewing index reported active for generation 2; JEI started in 4.650 seconds and published 1,688 ingredients in 4 chunks with no fallback. Auto worker selection resolved to 8 threads. |
 
+Thermal Expansion runtime compatibility was also verified on Forge with JEI `15.21.0.148` and
+Thermal Expansion `11.0.1.29`. `ThermalExpansionJeiPluginMixin` applied, and Stirling fuel batches
+compacted from 5 to 5 and from 313 to 14 pages. JEI startup completed in 5.168 seconds with zero
+`Could not compact Thermal`, ABI-disable, `InjectionError`, `InvalidInjectionException`, or
+`MixinApplyError` markers. The remapped `0.13.3` Forge jar invokes the production-mapped
+`Recipe.m_6423_()` method instead of reflecting the development-only `getId` name. Evidence:
+`build/benchmarks/jei-compat/forge-15.21.0.148.thermal.latest.log` and
+`forge-15.21.0.148.thermal.debug.log`. The same run applied the Mekanism Nutritional Liquifier
+feature and compacted 117 recipes to 12 pages without a compaction or ABI failure.
+
+Generator Galore `1.2.5` runtime compatibility was verified separately against JEI `15.21.0.148`
+using the cached Loom-named artifact derived from the released jar listed below. The compatibility
+Mixin applied to `lambda$registerRecipes$14`, and all 11 solid-fuel batches reached the compactor;
+the largest reductions were 132 to 43, 120 to 86, and 126 to 8 pages. JEI startup completed in
+7.872 seconds with zero compaction fallback, ABI-disable, `InjectionError`,
+`InvalidInjectionException`, or `MixinApplyError` markers. Evidence:
+`build/benchmarks/jei-compat/forge-15.21.0.148.generator-galore.latest.log` and
+`forge-15.21.0.148.generator-galore.debug.log`.
+
 Hidden-menu A/B on Forge JEI 15.48 used identical configuration except
 `skipRedundantMenuUpdates`. Both runs registered 95 generated anvil recipes and 250 grindstone
 recipes; the disabled run skipped all four menu-related mixins before application. Evidence:
@@ -337,3 +356,15 @@ When a validation run resolves a to-verify item:
 	legacy/modern variants. Both released class hashes matched the Maven runtime artifacts; quick-play
 	smoke selected legacy on `.199` and modern on `.200`, with both retaining 73 of 621 compatible
 	items across 39 enchantments and completing JEI startup without injection errors or OOM.
+- 2026-09-02 — Investigated `latest_tail.log`: 628 of 630 crafting errors came from JEI's debug-only
+	second layout build after `isHandled=false`; two genuine recipe/indexing failures used separate
+	branches and remain fully diagnosed. Six of nine plugin failures were wrong-thread JEI API calls.
+	All plugin bodies now run serially on the client thread, and async startup is capability-gated on
+	the exact `PluginCaller.callOnPlugins -> Consumer.accept` instruction. The safe diagnostic applies
+	only when the verified three-call layout and unhandled-category log marker both match. Added atomic
+	ABI checks for Sophisticated Storage recipe-extension cache reuse and anvil representative Mixins,
+	loader-specific grindstone repair checks, and generation/plugin-finally cleanup for anvil,
+	grindstone, and SFM temporary contexts. Forge JEI 15.20, Forge JEI 15.49.0.200, and NeoForge JEI
+	19.27 all completed quick-play with `wrong-thread=0`, `false broken-setRecipe=0`, and no critical
+	injection failure. The remaining Tinkers Jewelry category omission, Supplementaries null color
+	mapping, and AlmostFluidified null runtime are third-party state errors and remain visible.

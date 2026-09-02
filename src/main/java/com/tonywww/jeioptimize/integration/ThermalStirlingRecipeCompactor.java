@@ -6,8 +6,12 @@ import mezz.jei.api.constants.VanillaTypes;
 import mezz.jei.api.ingredients.IIngredientHelper;
 import mezz.jei.api.ingredients.subtypes.UidContext;
 import mezz.jei.api.runtime.IIngredientManager;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
+//? if forge {
+import net.minecraft.world.item.crafting.Recipe;
+//?}
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
@@ -39,9 +43,8 @@ public final class ThermalStirlingRecipeCompactor {
             Method inputItemsMethod = recipeClass.getMethod("getInputItems");
             Method inputFluidsMethod = recipeClass.getMethod("getInputFluids");
             Method energyMethod = recipeClass.getMethod("getEnergy");
-            Method idMethod = recipeClass.getMethod("getId");
             Constructor<?> constructor = recipeClass.getConstructor(
-                idMethod.getReturnType(),
+                ResourceLocation.class,
                 int.class,
                 List.class,
                 List.class
@@ -83,7 +86,7 @@ public final class ThermalStirlingRecipeCompactor {
                 }
                 Ingredient merged = Ingredient.of(group.inputs().values().stream());
                 compacted.add(constructor.newInstance(
-                    idMethod.invoke(group.firstRecipe()),
+                    getRecipeId(group.firstRecipe()),
                     group.energy(),
                     List.of(merged),
                     group.inputFluids()
@@ -105,6 +108,15 @@ public final class ThermalStirlingRecipeCompactor {
             }
             return recipes;
         }
+    }
+
+    private static ResourceLocation getRecipeId(Object recipe) throws ReflectiveOperationException {
+        //? if forge {
+        if (recipe instanceof Recipe<?> minecraftRecipe) {
+            return minecraftRecipe.getId();
+        }
+        //?}
+        throw new ReflectiveOperationException("Thermal Stirling fuel does not implement Recipe");
     }
 
     private record GroupKey(int energy, List<?> inputFluids) {

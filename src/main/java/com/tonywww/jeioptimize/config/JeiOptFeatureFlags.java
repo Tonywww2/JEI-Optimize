@@ -1,5 +1,7 @@
 package com.tonywww.jeioptimize.config;
 
+import com.tonywww.jeioptimize.runtime.JeiOptCompatibilityState;
+
 public final class JeiOptFeatureFlags {
     private static final int DEFAULT_WORKER_THREADS = 2;
 
@@ -248,7 +250,9 @@ public final class JeiOptFeatureFlags {
 
     public static boolean asyncStartup() {
         JeiOptConfigSnapshot.Snapshot snapshot = JeiOptConfigSnapshot.current();
-        return enabled() && (snapshot != null ? snapshot.asyncStartup() : JeiOptConfig.ASYNC_STARTUP.get());
+        return enabled()
+            && JeiOptCompatibilityState.isAsyncStartupSupported()
+            && (snapshot != null ? snapshot.asyncStartup() : JeiOptConfig.ASYNC_STARTUP.get());
     }
 
     public static int ingredientFilterBudgetMs() {

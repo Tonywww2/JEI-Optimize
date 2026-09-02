@@ -18,6 +18,9 @@
 .PARAMETER RuntimeModJars
     Local mod jars to remap and add only to this compatibility run. They are never packaged.
 
+.PARAMETER Label
+    Optional file-name suffix for keeping separate logs from different mod combinations.
+
 .EXAMPLE
     .\scripts\test-jei-compat.ps1 -JeiVersion 15.48.0.179
 
@@ -32,6 +35,7 @@ param(
     [string] $World = "",
     [switch] $KeepConfig,
     [string[]] $RuntimeModJars = @(),
+    [string] $Label = "",
     [int] $TimeoutSeconds = 300,
     [int] $PostJeiWaitSeconds = 12,
     [string] $JavaHome = "C:\Program Files\Java\jdk-21"
@@ -58,8 +62,10 @@ if ($Loader -eq "forge") {
 
 $ConfigPath = Join-Path $RunDir "config\justenoughthreads-client.toml"
 $RunLogPath = Join-Path $RunDir "logs\latest.log"
+$RunDebugLogPath = Join-Path $RunDir "logs\debug.log"
 $OutDir = Join-Path $RepoRoot "build\benchmarks\jei-compat"
 $Tag = "$Loader-" + $(if ($JeiVersion) { $JeiVersion } else { "default" })
+if ($Label) { $Tag += ".$Label" }
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 
 function Stop-ProcessTree($ProcessId) {
@@ -67,6 +73,13 @@ function Stop-ProcessTree($ProcessId) {
         Stop-ProcessTree -ProcessId $child.ProcessId
     }
     try { Stop-Process -Id $ProcessId -Force -ErrorAction Stop } catch { }
+}
+
+function Get-DescendantProcesses($ProcessId) {
+    foreach ($child in @(Get-CimInstance Win32_Process -Filter "ParentProcessId = $ProcessId" -ErrorAction SilentlyContinue)) {
+        $child
+        Get-DescendantProcesses -ProcessId $child.ProcessId
+    }
 }
 
 function Read-LogShared($Path) {
@@ -90,6 +103,7 @@ for ($attempt = 0; $attempt -lt 60 -and (Test-Path $RunLogPath); $attempt++) {
     try { Remove-Item $RunLogPath -Force -ErrorAction Stop } catch { Start-Sleep -Milliseconds 500 }
 }
 if (Test-Path $RunLogPath) { throw "$RunLogPath is still locked; a previous client has not exited" }
+if (Test-Path $RunDebugLogPath) { Remove-Item $RunDebugLogPath -Force }
 
 $oldJavaHome = $env:JAVA_HOME
 $oldPath = $env:Path
@@ -135,10 +149,22 @@ try {
     }
 } finally {
     if ($null -ne $process -and !$process.HasExited) {
+        if ($status -eq "timeout") {
+            $javaProcess = Get-DescendantProcesses -ProcessId $process.Id |
+                Where-Object { $_.Name -eq "java.exe" -and $_.CommandLine -like "*forgeclientuserdev*" } |
+                Select-Object -First 1
+            $jcmd = Join-Path $JavaHome "bin\jcmd.exe"
+            if ($null -ne $javaProcess -and (Test-Path $jcmd)) {
+                $threadDumpPath = Join-Path $OutDir "$Tag.thread-dump.txt"
+                & $jcmd $javaProcess.ProcessId Thread.print -l | Out-File $threadDumpPath -Encoding utf8
+                Write-Host "timeout thread dump: $threadDumpPath"
+            }
+        }
         Stop-ProcessTree -ProcessId $process.Id
         [void] $process.WaitForExit(20000)
     }
     if (Test-Path $RunLogPath) { Copy-Item $RunLogPath (Join-Path $OutDir "$Tag.latest.log") -Force }
+    if (Test-Path $RunDebugLogPath) { Copy-Item $RunDebugLogPath (Join-Path $OutDir "$Tag.debug.log") -Force }
     $env:JAVA_HOME = $oldJavaHome
     $env:Path = $oldPath
 }

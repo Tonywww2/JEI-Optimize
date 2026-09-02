@@ -14,7 +14,8 @@ public abstract class AnvilEnchantmentRepresentativeMixin {
     @Inject(
         method = "canEnchant(Lnet/minecraft/world/item/ItemStack;)Z",
         at = @At("RETURN"),
-        cancellable = true
+        cancellable = true,
+        require = 1
     )
     private void jeiOptimize$limitCompatibleItems(
         ItemStack ingredient,

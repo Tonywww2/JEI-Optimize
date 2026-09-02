@@ -40,6 +40,14 @@ public final class SfmFallingAnvilRepresentativeLimiter {
         }
     }
 
+    public static void clear() {
+        CONTEXT.remove();
+    }
+
+    static boolean hasContext() {
+        return CONTEXT.get() != null;
+    }
+
     private record Context(RepresentativeItemLimiter limiter) {
     }
 }

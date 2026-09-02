@@ -17,6 +17,7 @@ public final class JeiRecipeGenerationLimiter {
     }
 
     public static void beginAnvil(IIngredientManager ingredientManager, int limitPerEnchantment) {
+        ANVIL.remove();
         begin(ANVIL, ingredientManager, limitPerEnchantment);
     }
 
@@ -33,6 +34,7 @@ public final class JeiRecipeGenerationLimiter {
     }
 
     public static void beginGrindstone(IIngredientManager ingredientManager, int limitPerEnchantment) {
+        GRINDSTONE.remove();
         begin(GRINDSTONE, ingredientManager, limitPerEnchantment);
     }
 
@@ -46,6 +48,19 @@ public final class JeiRecipeGenerationLimiter {
 
     public static void clearGrindstone() {
         GRINDSTONE.remove();
+    }
+
+    public static void clearAll() {
+        ANVIL.remove();
+        GRINDSTONE.remove();
+    }
+
+    static boolean hasAnvilContext() {
+        return hasContext(ANVIL);
+    }
+
+    static boolean hasGrindstoneContext() {
+        return hasContext(GRINDSTONE);
     }
 
     private static void begin(
@@ -77,6 +92,15 @@ public final class JeiRecipeGenerationLimiter {
             itemKey = stack.getDescriptionId();
         }
         return context.limiter().shouldKeep(enchantmentGroup, itemKey);
+    }
+
+    private static boolean hasContext(ThreadLocal<Deque<Context>> contextHolder) {
+        Deque<Context> contexts = contextHolder.get();
+        boolean present = !contexts.isEmpty();
+        if (!present) {
+            contextHolder.remove();
+        }
+        return present;
     }
 
     private static void end(ThreadLocal<Deque<Context>> contextHolder, String category) {

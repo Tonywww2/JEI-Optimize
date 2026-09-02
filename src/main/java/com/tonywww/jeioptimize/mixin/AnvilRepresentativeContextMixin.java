@@ -17,7 +17,8 @@ import java.util.List;
 public abstract class AnvilRepresentativeContextMixin {
     @Inject(
         method = "getAnvilRecipes(Lmezz/jei/api/recipe/vanilla/IVanillaRecipeFactory;Lmezz/jei/api/runtime/IIngredientManager;)Ljava/util/List;",
-        at = @At("HEAD")
+        at = @At("HEAD"),
+        require = 1
     )
     private static void jeiOptimize$beginRepresentativeSelection(
         IVanillaRecipeFactory vanillaRecipeFactory,
@@ -37,7 +38,8 @@ public abstract class AnvilRepresentativeContextMixin {
 
     @Inject(
         method = "getAnvilRecipes(Lmezz/jei/api/recipe/vanilla/IVanillaRecipeFactory;Lmezz/jei/api/runtime/IIngredientManager;)Ljava/util/List;",
-        at = @At("RETURN")
+        at = @At("RETURN"),
+        require = 1
     )
     private static void jeiOptimize$endRepresentativeSelection(
         IVanillaRecipeFactory vanillaRecipeFactory,

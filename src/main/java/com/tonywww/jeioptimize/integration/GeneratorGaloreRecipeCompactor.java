@@ -8,6 +8,9 @@ import mezz.jei.api.ingredients.subtypes.UidContext;
 import mezz.jei.api.runtime.IIngredientManager;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
+//? if forge {
+import net.minecraft.world.item.crafting.Recipe;
+//?}
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
@@ -41,7 +44,7 @@ public final class GeneratorGaloreRecipeCompactor {
             Method generatorMethod = recipeClass.getMethod("generator");
             Method rateMethod = recipeClass.getMethod("rate");
             Method durationMethod = findMethod(recipeClass, "burnTime", "consumptionRate");
-            Method idMethod = findOptionalMethod(recipeClass, "id", "getId");
+            Method idMethod = findOptionalMethod(recipeClass, "id");
             Constructor<?> constructor = findRecordConstructor(recipeClass);
             IIngredientHelper<ItemStack> helper = ingredientManager.getIngredientHelper(VanillaTypes.ITEM_STACK);
 
@@ -82,9 +85,9 @@ public final class GeneratorGaloreRecipeCompactor {
                 }
                 Ingredient mergedFuel = Ingredient.of(group.fuels().values().stream());
                 Object compactedRecipe;
-                if (constructor.getParameterCount() == 5 && idMethod != null) {
+                if (constructor.getParameterCount() == 5) {
                     compactedRecipe = constructor.newInstance(
-                        idMethod.invoke(group.firstRecipe()),
+                        recipeId(group.firstRecipe(), idMethod),
                         List.of(mergedFuel),
                         group.generator(),
                         group.rate().floatValue(),
@@ -160,6 +163,18 @@ public final class GeneratorGaloreRecipeCompactor {
             }
         }
         throw new NoSuchMethodException(type.getName() + " canonical record constructor");
+    }
+
+    private static Object recipeId(Object recipe, Method idMethod) throws ReflectiveOperationException {
+        if (idMethod != null) {
+            return idMethod.invoke(recipe);
+        }
+        //? if forge {
+        if (recipe instanceof Recipe<?> minecraftRecipe) {
+            return minecraftRecipe.getId();
+        }
+        //?}
+        throw new ReflectiveOperationException("Generator Galore fuel recipe has no accessible id");
     }
 
     private record GroupKey(String generator, long rate, long duration) {

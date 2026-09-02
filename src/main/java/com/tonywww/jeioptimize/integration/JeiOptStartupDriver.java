@@ -4,6 +4,7 @@ import com.tonywww.jeioptimize.JeiOptimize;
 import com.tonywww.jeioptimize.config.JeiOptFeatureFlags;
 import com.tonywww.jeioptimize.index.AsyncIngredientFilterBuilder;
 import com.tonywww.jeioptimize.instrumentation.JeiOptDiagnostics;
+import com.tonywww.jeioptimize.recipe.JeiRecipeGenerationLimiter;
 import com.tonywww.jeioptimize.runtime.JeiOptClientTickQueue;
 import com.tonywww.jeioptimize.runtime.JeiOptCacheScope;
 import com.tonywww.jeioptimize.runtime.JeiOptExecutors;
@@ -62,6 +63,7 @@ public final class JeiOptStartupDriver {
 
     private static void clearRuntimeWork() {
         AsyncIngredientFilterBuilder.cancelInFlight();
+        JeiRecipeGenerationLimiter.clearAll();
         JeiOptCacheScope.clear();
         CelestialForgeReinforceCache.clear();
         CelestialForgeReinforceInputPool.clear();
@@ -69,6 +71,7 @@ public final class JeiOptStartupDriver {
         IronFurnacesGeneratorCompactor.clear();
         IronsSpellsRecipeCompactor.clear();
         SfmFallingAnvilCache.clear();
+        SfmFallingAnvilRepresentativeLimiter.clear();
         UltimateCarWorkshopCompactor.clear();
         JeiOptFilterBootstrap.clear();
         JeiOptClientTickQueue.clear();

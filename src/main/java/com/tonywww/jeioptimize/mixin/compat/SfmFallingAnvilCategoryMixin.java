@@ -21,7 +21,12 @@ import java.util.List;
 @Pseudo
 @Mixin(targets = "ca.teamdman.sfm.client.jei.FallingAnvilJEICategory", remap = false)
 public abstract class SfmFallingAnvilCategoryMixin {
-    @Inject(method = "setRecipeForFallingAnvilDisenchantRecipe", at = @At("HEAD"), cancellable = true)
+    @Inject(
+        method = "setRecipeForFallingAnvilDisenchantRecipe",
+        at = @At("HEAD"),
+        cancellable = true,
+        require = 1
+    )
     private static void jeiOptimize$useCachedDisenchantmentLayout(
         IRecipeLayoutBuilder builder,
         IFocusGroup focuses,
@@ -76,7 +81,11 @@ public abstract class SfmFallingAnvilCategoryMixin {
         return original.call(slot, stacks);
     }
 
-    @Inject(method = "setRecipeForFallingAnvilDisenchantRecipe", at = @At("RETURN"))
+    @Inject(
+        method = "setRecipeForFallingAnvilDisenchantRecipe",
+        at = @At("RETURN"),
+        require = 1
+    )
     private static void jeiOptimize$finishCapture(
         IRecipeLayoutBuilder builder,
         IFocusGroup focuses,
@@ -86,4 +95,5 @@ public abstract class SfmFallingAnvilCategoryMixin {
         SfmFallingAnvilCache.endCapture();
         SfmFallingAnvilRepresentativeLimiter.end();
     }
+
 }

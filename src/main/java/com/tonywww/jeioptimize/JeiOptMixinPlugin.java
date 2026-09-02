@@ -1,9 +1,12 @@
 package com.tonywww.jeioptimize;
 
+import com.tonywww.jeioptimize.runtime.JeiOptCompatibilityState;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.FieldNode;
+import org.objectweb.asm.tree.LdcInsnNode;
 import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.MethodNode;
 import org.spongepowered.asm.mixin.extensibility.IMixinConfigPlugin;
@@ -17,6 +20,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 
 /**
  * Skips a mixin when the JEI member it patches is missing or has a different descriptor, so a JEI
@@ -29,6 +33,8 @@ import java.util.Set;
 public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
     private static final Logger LOGGER = LogManager.getLogger(JeiOptimize.MOD_ID);
     private static final String MIXIN_PACKAGE = "com.tonywww.jeioptimize.mixin.";
+    private static final String STARTER_MIXIN = MIXIN_PACKAGE + "JeiStarterMixin";
+    private static final String PLUGIN_CALLER_MIXIN = MIXIN_PACKAGE + "PluginCallerMixin";
     private static final String STARTER_PUBLISH_LEGACY_MIXIN = MIXIN_PACKAGE + "JeiStarterPublishLegacyMixin";
     private static final String STARTER_PUBLISH_MODERN_MIXIN = MIXIN_PACKAGE + "JeiStarterPublishModernMixin";
     private static final String CELESTIAL_REINFORCE_MIXIN =
@@ -41,6 +47,13 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
         MIXIN_PACKAGE + "compat.IronFurnacesJeiPluginMixin";
     private static final String IRON_FURNACES_CATEGORY_MIXIN =
         MIXIN_PACKAGE + "compat.IronFurnacesGeneratorCategoryMixin";
+    private static final String GENERATOR_GALORE_PLUGIN_MIXIN =
+        MIXIN_PACKAGE + "compat.GeneratorGaloreJeiPluginMixin";
+    private static final String MEKANISM_RECIPE_REGISTRY_MIXIN =
+        MIXIN_PACKAGE + "compat.MekanismRecipeRegistryHelperMixin";
+    private static final String THERMAL_EXPANSION_PLUGIN_MIXIN =
+        MIXIN_PACKAGE + "compat.ThermalExpansionJeiPluginMixin";
+    private static final String TINKERS_PLUGIN_MIXIN = MIXIN_PACKAGE + "compat.TinkersJeiPluginMixin";
     private static final String EMBERS_PLUGIN_MIXIN = MIXIN_PACKAGE + "compat.EmbersJeiPluginMixin";
     private static final String EMBERS_CATEGORY_MIXIN =
         MIXIN_PACKAGE + "compat.EmbersDawnstoneAnvilCategoryMixin";
@@ -55,32 +68,142 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
     private static final String MENU_COMBINER_GUARD_MIXIN = MIXIN_PACKAGE + "MenuSlotUpdateGuardMixin$ItemCombiner";
     private static final String MENU_GRINDSTONE_GUARD_MIXIN = MIXIN_PACKAGE + "MenuSlotUpdateGuardMixin$Grindstone";
     private static final String LEGACY_RECIPE_LAYOUT_MIXIN = MIXIN_PACKAGE + "RecipeGuiLogicLegacyMixin";
+    private static final String ANVIL_REPRESENTATIVE_CONTEXT_MIXIN =
+        MIXIN_PACKAGE + "AnvilRepresentativeContextMixin";
+    private static final String ANVIL_ENCHANTMENT_REPRESENTATIVE_MIXIN =
+        MIXIN_PACKAGE + "AnvilEnchantmentRepresentativeMixin";
     private static final String GRINDSTONE_REPRESENTATIVE_MIXIN = MIXIN_PACKAGE + "GrindstoneRepresentativeMixin";
     private static final String GRINDSTONE_DISENCHANT_LEGACY_MIXIN =
         MIXIN_PACKAGE + "GrindstoneDisenchantLegacyMixin";
     private static final String GRINDSTONE_DISENCHANT_MODERN_MIXIN =
         MIXIN_PACKAGE + "GrindstoneDisenchantModernMixin";
+    private static final String RECIPE_MANAGER_SAFE_DIAGNOSTIC_MIXIN =
+        MIXIN_PACKAGE + "RecipeManagerSafeDiagnosticMixin";
+    private static final String EXTENDABLE_RECIPE_HELPER_MIXIN =
+        MIXIN_PACKAGE + "ExtendableRecipeCategoryHelperMixin";
+    private static final String SOPHISTICATED_SHULKER_ACCESSOR_MIXIN =
+        MIXIN_PACKAGE + "accessor.SophisticatedStorageShulkerRecipeAccessor";
+    private static final String EXTENDABLE_RECIPE_HELPER_CLASS =
+        "mezz.jei.library.recipes.ExtendableRecipeCategoryHelper";
+    private static final String SOPHISTICATED_SHULKER_RECIPE_CLASS =
+        "net.p3pp3rf1y.sophisticatedstorage.crafting.ShulkerBoxFromVanillaShapelessRecipe";
+    private static final String ANVIL_RECIPE_MAKER_CLASS =
+        "mezz.jei.library.plugins.vanilla.anvil.AnvilRecipeMaker";
+    private static final String ANVIL_ENCHANTMENT_DATA_CLASS = ANVIL_RECIPE_MAKER_CLASS + "$EnchantmentData";
+    private static final Requirement ANVIL_REPRESENTATIVE_ENTRY_POINT = Requirement.method(
+        "anvil representative recipes",
+        "getAnvilRecipes",
+        "(Lmezz/jei/api/recipe/vanilla/IVanillaRecipeFactory;"
+            + "Lmezz/jei/api/runtime/IIngredientManager;)Ljava/util/List;"
+    );
+    private static final Requirement ANVIL_REPRESENTATIVE_CAN_ENCHANT = Requirement.method(
+        "anvil representative recipes",
+        "canEnchant",
+        "(Lnet/minecraft/world/item/ItemStack;)Z"
+    );
+    private static final InvocationRequirement RECIPE_DEBUG_INVOCATION = new InvocationRequirement(
+        "addRecipe",
+        "(Lmezz/jei/api/recipe/category/IRecipeCategory;Ljava/lang/Object;Ljava/util/Set;)Z",
+        "mezz/jei/library/util/RecipeDebugUtil",
+        "getDebugInfoFromRecipe",
+        "(Ljava/lang/Object;Lmezz/jei/api/recipe/category/IRecipeCategory;"
+            + "Lmezz/jei/api/runtime/IIngredientManager;)Ljava/lang/String;"
+    );
+    private static final String UNHANDLED_RECIPE_DEBUG_MESSAGE =
+        "Recipe not added because the recipe category cannot handle it: {}";
+    private static final InvocationRequirement PLUGIN_CALLBACK_INVOCATION = new InvocationRequirement(
+        "callOnPlugins",
+        "(Ljava/lang/String;Ljava/util/List;Ljava/util/function/Consumer;)V",
+        "java/util/function/Consumer",
+        "accept",
+        "(Ljava/lang/Object;)V"
+    );
+    private static final Requirement THERMAL_REGISTER_RECIPES = Requirement.method(
+        "Thermal Stirling Dynamo fuel compaction",
+        "registerRecipes",
+        "(Lmezz/jei/api/registration/IRecipeRegistration;)V"
+    );
+    private static final InvocationRequirement THERMAL_ADD_RECIPES_INVOCATION = new InvocationRequirement(
+        "registerRecipes",
+        "(Lmezz/jei/api/registration/IRecipeRegistration;)V",
+        "mezz/jei/api/registration/IRecipeRegistration",
+        "addRecipes",
+        "(Lmezz/jei/api/recipe/RecipeType;Ljava/util/List;)V"
+    );
+    private static final Requirement THERMAL_STIRLING_CONSTRUCTOR = Requirement.method(
+        "Thermal Stirling Dynamo fuel compaction",
+        "<init>",
+        "(Lnet/minecraft/resources/ResourceLocation;ILjava/util/List;Ljava/util/List;)V"
+    );
+    private static final List<Requirement> THERMAL_FUEL_ACCESSORS = List.of(
+        Requirement.method("", "getInputItems", "()Ljava/util/List;"),
+        Requirement.method("", "getInputFluids", "()Ljava/util/List;"),
+        Requirement.method("", "getEnergy", "()I")
+    );
+    private static final Requirement GENERATOR_GALORE_REGISTER_LAMBDA = Requirement.method(
+        "Generator Galore solid-fuel compaction",
+        "lambda$registerRecipes$14",
+        "(Lmezz/jei/api/registration/IRecipeRegistration;Ljava/util/List;Ljava/util/List;"
+            + "Ljava/util/List;Ljava/util/List;Lnet/minecraft/resources/ResourceLocation;"
+            + "Lcy/jdkdigital/generatorgalore/util/GeneratorObject;)V"
+    );
+    private static final InvocationRequirement GENERATOR_GALORE_ADD_RECIPES_INVOCATION =
+        new InvocationRequirement(
+            GENERATOR_GALORE_REGISTER_LAMBDA.memberName(),
+            GENERATOR_GALORE_REGISTER_LAMBDA.descriptor(),
+            "mezz/jei/api/registration/IRecipeRegistration",
+            "addRecipes",
+            "(Lmezz/jei/api/recipe/RecipeType;Ljava/util/List;)V"
+        );
+    private static final Requirement MEKANISM_REGISTER_RECIPES = Requirement.method(
+        "Mekanism Nutritional Liquifier compaction",
+        "register",
+        "(Lmezz/jei/api/registration/IRecipeRegistration;"
+            + "Lmekanism/client/jei/MekanismJEIRecipeType;Ljava/util/List;)V"
+    );
+    private static final InvocationRequirement MEKANISM_ADD_RECIPES_INVOCATION = new InvocationRequirement(
+        MEKANISM_REGISTER_RECIPES.memberName(),
+        MEKANISM_REGISTER_RECIPES.descriptor(),
+        "mezz/jei/api/registration/IRecipeRegistration",
+        "addRecipes",
+        "(Lmezz/jei/api/recipe/RecipeType;Ljava/util/List;)V"
+    );
+    private static final Requirement TINKERS_REGISTER_RECIPES = Requirement.method(
+        "Tinkers casting compaction",
+        "registerRecipes",
+        "(Lmezz/jei/api/registration/IRecipeRegistration;)V"
+    );
+    private static final InvocationRequirement TINKERS_ADD_RECIPES_INVOCATION = new InvocationRequirement(
+        TINKERS_REGISTER_RECIPES.memberName(),
+        TINKERS_REGISTER_RECIPES.descriptor(),
+        "mezz/jei/api/registration/IRecipeRegistration",
+        "addRecipes",
+        "(Lmezz/jei/api/recipe/RecipeType;Ljava/util/List;)V"
+    );
+    private static final Requirement IRON_FURNACES_REGISTER_RECIPES = Requirement.method(
+        "Iron Furnaces generator compaction",
+        "registerRecipes",
+        "(Lmezz/jei/api/registration/IRecipeRegistration;)V"
+    );
+    private static final Requirement IRON_FURNACES_SET_RECIPE = Requirement.method(
+        "Iron Furnaces generator compaction",
+        "setRecipe",
+        "(Lmezz/jei/api/gui/builder/IRecipeLayoutBuilder;"
+            + "Lironfurnaces/recipes/SimpleGeneratorRecipe;Lmezz/jei/api/recipe/IFocusGroup;)V"
+    );
+    private static final InvocationRequirement IRON_FURNACES_ADD_RECIPES_INVOCATION = new InvocationRequirement(
+        IRON_FURNACES_REGISTER_RECIPES.memberName(),
+        IRON_FURNACES_REGISTER_RECIPES.descriptor(),
+        "mezz/jei/api/registration/IRecipeRegistration",
+        "addRecipes",
+        "(Lmezz/jei/api/recipe/RecipeType;Ljava/util/List;)V"
+    );
 
     private static final Requirement GRINDSTONE_ENTRY_POINT = Requirement.method(
         "grindstone representative recipes",
         "getGrindstoneRecipes",
         "(Lmezz/jei/api/runtime/IIngredientManager;"
             + "Lmezz/jei/common/platform/IPlatformRecipeHelper;)Ljava/util/List;"
-    );
-    private static final List<Requirement> GRINDSTONE_REPAIR_METHODS = List.of(
-        Requirement.method(
-            "",
-            "getRepairRecipes",
-            "(Lmezz/jei/common/platform/IPlatformRecipeHelper;"
-                + "Lmezz/jei/api/runtime/IIngredientManager;"
-                + "Lnet/minecraft/world/inventory/GrindstoneMenu;)Ljava/util/stream/Stream;"
-        ),
-        Requirement.method(
-            "",
-            "getRepairRecipes",
-            "(Lmezz/jei/common/platform/IPlatformRecipeHelper;"
-                + "Lmezz/jei/api/runtime/IIngredientManager;)Ljava/util/stream/Stream;"
-        )
     );
     private static final Requirement GRINDSTONE_MODERN_CAN_ENCHANT = Requirement.method(
         "",
@@ -121,6 +244,10 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
     );
 
     private static final Map<String, Requirement> REQUIREMENTS = Map.ofEntries(
+        Map.entry(PLUGIN_CALLER_MIXIN, Requirement.method(
+            "client-thread plugin callbacks",
+            "callOnPlugins",
+            "(Ljava/lang/String;Ljava/util/List;Ljava/util/function/Consumer;)V")),
         Map.entry(MIXIN_PACKAGE + "IngredientFilterMixin", Requirement.method(
             "async ingredient filter",
             "<init>",
@@ -143,15 +270,8 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
             "anvil recipe hiding",
             "getBookEnchantmentRecipes",
             "()Ljava/util/stream/Stream;")),
-        Map.entry(MIXIN_PACKAGE + "AnvilRepresentativeContextMixin", Requirement.method(
-            "anvil representative recipes",
-            "getAnvilRecipes",
-            "(Lmezz/jei/api/recipe/vanilla/IVanillaRecipeFactory;"
-                + "Lmezz/jei/api/runtime/IIngredientManager;)Ljava/util/List;")),
-        Map.entry(MIXIN_PACKAGE + "AnvilEnchantmentRepresentativeMixin", Requirement.method(
-            "anvil representative recipes",
-            "canEnchant",
-            "(Lnet/minecraft/world/item/ItemStack;)Z")),
+        Map.entry(ANVIL_REPRESENTATIVE_CONTEXT_MIXIN, ANVIL_REPRESENTATIVE_ENTRY_POINT),
+        Map.entry(ANVIL_ENCHANTMENT_REPRESENTATIVE_MIXIN, ANVIL_REPRESENTATIVE_CAN_ENCHANT),
         Map.entry(MIXIN_PACKAGE + "FuelRecipeMakerMixin", Requirement.method(
             "fuel recipe compaction",
             "getFuelRecipes",
@@ -191,19 +311,9 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
         Map.entry(MIXIN_PACKAGE + "compat.IronsSpellsArcaneAnvilRecipeMixin", Requirement.method(
             "Iron's Spells Arcane Anvil compaction",
             "getRecipeItems")),
-        Map.entry(MIXIN_PACKAGE + "compat.GeneratorGaloreJeiPluginMixin", Requirement.method(
-            "Generator Galore solid-fuel compaction",
-            "registerRecipes",
-            "(Lmezz/jei/api/registration/IRecipeRegistration;)V")),
-        Map.entry(MIXIN_PACKAGE + "compat.MekanismRecipeRegistryHelperMixin", Requirement.method(
-            "Mekanism Nutritional Liquifier compaction",
-            "register",
-            "(Lmezz/jei/api/registration/IRecipeRegistration;"
-                + "Lmekanism/client/jei/MekanismJEIRecipeType;Ljava/util/List;)V")),
-        Map.entry(MIXIN_PACKAGE + "compat.ThermalExpansionJeiPluginMixin", Requirement.method(
-            "Thermal Stirling Dynamo fuel compaction",
-            "registerRecipes",
-            "(Lmezz/jei/api/registration/IRecipeRegistration;)V")),
+        Map.entry(GENERATOR_GALORE_PLUGIN_MIXIN, GENERATOR_GALORE_REGISTER_LAMBDA),
+        Map.entry(MEKANISM_RECIPE_REGISTRY_MIXIN, MEKANISM_REGISTER_RECIPES),
+        Map.entry(THERMAL_EXPANSION_PLUGIN_MIXIN, THERMAL_REGISTER_RECIPES),
         Map.entry(CELESTIAL_REINFORCE_MIXIN, Requirement.method(
             "Celestial Forge Item Reinforce caching",
             "input",
@@ -215,13 +325,8 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
         Map.entry(ULTIMATE_CAR_CATEGORY_MIXIN, Requirement.method(
             "Ultimate Car Mod workshop compaction",
             "setRecipe")),
-        Map.entry(IRON_FURNACES_PLUGIN_MIXIN, Requirement.method(
-            "Iron Furnaces generator compaction",
-            "registerRecipes",
-            "(Lmezz/jei/api/registration/IRecipeRegistration;)V")),
-        Map.entry(IRON_FURNACES_CATEGORY_MIXIN, Requirement.method(
-            "Iron Furnaces generator compaction",
-            "setRecipe")),
+        Map.entry(IRON_FURNACES_PLUGIN_MIXIN, IRON_FURNACES_REGISTER_RECIPES),
+        Map.entry(IRON_FURNACES_CATEGORY_MIXIN, IRON_FURNACES_SET_RECIPE),
         Map.entry(SFM_FALLING_ANVIL_MIXIN, Requirement.method(
             "SFM Falling Anvil optimization",
             "setRecipeForFallingAnvilDisenchantRecipe",
@@ -240,10 +345,7 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
         Map.entry(MIXIN_PACKAGE + "compat.ProductiveTreesLogStrippingCategoryMixin", Requirement.method(
             "Productive Trees log-stripping tool caching",
             "setRecipe")),
-        Map.entry(MIXIN_PACKAGE + "compat.TinkersJeiPluginMixin", Requirement.method(
-            "Tinkers casting compaction",
-            "registerRecipes",
-            "(Lmezz/jei/api/registration/IRecipeRegistration;)V")),
+        Map.entry(TINKERS_PLUGIN_MIXIN, TINKERS_REGISTER_RECIPES),
         Map.entry(STARTER_PUBLISH_MODERN_MIXIN, Requirement.field(
             "async JEI runtime publication",
             "running",
@@ -289,6 +391,19 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
     );
     private static final Map<String, Boolean> EARLY_CONFIG_VALUES = new HashMap<>();
 
+    private static final AtomicFeature ANVIL_REPRESENTATIVE_FEATURE = new AtomicFeature(
+        "anvil representative recipes",
+        List.of(
+            new TargetRequirement(
+                ANVIL_RECIPE_MAKER_CLASS,
+                List.of(ANVIL_REPRESENTATIVE_ENTRY_POINT)
+            ),
+            new TargetRequirement(
+                ANVIL_ENCHANTMENT_DATA_CLASS,
+                List.of(ANVIL_REPRESENTATIVE_CAN_ENCHANT)
+            )
+        )
+    );
     private static final AtomicFeature CELESTIAL_REINFORCE_FEATURE = new AtomicFeature(
         "Celestial Forge Item Reinforce caching",
         List.of(new TargetRequirement(
@@ -317,18 +432,182 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
         List.of(
             new TargetRequirement(
                 "ironfurnaces.jei.IronFurnacesJEIPlugin",
-                List.of(Requirement.method(
-                    "", "registerRecipes", "(Lmezz/jei/api/registration/IRecipeRegistration;)V"))
+                List.of(IRON_FURNACES_REGISTER_RECIPES)
             ),
             new TargetRequirement(
                 "ironfurnaces.jei.RecipeCategoryGeneratorRegular",
-                List.of(Requirement.method("", "setRecipe"))
+                List.of(IRON_FURNACES_SET_RECIPE)
             ),
             new TargetRequirement(
                 "ironfurnaces.jei.RecipeCategoryGeneratorSmoking",
-                List.of(Requirement.method("", "setRecipe"))
+                List.of(IRON_FURNACES_SET_RECIPE)
+            ),
+            new TargetRequirement(
+                "ironfurnaces.recipes.SimpleGeneratorRecipe",
+                List.of(
+                    Requirement.method("", "<init>", "(ILnet/minecraft/world/item/ItemStack;)V"),
+                    Requirement.method("", "getEnergy", "()I"),
+                    Requirement.method(
+                        "", "getIngredient", "()Lnet/minecraft/world/item/ItemStack;")
+                )
             )
-        )
+        ),
+        List.of(new InvocationTargetRequirement(
+            "ironfurnaces.jei.IronFurnacesJEIPlugin",
+            IRON_FURNACES_ADD_RECIPES_INVOCATION
+        ))
+    );
+    private static final AtomicFeature GENERATOR_GALORE_FEATURE = new AtomicFeature(
+        "Generator Galore solid-fuel compaction",
+        List.of(
+            new TargetRequirement(
+                "cy.jdkdigital.generatorgalore.integrations.JeiPlugin",
+                List.of(GENERATOR_GALORE_REGISTER_LAMBDA)
+            ),
+            new TargetRequirement(
+                "cy.jdkdigital.generatorgalore.common.recipe.SolidFuelRecipe",
+                List.of(
+                    Requirement.method(
+                        "",
+                        "<init>",
+                        "(Lnet/minecraft/resources/ResourceLocation;Ljava/util/List;"
+                            + "Lnet/minecraft/world/item/crafting/Ingredient;FI)V"
+                    ),
+                    Requirement.method("", "id", "()Lnet/minecraft/resources/ResourceLocation;"),
+                    Requirement.method("", "fuels", "()Ljava/util/List;"),
+                    Requirement.method(
+                        "", "generator", "()Lnet/minecraft/world/item/crafting/Ingredient;"),
+                    Requirement.method("", "rate", "()F"),
+                    Requirement.method("", "burnTime", "()I")
+                )
+            )
+        ),
+        List.of(new InvocationTargetRequirement(
+            "cy.jdkdigital.generatorgalore.integrations.JeiPlugin",
+            GENERATOR_GALORE_ADD_RECIPES_INVOCATION
+        ))
+    );
+    private static final AtomicFeature MEKANISM_NUTRITIONAL_FEATURE = new AtomicFeature(
+        "Mekanism Nutritional Liquifier compaction",
+        List.of(
+            new TargetRequirement(
+                "mekanism.client.jei.RecipeRegistryHelper",
+                List.of(MEKANISM_REGISTER_RECIPES)
+            ),
+            new TargetRequirement(
+                "mekanism.common.recipe.impl.NutritionalLiquifierIRecipe",
+                List.of(Requirement.method(
+                    "",
+                    "<init>",
+                    "(Lnet/minecraft/world/item/Item;Lmekanism/api/recipes/ingredients/ItemStackIngredient;"
+                        + "Lnet/minecraftforge/fluids/FluidStack;)V"
+                ))
+            ),
+            new TargetRequirement(
+                "mekanism.api.recipes.ItemStackToFluidRecipe",
+                List.of(
+                    Requirement.method(
+                        "", "getInput", "()Lmekanism/api/recipes/ingredients/ItemStackIngredient;"),
+                    Requirement.method("", "getOutputDefinition", "()Ljava/util/List;")
+                )
+            ),
+            new TargetRequirement(
+                "mekanism.api.recipes.ingredients.InputIngredient",
+                List.of(Requirement.method("", "getRepresentations", "()Ljava/util/List;"))
+            ),
+            new TargetRequirement(
+                "mekanism.api.recipes.ingredients.creator.IngredientCreatorAccess",
+                List.of(Requirement.method(
+                    "",
+                    "item",
+                    "()Lmekanism/api/recipes/ingredients/creator/IItemStackIngredientCreator;"
+                ))
+            ),
+            new TargetRequirement(
+                "mekanism.api.recipes.ingredients.creator.IItemStackIngredientCreator",
+                List.of(Requirement.method(
+                    "",
+                    "from",
+                    "(Lnet/minecraft/world/item/crafting/Ingredient;I)"
+                        + "Lmekanism/api/recipes/ingredients/ItemStackIngredient;"
+                ))
+            ),
+            new TargetRequirement(
+                "net.minecraftforge.fluids.FluidStack",
+                List.of(
+                    Requirement.method("", "getFluid", "()Lnet/minecraft/world/level/material/Fluid;"),
+                    Requirement.method("", "getAmount", "()I")
+                )
+            )
+        ),
+        List.of(new InvocationTargetRequirement(
+            "mekanism.client.jei.RecipeRegistryHelper",
+            MEKANISM_ADD_RECIPES_INVOCATION
+        ))
+    );
+    private static final AtomicFeature TINKERS_CASTING_FEATURE = new AtomicFeature(
+        "Tinkers casting compaction",
+        List.of(
+            new TargetRequirement(
+                "slimeknights.tconstruct.plugin.jei.JEIPlugin",
+                List.of(TINKERS_REGISTER_RECIPES)
+            ),
+            new TargetRequirement(
+                "slimeknights.tconstruct.library.recipe.casting.DisplayCastingRecipe",
+                List.of(
+                    Requirement.method(
+                        "",
+                        "<init>",
+                        "(Lnet/minecraft/resources/ResourceLocation;Lnet/minecraft/world/item/crafting/RecipeType;"
+                            + "Ljava/util/List;Ljava/util/List;Ljava/util/List;IZ)V"
+                    ),
+                    Requirement.method("", "getRecipeId", "()Lnet/minecraft/resources/ResourceLocation;"),
+                    Requirement.method("", "getType", "()Lnet/minecraft/world/item/crafting/RecipeType;"),
+                    Requirement.method("", "getCastItems", "()Ljava/util/List;"),
+                    Requirement.method("", "getFluids", "()Ljava/util/List;"),
+                    Requirement.method("", "getOutputs", "()Ljava/util/List;"),
+                    Requirement.method("", "getCoolingTime", "()I"),
+                    Requirement.method("", "isConsumed", "()Z")
+                )
+            ),
+            new TargetRequirement(
+                "mezz.jei.api.forge.ForgeTypes",
+                List.of(Requirement.field(
+                    "", "FLUID_STACK", "Lmezz/jei/api/ingredients/IIngredientTypeWithSubtypes;"))
+            ),
+            new TargetRequirement(
+                "net.minecraftforge.fluids.FluidStack",
+                List.of(
+                    Requirement.method("", "getAmount", "()I"),
+                    Requirement.method("", "getTag", "()Lnet/minecraft/nbt/CompoundTag;")
+                )
+            )
+        ),
+        List.of(new InvocationTargetRequirement(
+            "slimeknights.tconstruct.plugin.jei.JEIPlugin",
+            TINKERS_ADD_RECIPES_INVOCATION
+        ))
+    );
+    private static final AtomicFeature THERMAL_STIRLING_FEATURE = new AtomicFeature(
+        "Thermal Stirling Dynamo fuel compaction",
+        List.of(
+            new TargetRequirement(
+                "cofh.thermal.expansion.compat.jei.TExpJeiPlugin",
+                List.of(THERMAL_REGISTER_RECIPES)
+            ),
+            new TargetRequirement(
+                "cofh.thermal.core.util.recipes.dynamo.StirlingFuel",
+                List.of(THERMAL_STIRLING_CONSTRUCTOR)
+            ),
+            new TargetRequirement(
+                "cofh.thermal.lib.util.recipes.ThermalFuel",
+                THERMAL_FUEL_ACCESSORS
+            )
+        ),
+        List.of(new InvocationTargetRequirement(
+            "cofh.thermal.expansion.compat.jei.TExpJeiPlugin",
+            THERMAL_ADD_RECIPES_INVOCATION
+        ))
     );
     private static final AtomicFeature EMBERS_DAWNSTONE_ANVIL_FEATURE = new AtomicFeature(
         "Embers Dawnstone Anvil compaction",
@@ -397,22 +676,16 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
     );
     private static final AtomicFeature BREWING_INDEX_FORGE_FEATURE = new AtomicFeature(
         "indexed brewing lookup",
-        List.of(
-            new TargetRequirement(
-                "mezz.jei.library.util.BrewingRecipeMakerCommon",
-                List.of(Requirement.method(
-                    "",
-                    "getNewPotions",
-                    "(Lmezz/jei/api/recipe/vanilla/IVanillaRecipeFactory;"
-                        + "Lmezz/jei/api/ingredients/IIngredientHelper;Ljava/util/Collection;"
-                        + "Ljava/util/Collection;Ljava/util/Collection;)Ljava/util/List;"
-                ))
-            ),
-            new TargetRequirement(
-                "mezz.jei.library.plugins.vanilla.anvil.AnvilHelper",
-                List.of(Requirement.method("", "setAnvilMenu"))
-            )
-        )
+        List.of(new TargetRequirement(
+            "mezz.jei.library.util.BrewingRecipeMakerCommon",
+            List.of(Requirement.method(
+                "",
+                "getNewPotions",
+                "(Lmezz/jei/api/recipe/vanilla/IVanillaRecipeFactory;"
+                    + "Lmezz/jei/api/ingredients/IIngredientHelper;Ljava/util/Collection;"
+                    + "Ljava/util/Collection;Ljava/util/Collection;)Ljava/util/List;"
+            ))
+        ))
     );
     private static final AtomicFeature BREWING_INDEX_NEO_FEATURE = new AtomicFeature(
         "indexed brewing lookup",
@@ -458,11 +731,17 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
         )
     );
     private static final Map<String, AtomicFeature> ATOMIC_FEATURES = Map.ofEntries(
+        Map.entry(ANVIL_REPRESENTATIVE_CONTEXT_MIXIN, ANVIL_REPRESENTATIVE_FEATURE),
+        Map.entry(ANVIL_ENCHANTMENT_REPRESENTATIVE_MIXIN, ANVIL_REPRESENTATIVE_FEATURE),
         Map.entry(CELESTIAL_REINFORCE_MIXIN, CELESTIAL_REINFORCE_FEATURE),
         Map.entry(ULTIMATE_CAR_BUILDER_MIXIN, ULTIMATE_CAR_FEATURE),
         Map.entry(ULTIMATE_CAR_CATEGORY_MIXIN, ULTIMATE_CAR_FEATURE),
+        Map.entry(GENERATOR_GALORE_PLUGIN_MIXIN, GENERATOR_GALORE_FEATURE),
         Map.entry(IRON_FURNACES_PLUGIN_MIXIN, IRON_FURNACES_FEATURE),
         Map.entry(IRON_FURNACES_CATEGORY_MIXIN, IRON_FURNACES_FEATURE),
+        Map.entry(MEKANISM_RECIPE_REGISTRY_MIXIN, MEKANISM_NUTRITIONAL_FEATURE),
+        Map.entry(THERMAL_EXPANSION_PLUGIN_MIXIN, THERMAL_STIRLING_FEATURE),
+        Map.entry(TINKERS_PLUGIN_MIXIN, TINKERS_CASTING_FEATURE),
         Map.entry(EMBERS_PLUGIN_MIXIN, EMBERS_DAWNSTONE_ANVIL_FEATURE),
         Map.entry(EMBERS_CATEGORY_MIXIN, EMBERS_DAWNSTONE_ANVIL_FEATURE),
         Map.entry(SFM_FALLING_ANVIL_MIXIN, SFM_FALLING_ANVIL_FEATURE),
@@ -477,6 +756,7 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
 
     private final Map<String, ClassNode> targetCache = new HashMap<>();
     private final Map<AtomicFeature, Boolean> atomicFeatureCompatibility = new HashMap<>();
+    private Boolean sophisticatedShulkerCompatibility;
 
     /** One of these covers each JEI generation, so the one that does not match is not a problem. */
     private static final Set<String> VARIANTS = Set.of(
@@ -508,7 +788,7 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
         MIXIN_PACKAGE + "compat.MekanismRecipeRegistryHelperMixin",
         MIXIN_PACKAGE + "compat.ProductiveTreesLogStrippingCategoryMixin",
         MIXIN_PACKAGE + "compat.SfmFallingAnvilCategoryMixin",
-        MIXIN_PACKAGE + "compat.ThermalExpansionJeiPluginMixin",
+        THERMAL_EXPANSION_PLUGIN_MIXIN,
         MIXIN_PACKAGE + "compat.TinkersJeiPluginMixin",
         MIXIN_PACKAGE + "compat.UltimateCarRecipeBuilderMixin",
         MIXIN_PACKAGE + "compat.UltimateCarRecipeCategoryMixin"
@@ -528,8 +808,28 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
         if (!readEarlyBoolean("enabled", true)) {
             return false;
         }
+        if (STARTER_MIXIN.equals(mixinClassName)) {
+            updateAsyncStartupCompatibility();
+        } else if (PLUGIN_CALLER_MIXIN.equals(mixinClassName)) {
+            boolean compatible = hasPluginCallbackRoutingContract(readTarget(targetClassName));
+            JeiOptCompatibilityState.setAsyncStartupSupported(compatible);
+            if (!compatible) {
+                LOGGER.warn(
+                    "JEI Optimize disabled asynchronous startup because PluginCaller no longer has the verified callback ABI."
+                );
+            }
+            return compatible;
+        }
         if (isGrindstoneRepresentativeMixin(mixinClassName)) {
             return shouldApplyGrindstoneRepresentativeMixin(targetClassName, mixinClassName);
+        }
+        if (RECIPE_MANAGER_SAFE_DIAGNOSTIC_MIXIN.equals(mixinClassName)) {
+            ClassNode target = readTarget(targetClassName);
+            return target != null && hasUnsafeRecipeDiagnostics(target);
+        }
+        if (EXTENDABLE_RECIPE_HELPER_MIXIN.equals(mixinClassName)
+            || SOPHISTICATED_SHULKER_ACCESSOR_MIXIN.equals(mixinClassName)) {
+            return isSophisticatedShulkerCompatible();
         }
         ConfigGate configGate = CONFIG_GATES.get(mixinClassName);
         if (configGate != null && !readEarlyBoolean(configGate.key(), configGate.defaultValue())) {
@@ -600,6 +900,21 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
         return false;
     }
 
+    private void updateAsyncStartupCompatibility() {
+        ClassNode pluginCaller = readTarget("mezz.jei.library.load.PluginCaller");
+        boolean compatible = hasPluginCallbackRoutingContract(pluginCaller);
+        JeiOptCompatibilityState.setAsyncStartupSupported(compatible);
+        if (!compatible) {
+            LOGGER.warn(
+                "JEI Optimize disabled asynchronous startup because plugin callbacks cannot be routed safely to the client thread."
+            );
+        }
+    }
+
+    static boolean hasPluginCallbackRoutingContract(ClassNode pluginCaller) {
+        return pluginCaller != null && PLUGIN_CALLBACK_INVOCATION.countIn(pluginCaller) == 1;
+    }
+
     private static boolean isGrindstoneRepresentativeMixin(String mixinClassName) {
         return GRINDSTONE_REPRESENTATIVE_MIXIN.equals(mixinClassName)
             || GRINDSTONE_DISENCHANT_LEGACY_MIXIN.equals(mixinClassName)
@@ -621,10 +936,8 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
         }
 
         GrindstoneVariant variant = detectGrindstoneVariant(target);
-        boolean hasRepairMethod = GRINDSTONE_REPAIR_METHODS.stream()
-            .anyMatch(requirement -> requirement.isPresentIn(target));
         boolean compatible = GRINDSTONE_ENTRY_POINT.isPresentIn(target)
-            && hasRepairMethod
+            && hasExpectedGrindstoneRepairMethod(target)
             && variant != GrindstoneVariant.NONE;
         if (!compatible) {
             if (GRINDSTONE_REPRESENTATIVE_MIXIN.equals(mixinClassName)) {
@@ -659,31 +972,105 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
         return GrindstoneVariant.LEGACY;
     }
 
+    private static boolean hasExpectedGrindstoneRepairMethod(ClassNode target) {
+        //? if forge {
+        return Requirement.method(
+            "",
+            "getRepairRecipes",
+            "(Lmezz/jei/common/platform/IPlatformRecipeHelper;"
+                + "Lmezz/jei/api/runtime/IIngredientManager;"
+                + "Lnet/minecraft/world/inventory/GrindstoneMenu;)Ljava/util/stream/Stream;"
+        ).isPresentIn(target);
+        //?} else {
+        /*return Requirement.method(
+            "",
+            "getRepairRecipes",
+            "(Lmezz/jei/common/platform/IPlatformRecipeHelper;"
+                + "Lmezz/jei/api/runtime/IIngredientManager;)Ljava/util/stream/Stream;"
+        ).isPresentIn(target);
+        *///?}
+    }
+
+    static boolean hasUnsafeRecipeDiagnostics(ClassNode target) {
+        if (target == null) {
+            return false;
+        }
+        for (MethodNode method : target.methods) {
+            if (!RECIPE_DEBUG_INVOCATION.enclosingMethod().equals(method.name)
+                || !RECIPE_DEBUG_INVOCATION.enclosingDescriptor().equals(method.desc)) {
+                continue;
+            }
+            int invocationCount = 0;
+            boolean markerAfterSecondInvocation = false;
+            for (AbstractInsnNode instruction = method.instructions.getFirst();
+                 instruction != null;
+                 instruction = instruction.getNext()) {
+                if (RECIPE_DEBUG_INVOCATION.matches(instruction)) {
+                    invocationCount++;
+                } else if (invocationCount == 2
+                    && instruction instanceof LdcInsnNode constant
+                    && UNHANDLED_RECIPE_DEBUG_MESSAGE.equals(constant.cst)) {
+                    markerAfterSecondInvocation = true;
+                }
+            }
+            return invocationCount == 3 && markerAfterSecondInvocation;
+        }
+        return false;
+    }
+
+    private boolean isSophisticatedShulkerCompatible() {
+        if (sophisticatedShulkerCompatibility != null) {
+            return sophisticatedShulkerCompatibility;
+        }
+        ClassNode wrapper = readTarget(SOPHISTICATED_SHULKER_RECIPE_CLASS);
+        if (wrapper == null) {
+            sophisticatedShulkerCompatibility = false;
+            return false;
+        }
+        ClassNode helper = readTarget(EXTENDABLE_RECIPE_HELPER_CLASS);
+        boolean compatible = hasSophisticatedShulkerContract(helper, wrapper);
+        sophisticatedShulkerCompatibility = compatible;
+        if (!compatible) {
+            LOGGER.warn(
+                "JEI Optimize disabled Sophisticated Storage shulker recipe extension reuse because its complete ABI changed."
+            );
+        }
+        return compatible;
+    }
+
+    static boolean hasSophisticatedShulkerContract(ClassNode helper, ClassNode wrapper) {
+        return helper != null
+            && wrapper != null
+            && Requirement.field("", "cache", "Ljava/util/Map;").isPresentIn(helper)
+            && Requirement.method(
+                "",
+                "getOptionalRecipeExtension",
+                "(Ljava/lang/Object;)Ljava/util/Optional;"
+            ).isPresentIn(helper)
+            && Requirement.field(
+                "",
+                "compose",
+                "Lnet/minecraft/world/item/crafting/ShapelessRecipe;"
+            ).isPresentIn(wrapper);
+    }
+
+    static boolean hasAnvilRepresentativeContract(ClassNode recipeMaker, ClassNode enchantmentData) {
+        return recipeMaker != null
+            && enchantmentData != null
+            && ANVIL_REPRESENTATIVE_ENTRY_POINT.isPresentIn(recipeMaker)
+            && ANVIL_REPRESENTATIVE_CAN_ENCHANT.isPresentIn(enchantmentData);
+    }
+
     private boolean isAtomicFeatureCompatible(AtomicFeature feature, boolean variant) {
         Boolean cached = atomicFeatureCompatibility.get(feature);
         if (cached != null) {
             return cached;
         }
 
-        boolean sawTarget = false;
-        String missing = null;
-        for (TargetRequirement targetRequirement : feature.targets()) {
-            ClassNode target = readTarget(targetRequirement.className());
-            if (target == null) {
-                if (missing == null) {
-                    missing = "class " + targetRequirement.className();
-                }
-                continue;
-            }
-            sawTarget = true;
-            for (Requirement requirement : targetRequirement.requirements()) {
-                if (!requirement.isPresentIn(target) && missing == null) {
-                    missing = targetRequirement.className() + " " + requirement.describe();
-                }
-            }
-        }
-
-        boolean compatible = missing == null;
+        AtomicFeatureCheck check = checkAtomicFeature(feature, this::readTarget);
+        boolean compatible = check.compatible();
+        boolean sawTarget = check.sawTarget();
+        String missing = check.missing();
         atomicFeatureCompatibility.put(feature, compatible);
         if (!compatible) {
             if (variant) {
@@ -702,6 +1089,51 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
             }
         }
         return compatible;
+    }
+
+    static boolean hasAtomicFeatureContract(String mixinClassName, Map<String, ClassNode> targets) {
+        String qualifiedName = mixinClassName.startsWith(MIXIN_PACKAGE)
+            ? mixinClassName
+            : MIXIN_PACKAGE + mixinClassName;
+        AtomicFeature feature = ATOMIC_FEATURES.get(qualifiedName);
+        return feature != null && checkAtomicFeature(feature, targets::get).compatible();
+    }
+
+    private static AtomicFeatureCheck checkAtomicFeature(
+        AtomicFeature feature,
+        Function<String, ClassNode> targetResolver
+    ) {
+        boolean sawTarget = false;
+        String missing = null;
+        for (TargetRequirement targetRequirement : feature.targets()) {
+            ClassNode target = targetResolver.apply(targetRequirement.className());
+            if (target == null) {
+                if (missing == null) {
+                    missing = "class " + targetRequirement.className();
+                }
+                continue;
+            }
+            sawTarget = true;
+            for (Requirement requirement : targetRequirement.requirements()) {
+                if (!requirement.isPresentIn(target) && missing == null) {
+                    missing = targetRequirement.className() + " " + requirement.describe();
+                }
+            }
+        }
+        for (InvocationTargetRequirement invocationTarget : feature.invocations()) {
+            ClassNode target = targetResolver.apply(invocationTarget.className());
+            if (target == null) {
+                if (missing == null) {
+                    missing = "class " + invocationTarget.className();
+                }
+                continue;
+            }
+            sawTarget = true;
+            if (!invocationTarget.requirement().isPresentIn(target) && missing == null) {
+                missing = invocationTarget.className() + " " + invocationTarget.requirement().describe();
+            }
+        }
+        return new AtomicFeatureCheck(missing == null, sawTarget, missing);
     }
 
     private ClassNode readTarget(String targetClassName) {
@@ -772,13 +1204,26 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
     public void postApply(String targetClassName, ClassNode targetClass, String mixinClassName, IMixinInfo mixinInfo) {
     }
 
-    private record AtomicFeature(String name, List<TargetRequirement> targets) {
+    private record AtomicFeature(
+        String name,
+        List<TargetRequirement> targets,
+        List<InvocationTargetRequirement> invocations
+    ) {
+        private AtomicFeature(String name, List<TargetRequirement> targets) {
+            this(name, targets, List.of());
+        }
     }
 
     private record ConfigGate(String key, boolean defaultValue) {
     }
 
     private record TargetRequirement(String className, List<Requirement> requirements) {
+    }
+
+    private record InvocationTargetRequirement(String className, InvocationRequirement requirement) {
+    }
+
+    private record AtomicFeatureCheck(boolean compatible, boolean sawTarget, String missing) {
     }
 
     enum GrindstoneVariant {
@@ -795,22 +1240,36 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
         String invokedDescriptor
     ) {
         boolean isPresentIn(ClassNode target) {
+            return countIn(target) > 0;
+        }
+
+        int countIn(ClassNode target) {
+            int count = 0;
             for (MethodNode method : target.methods) {
                 if (!enclosingMethod.equals(method.name) || !enclosingDescriptor.equals(method.desc)) {
                     continue;
                 }
-                for (org.objectweb.asm.tree.AbstractInsnNode instruction = method.instructions.getFirst();
+                for (AbstractInsnNode instruction = method.instructions.getFirst();
                      instruction != null;
                      instruction = instruction.getNext()) {
-                    if (instruction instanceof MethodInsnNode invocation
-                        && owner.equals(invocation.owner)
-                        && invokedMethod.equals(invocation.name)
-                        && invokedDescriptor.equals(invocation.desc)) {
-                        return true;
+                    if (matches(instruction)) {
+                        count++;
                     }
                 }
             }
-            return false;
+            return count;
+        }
+
+        boolean matches(AbstractInsnNode instruction) {
+            return instruction instanceof MethodInsnNode invocation
+                && owner.equals(invocation.owner)
+                && invokedMethod.equals(invocation.name)
+                && invokedDescriptor.equals(invocation.desc);
+        }
+
+        String describe() {
+            return "invocation " + owner + '.' + invokedMethod + invokedDescriptor
+                + " in " + enclosingMethod + enclosingDescriptor;
         }
     }
 

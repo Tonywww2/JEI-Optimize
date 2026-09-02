@@ -19,7 +19,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
     remap = false
 )
 public abstract class IronFurnacesGeneratorCategoryMixin {
-    @Inject(method = "setRecipe", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "setRecipe", at = @At("HEAD"), cancellable = true, require = 1)
     private void jeiOptimize$addCompactedInput(
         IRecipeLayoutBuilder builder,
         @Coerce Object recipe,

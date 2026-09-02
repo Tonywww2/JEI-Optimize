@@ -23,6 +23,7 @@
     "RecipeManagerInternalCompactMixin",
     "VanillaRecipesMixin",
     "RecipeAddTimingMixin",
+    "RecipeManagerSafeDiagnosticMixin",
     "AnvilRecipeMakerTimingMixin",
     "AnvilRecipeControlMixin",
     "AnvilRecipeControlModernMixin",

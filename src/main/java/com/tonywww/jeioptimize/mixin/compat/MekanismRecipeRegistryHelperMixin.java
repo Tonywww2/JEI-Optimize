@@ -20,7 +20,8 @@ public abstract class MekanismRecipeRegistryHelperMixin {
         at = @At(
             value = "INVOKE",
             target = "Lmezz/jei/api/registration/IRecipeRegistration;addRecipes(Lmezz/jei/api/recipe/RecipeType;Ljava/util/List;)V"
-        )
+        ),
+        require = 1
     )
     private static <T> void jeiOptimize$compactNutritionalLiquifierRecipes(
         IRecipeRegistration registration,

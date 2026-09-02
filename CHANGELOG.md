@@ -4,6 +4,37 @@ All notable changes to Just Enough Threads are documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.13.3
+
+### Fixed
+
+- **JEI plugin callbacks once again run on the client thread during asynchronous startup.** This
+  preserves JEI's original threading contract for ingredient removal, GUI registration, recipe
+  extensions, and runtime callbacks while the remaining startup coordination stays off-thread.
+  Async startup now automatically falls back to JEI's caller thread if the verified plugin-callback
+  routing instruction is missing or ambiguous.
+- **Unsupported crafting recipes no longer generate hundreds of false broken-recipe errors in JEI
+  15.48 and newer debug logs.** JEI's unhandled-recipe diagnostic rebuilt the layout after
+  `isHandled` had already rejected it, causing `getRecipeExtension` to throw. The guarded diagnostic
+  now reports a side-effect-free class/category summary; genuine layout and indexing failures keep
+  JEI's original detailed error path.
+- **Sophisticated Storage shulker recipe extension reuse now updates JEI's identity cache.** The
+  wrapper and its composed recipe can no longer disagree between `isHandled` and `setRecipe`, and
+  the complete helper/accessor ABI is checked before either Mixin is applied.
+- **Anvil, grindstone, and SFM recipe-generation contexts now have deterministic cleanup.** Plugin
+  callback cleanup runs in `finally`, generation teardown clears all temporary state, and related
+  multi-Mixin features require their complete ABI with mandatory critical injections.
+- **Thermal Stirling Dynamo fuel compaction now obtains recipe IDs through Minecraft's mapped
+  `Recipe` interface.** Production Forge jars no longer attempt to reflect the development-only
+  `getId` name, so Thermal fuel pages compact without falling back after a `NoSuchMethodException`.
+- **Generator Galore 1.2.5 solid-fuel compaction now hooks its actual recipe-registration lambda.**
+  The previous hook targeted `registerRecipes` even though its `addRecipes` calls were emitted in a
+  synthetic helper, which allowed the optimization to miss silently.
+- **Reflected Generator Galore, Mekanism, Tinkers, Iron Furnaces, and Thermal integrations now fail
+  closed against verified complete ABIs.** Constructors, accessors, companion category methods,
+  and exact JEI `addRecipes` call sites are checked as one feature before mandatory injections apply;
+  incompatible mod updates retain their original recipes instead of partially enabling compaction.
+
 ## 0.13.2
 
 ### Changed

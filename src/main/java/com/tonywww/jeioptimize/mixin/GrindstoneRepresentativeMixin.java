@@ -21,7 +21,8 @@ import java.util.stream.Stream;
 public abstract class GrindstoneRepresentativeMixin {
     @Inject(
         method = "getGrindstoneRecipes(Lmezz/jei/api/runtime/IIngredientManager;Lmezz/jei/common/platform/IPlatformRecipeHelper;)Ljava/util/List;",
-        at = @At("HEAD")
+        at = @At("HEAD"),
+        require = 1
     )
     private static void jeiOptimize$beginRepresentativeSelection(
         IIngredientManager ingredientManager,
@@ -42,7 +43,8 @@ public abstract class GrindstoneRepresentativeMixin {
     @Inject(
         method = "getRepairRecipes(Lmezz/jei/common/platform/IPlatformRecipeHelper;Lmezz/jei/api/runtime/IIngredientManager;Lnet/minecraft/world/inventory/GrindstoneMenu;)Ljava/util/stream/Stream;",
         at = @At("RETURN"),
-        cancellable = true
+        cancellable = true,
+        require = 1
     )
     private static void jeiOptimize$limitRepairExamples(
         IPlatformRecipeHelper platformHelper,
@@ -56,7 +58,8 @@ public abstract class GrindstoneRepresentativeMixin {
     /*@Inject(
         method = "getRepairRecipes(Lmezz/jei/common/platform/IPlatformRecipeHelper;Lmezz/jei/api/runtime/IIngredientManager;)Ljava/util/stream/Stream;",
         at = @At("RETURN"),
-        cancellable = true
+        cancellable = true,
+        require = 1
     )
     private static void jeiOptimize$limitRepairExamples(
         IPlatformRecipeHelper platformHelper,
@@ -77,7 +80,8 @@ public abstract class GrindstoneRepresentativeMixin {
 
     @Inject(
         method = "getGrindstoneRecipes(Lmezz/jei/api/runtime/IIngredientManager;Lmezz/jei/common/platform/IPlatformRecipeHelper;)Ljava/util/List;",
-        at = @At("RETURN")
+        at = @At("RETURN"),
+        require = 1
     )
     private static void jeiOptimize$endRepresentativeSelection(
         IIngredientManager ingredientManager,
@@ -86,4 +90,5 @@ public abstract class GrindstoneRepresentativeMixin {
     ) {
         JeiRecipeGenerationLimiter.endGrindstone();
     }
+
 }
