@@ -10,10 +10,10 @@ In large modpacks, JEI spends several seconds building its ingredient search ind
 
   JEI startup runs on one dedicated background thread, so the render thread can keep updating while
   recipes and the runtime are built. Plugin callbacks keep JEI's original order and are never run
-  concurrently. Final `onRuntimeAvailable` callbacks return to the client thread before the runtime
-  is published there, so plugins can safely use JEI's main-thread-only runtime APIs. Leaving the
-  world, timing out, or losing the server cancels the active generation, interrupts its build, and
-  prevents stale publication.
+  concurrently. Plugins known to call main-thread-only APIs are routed to the client thread through
+  the configurable `mainThreadPlugins` list. Final `onRuntimeAvailable` callbacks also return there
+  before runtime publication. Leaving the world, timing out, or losing the server cancels the active
+  generation, interrupts its build, and prevents stale publication.
 
 - **Client-tick-budgeted ingredient filter build** — `asyncIngredientFilter` (on by default)
 
@@ -69,11 +69,14 @@ Config file: `config/justenoughthreads-client.toml`
 
 When upgrading from an older release, `config/jei_optimize-client.toml` is copied automatically if
 the new file does not exist. The legacy file is left untouched and never overwrites a new config.
+JEI's built-in creative-tab enumeration and GUI runtime construction stay on the client thread
+automatically and do not need entries in `mainThreadPlugins`.
 
 | Option | Section | Default | Description |
 |--------|---------|---------|-------------|
 | `enabled` | general | `true` | Master switch. When `false`, the mod does nothing and JEI behaves normally. |
 | `asyncStartup` | async | `true` | Run JEI startup serially on a dedicated background thread; cancel it on world exit, timeout, or server shutdown. |
+| `mainThreadPlugins` | async | Five known plugin IDs | Route matching JEI plugin callbacks to the client thread. Add a full `modid:path`, or just `modid` to match every plugin from that mod. |
 | `asyncIngredientFilter` | async | `true` | Build an isolated ingredient filter in client-thread-safe chunks, then publish the complete sidebar once. |
 | `parallelVanillaRecipes` | async | `false` | Experimentally pre-resolve recipe ingredients across worker threads. |
 | `workerThreads` | async | `0` | Worker count for derived tasks; `0` selects CPU cores minus two, clamped to 1-8. |

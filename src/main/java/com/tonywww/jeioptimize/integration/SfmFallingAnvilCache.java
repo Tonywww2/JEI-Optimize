@@ -34,10 +34,6 @@ public final class SfmFallingAnvilCache {
         CAPTURE.remove();
     }
 
-    static boolean hasCapture() {
-        return CAPTURE.get() != null;
-    }
-
     public static void capture(List<ItemStack> stacks) {
         Capture capture = CAPTURE.get();
         if (capture != null) {

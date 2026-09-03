@@ -70,9 +70,6 @@ dependencies {
     minecraft("com.mojang:minecraft:$mcVersion")
     mappings(loom.officialMojangMappings())
     compileOnly("io.github.llamalad7:mixinextras-common:$mixinExtrasCommonVersion")
-    testImplementation(platform("org.junit:junit-bom:5.11.4"))
-    testImplementation("org.junit.jupiter:junit-jupiter")
-    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     compatTestRuntimeModJars.forEach { modRuntimeOnly(files(rootProject.file(it))) }
 
     if (loader == ModPlatform.FORGE) {
@@ -137,9 +134,6 @@ tasks {
         options.release = javaVersion
     }
 
-    test {
-        useJUnitPlatform()
-    }
 }
 
 java {

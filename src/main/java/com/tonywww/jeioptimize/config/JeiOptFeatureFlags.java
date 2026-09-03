@@ -2,6 +2,8 @@ package com.tonywww.jeioptimize.config;
 
 import com.tonywww.jeioptimize.runtime.JeiOptCompatibilityState;
 
+import java.util.Set;
+
 public final class JeiOptFeatureFlags {
     private static final int DEFAULT_WORKER_THREADS = 2;
 
@@ -253,6 +255,16 @@ public final class JeiOptFeatureFlags {
         return enabled()
             && JeiOptCompatibilityState.isAsyncStartupSupported()
             && (snapshot != null ? snapshot.asyncStartup() : JeiOptConfig.ASYNC_STARTUP.get());
+    }
+
+    public static boolean pluginRequiresMainThread(String pluginUid) {
+        JeiOptConfigSnapshot.Snapshot snapshot = JeiOptConfigSnapshot.current();
+        Set<String> configuredEntries = snapshot != null
+            ? snapshot.mainThreadPluginIds()
+            : configReady()
+                ? JeiMainThreadPluginPolicy.normalizeEntries(JeiOptConfig.ASYNC_MAIN_THREAD_PLUGINS.get())
+                : Set.copyOf(JeiMainThreadPluginPolicy.DEFAULT_PLUGIN_IDS);
+        return JeiMainThreadPluginPolicy.matches(pluginUid, configuredEntries);
     }
 
     public static int ingredientFilterBudgetMs() {

@@ -1,5 +1,7 @@
 package com.tonywww.jeioptimize.mixin;
 
+import com.tonywww.jeioptimize.JeiOptimize;
+import com.tonywww.jeioptimize.config.JeiOptFeatureFlags;
 import com.tonywww.jeioptimize.instrumentation.JeiOptDiagnostics;
 import com.tonywww.jeioptimize.instrumentation.JeiPluginCallContext;
 import com.tonywww.jeioptimize.integration.SfmFallingAnvilCache;
@@ -20,6 +22,11 @@ import java.util.function.Consumer;
 @Mixin(targets = "mezz.jei.library.load.PluginCaller", remap = false)
 public abstract class PluginCallerMixin {
     private static final String ALI_PLUGIN_CLASS = "com.yanny.ali.jei.compatibility.JeiCompatibility";
+    private static final String JEI_VANILLA_PLUGIN = "jei:minecraft";
+    private static final String JEI_FORGE_GUI_PLUGIN = "jei:forge_gui";
+    private static final String JEI_NEOFORGE_GUI_PLUGIN = "jei:neoforge_gui";
+    private static final String REGISTERING_INGREDIENTS = "Registering ingredients";
+    private static final String REGISTERING_RUNTIME = "Registering Runtime";
     private static final String REGISTERING_RECIPES = "Registering recipes";
 
     @Redirect(
@@ -40,6 +47,13 @@ public abstract class PluginCallerMixin {
         JeiOptExecutors.checkJeiStartActive();
         IModPlugin modPlugin = (IModPlugin) plugin;
         boolean isAliPlugin = ALI_PLUGIN_CLASS.equals(modPlugin.getClass().getName());
+        String pluginUid = jeiOptimize$safePluginUid(modPlugin);
+        boolean requiresMainThread = isAliPlugin
+            || pluginUid == null
+            || JEI_VANILLA_PLUGIN.equals(pluginUid) && REGISTERING_INGREDIENTS.equals(title)
+            || (JEI_FORGE_GUI_PLUGIN.equals(pluginUid) || JEI_NEOFORGE_GUI_PLUGIN.equals(pluginUid))
+                && REGISTERING_RUNTIME.equals(title)
+            || JeiOptFeatureFlags.pluginRequiresMainThread(pluginUid);
         Runnable pluginCall = () -> {
             try {
                 JeiOptDiagnostics.callPluginWithTiming(title, modPlugin, () ->
@@ -57,12 +71,31 @@ public abstract class PluginCallerMixin {
                         "JEI Optimize waiting for queued ALI client work before recipe registration");
                     JeiOptClientTickQueue.awaitNextClientTick();
                 }
-                JeiOptExecutors.runOnMainThreadAndWait(pluginCall);
+                if (requiresMainThread) {
+                    JeiOptExecutors.runOnMainThreadAndWait(() -> {
+                        JeiOptimize.LOGGER.debug(
+                            "JEI Optimize running plugin {} phase '{}' on the client thread",
+                            pluginUid != null ? pluginUid : modPlugin.getClass().getName(),
+                            title
+                        );
+                        pluginCall.run();
+                    });
+                } else {
+                    pluginCall.run();
+                }
             } else {
                 pluginCall.run();
             }
         } finally {
             JeiOptExecutors.checkJeiStartActive();
+        }
+    }
+
+    private static String jeiOptimize$safePluginUid(IModPlugin plugin) {
+        try {
+            return plugin.getPluginUid().toString();
+        } catch (RuntimeException | LinkageError e) {
+            return null;
         }
     }
 }

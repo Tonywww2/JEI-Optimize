@@ -1,5 +1,7 @@
 package com.tonywww.jeioptimize.config;
 
+import java.util.Set;
+
 public final class JeiOptConfigSnapshot {
     private static volatile Snapshot current;
 
@@ -23,6 +25,7 @@ public final class JeiOptConfigSnapshot {
             JeiOptConfig.ASYNC_PARALLEL_INGREDIENT_FILTER.get(),
             JeiOptConfig.ASYNC_PARALLEL_VANILLA_RECIPES.get(),
             JeiOptConfig.ASYNC_STARTUP.get(),
+            JeiMainThreadPluginPolicy.normalizeEntries(JeiOptConfig.ASYNC_MAIN_THREAD_PLUGINS.get()),
             JeiOptConfig.ASYNC_INGREDIENT_FILTER_BUDGET_MS.get(),
             JeiOptConfig.ASYNC_INGREDIENT_FILTER_CHUNK_SIZE.get()
         );
@@ -48,6 +51,7 @@ public final class JeiOptConfigSnapshot {
         boolean asyncIngredientFilter,
         boolean parallelVanillaRecipes,
         boolean asyncStartup,
+        Set<String> mainThreadPluginIds,
         int ingredientFilterBudgetMs,
         int ingredientFilterChunkSize
     ) {

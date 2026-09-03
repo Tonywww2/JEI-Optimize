@@ -359,8 +359,8 @@ When a validation run resolves a to-verify item:
 - 2026-09-02 — Investigated `latest_tail.log`: 628 of 630 crafting errors came from JEI's debug-only
 	second layout build after `isHandled=false`; two genuine recipe/indexing failures used separate
 	branches and remain fully diagnosed. Six of nine plugin failures were wrong-thread JEI API calls.
-	All plugin bodies now run serially on the client thread, and async startup is capability-gated on
-	the exact `PluginCaller.callOnPlugins -> Consumer.accept` instruction. The safe diagnostic applies
+	Async startup is capability-gated on the exact `PluginCaller.callOnPlugins -> Consumer.accept`
+	instruction. The safe diagnostic applies
 	only when the verified three-call layout and unhandled-category log marker both match. Added atomic
 	ABI checks for Sophisticated Storage recipe-extension cache reuse and anvil representative Mixins,
 	loader-specific grindstone repair checks, and generation/plugin-finally cleanup for anvil,
@@ -368,3 +368,40 @@ When a validation run resolves a to-verify item:
 	19.27 all completed quick-play with `wrong-thread=0`, `false broken-setRecipe=0`, and no critical
 	injection failure. The remaining Tinkers Jewelry category omission, Supplementaries null color
 	mapping, and AlmostFluidified null runtime are third-party state errors and remain visible.
+- 2026-09-03 — Issues 6 and 7 identified five JEI plugins that call main-thread-only APIs from
+	registration/runtime callbacks. Added `async.mainThreadPlugins` with those exact plugin IDs as
+	defaults and support for user-added plugin IDs or whole-mod namespaces. A Forge JEI `15.20.0.120`
+	smoke added `justenoughthreads:core` as a temporary custom entry: all of its callback bodies ran on
+	`Render thread`, while unlisted `jei:minecraft` recipe registration remained on
+	`justenoughthreads-start`. JEI completed in 3.726 seconds with no wrong-thread or Mixin errors.
+	The test entry was removed after the run. Evidence:
+	`build/benchmarks/jei-compat/forge-15.20.0.120.main-thread-plugin-list.debug.log`.
+- 2026-09-03 — Investigated the 25,000-line `latest_tail.log` from Forge `1.20.1`, JEI
+	`15.49.0.199`. Its 42 duplicate subtype errors all came from Storage in Motion iterating the same
+	`SubtypeInterpreters` map already registered by Sophisticated Storage. A released-jar A/B with
+	Storage in Motion `0.10.37.355`, Sophisticated Storage `1.4.86.2131`, and Sophisticated Core
+	`1.3.84.2308` reproduced exactly 42 errors with both `asyncStartup=true` and `false`, excluding
+	threading as the cause. The ABI-gated compatibility Mixin now skips only that duplicate map read;
+	both asynchronous and synchronous client runs completed with zero duplicate subtype, plugin, or
+	Mixin errors. Evidence: `forge-15.20.0.134.storage-in-motion-{async,sync,fixed-final,fixed-sync}.debug.log`.
+- 2026-09-03 — The same log contained no JEI wrong-thread assertion. The other visible failures are
+	third-party state, dependency, or data errors and remain unsuppressed: Avaritia Integration reads
+	missing optional-module items while building its creative tab; Tinkers Jewelry EX lacks
+	`AbstractMaterialStatsCategory`; Adams Ars Plus duplicates an Ars Nouveau `DyeRecipe` extension;
+	Supplementaries receives a null color mapping; AlmostFluidified has no initialized runtime;
+	JER treats four projectile entity types as living mobs; Apotheosis assembles an empty socketing
+	recipe; Brewin' and Chewin' references a missing Farmer's Respite item; and All The Imbaium tooltip
+	math divides by zero. PneumaticCraft's 12 no-world messages did not reproduce with its released
+	`6.0.23` jar in an isolated async client. JEI's 42 `is running and has taken` ERROR lines are slow
+	phase progress reports from `PluginCallerTimerRunnable`, not thrown exceptions.
+- 2026-09-03 — Verified the default issue-7 route with released Collector's Reap `1.5.5` and
+	Blueprint `7.1.4` on Forge JEI `15.20.0.120`. Its `registerRecipes` callback body ran on Render
+	thread and successfully removed 23 item stacks and 21 fluid stacks. JEI completed in 7.241 seconds
+	with zero wrong-thread, plugin, or Mixin failures. The unlisted Farmer's Delight callback remained
+	on `justenoughthreads-start`. Evidence:
+	`build/benchmarks/jei-compat/forge-15.20.0.120.collectors-reap-main-thread.debug.log`.
+- 2026-09-03 — Verified the loader-specific built-in route on NeoForge JEI `19.27.0.340`.
+	`jei:minecraft` ingredient registration and `jei:neoforge_gui` runtime registration executed on
+	Render thread, while JEI startup coordination remained on `justenoughthreads-start`. Startup
+	completed in 5.330 seconds with zero wrong-thread, plugin, or Mixin failures. Evidence:
+	`build/benchmarks/jei-compat/neoforge-default.builtin-main-thread-phases.debug.log`.

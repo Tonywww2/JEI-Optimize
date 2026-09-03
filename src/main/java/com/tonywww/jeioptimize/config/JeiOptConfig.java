@@ -24,6 +24,7 @@ import net.neoforged.neoforge.common.ModConfigSpec.IntValue;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 
 public final class JeiOptConfig {
     private static final String CONFIG_NAME = JeiOptimize.MOD_ID + "-client.toml";
@@ -96,6 +97,7 @@ public final class JeiOptConfig {
     static final BooleanValue ASYNC_PARALLEL_INGREDIENT_FILTER;
     static final BooleanValue ASYNC_PARALLEL_VANILLA_RECIPES;
     static final BooleanValue ASYNC_STARTUP;
+    static final ConfigValue<List<? extends String>> ASYNC_MAIN_THREAD_PLUGINS;
 
     private static boolean registered;
 
@@ -355,12 +357,24 @@ public final class JeiOptConfig {
                 "Run JEI startup serially on a dedicated background thread so the render thread stays responsive while",
                 "JEI builds its item list and recipes after you enter a world. JEI overlays and search simply",
                 "appear when startup finishes instead of freezing the loading screen.",
-                "Plugin callbacks keep JEI's original order and are never run concurrently. Runtime-available",
-                "callbacks and publication run on the client thread. Disable this option if an earlier plugin",
-                "registration callback requires the render thread. Leaving a world, timing out, or losing the server",
+                "Plugin callbacks keep JEI's original order and are never run concurrently. Plugins listed in",
+                "mainThreadPlugins, runtime-available callbacks, and publication run on the client thread.",
+                "Leaving a world, timing out, or losing the server",
                 "cancels an in-progress build before",
                 "its runtime can be published. Enabled by default.")
             .define("asyncStartup", true);
+        ASYNC_MAIN_THREAD_PLUGINS = builder
+            .comment(
+                "JEI plugin IDs that must run on the client thread during asynchronous startup.",
+                "Use a full plugin ID such as \"theurgy:jei_plugin\", or a mod ID such as \"theurgy\"",
+                "to route every JEI plugin from that mod. Add entries when a log reports that a plugin",
+                "called a main-thread-only API from justenoughthreads-start. JEI's own creative-tab",
+                "enumeration and GUI runtime construction stay on the client thread automatically.")
+            .defineListAllowEmpty(
+                "mainThreadPlugins",
+                JeiMainThreadPluginPolicy.DEFAULT_PLUGIN_IDS,
+                JeiMainThreadPluginPolicy::isValidEntry
+            );
         builder.pop();
 
         SPEC = builder.build();

@@ -88,12 +88,6 @@ public final class JeiOptRuntimeState {
         }
     }
 
-    public static int pendingTaskCount() {
-        synchronized (LOCK) {
-            return pendingTasks.size();
-        }
-    }
-
     private static void cancelPendingTasksLocked() {
         if (pendingTasks.isEmpty()) {
             return;

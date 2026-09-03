@@ -187,6 +187,14 @@ Feature facade: `com.tonywww.jeioptimize.config.JeiOptFeatureFlags`.
 | `async.parallelVanillaRecipes` | `false` | Recipe ingredients are not pre-resolved on workers. |
 | `async.asyncStartup` | `true` | `JeiStarter.start()` runs on its caller thread. |
 
+`async.mainThreadPlugins` is a string list of JEI plugin IDs that must execute on the client thread
+during asynchronous startup. A full `namespace:path` matches one plugin; a bare `namespace` matches
+all plugins from that mod. The shipped defaults are `alexscaves:alexscaves`,
+`experienceobelisk:jei_plugin`, `collectorsreap:jei_plugin`, `theurgy:jei_plugin`, and
+`productivetrees:productivetrees`. JEI's own `jei:minecraft` ingredient registration and
+`jei:forge_gui`/`jei:neoforge_gui` runtime registration are mandatory client-thread safety
+boundaries and are not controlled by this list; their other phases remain on the startup thread.
+
 Defaults reflect the shipped configuration after validation and change-control approval. Any later
 default change still requires a CR.
 
@@ -228,6 +236,7 @@ public final class JeiOptFeatureFlags {
     public static boolean asyncIngredientFilter();
     public static boolean parallelVanillaRecipes();
     public static boolean asyncStartup();
+    public static boolean pluginRequiresMainThread(String pluginUid);
     public static int workerThreads();
     public static int parallelThreshold();
 }
@@ -235,7 +244,9 @@ public final class JeiOptFeatureFlags {
 
 Rules:
 
-- Every boolean method except `enabled()` must return `enabled() && specificConfigValue`.
+- Boolean feature gates except `enabled()` must return `enabled() && specificConfigValue`.
+- `pluginRequiresMainThread` matches an immutable lifecycle snapshot of full plugin IDs and bare mod
+    namespaces; it is a routing policy rather than an independent feature gate.
 - Mixins must call the specific method closest to their feature.
 - No mixin may read `JeiOptConfig` fields directly.
 
@@ -267,6 +278,8 @@ pool and does not run plugin callbacks concurrently. The exception requires all 
 - Plugin callback order and JEI exception behavior remain unchanged.
 - Every start owns a generation token and checks cancellation between plugin callbacks.
 - Stop invalidates the generation, interrupts the startup thread, and cancels derived tasks.
+- Plugins selected by `async.mainThreadPlugins` execute serially on the client thread; all other
+    registration callbacks remain serial on the dedicated startup thread.
 - The final `IModPlugin.onRuntimeAvailable` callback batch executes serially on the client thread.
 - Ingredient-filter chunks build only into an isolated search index. JEI string extraction and
     insertion execute in bounded client-thread chunks; worker pools may only coordinate them or
@@ -278,8 +291,9 @@ pool and does not run plugin callbacks concurrently. The exception requires all 
     JEI registers them before its runtime exists. The guard must not cancel vanilla screen input and
     must become inert immediately after runtime publication completes.
 - The runtime is published on the client thread only when its generation is still current.
-- Packs containing an earlier registration callback that requires the client thread can disable
-    `asyncStartup` to restore JEI's caller-thread startup path.
+- Packs containing another registration callback that requires the client thread can add its JEI
+    plugin ID or mod ID to `async.mainThreadPlugins`; disabling `asyncStartup` remains the full
+    compatibility fallback.
 
 Publish rules:
 

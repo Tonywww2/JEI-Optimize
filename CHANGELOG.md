@@ -4,6 +4,32 @@ All notable changes to Just Enough Threads are documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.13.4
+
+### Fixed
+
+- **JEI plugins that call main-thread-only APIs are selectively routed back to the client thread
+  during asynchronous startup.** The default `async.mainThreadPlugins` list covers Alex's Caves,
+  Experience Obelisk, Collector's Reap, Theurgy, and Productive Trees, resolving the wrong-thread
+  failures reported in issues 6 and 7. Users can add a full JEI plugin ID or a mod ID to cover
+  additional plugins. Callback order remains serial, and an unknown plugin UID fails safe to the
+  client thread.
+- **JEI's own thread-sensitive phases remain on the client thread without moving all of its work
+  there.** Vanilla ingredient registration stays on the client thread because it enumerates
+  creative tabs and invokes third-party callbacks; Forge and NeoForge GUI runtime construction
+  stays there because it requests third-party tooltips. Expensive vanilla recipe registration
+  remains on the dedicated startup thread.
+- **Sophisticated Storage in Motion no longer registers Sophisticated Storage's 42 subtype
+  interpreters a second time.** The compatibility hook skips only the shared subtype-table traversal
+  after verifying that both plugins use the same exact call shape; all add-on-specific behavior is
+  retained, and an incompatible update keeps its original behavior.
+
+### Changed
+
+- **Repository unit tests were removed in favor of real client startup validation.** Build tasks
+  continue to verify compilation and packaging, while behavior changes are exercised against the
+  affected released mod jars in isolated synchronous and asynchronous runtime environments.
+
 ## 0.13.3
 
 ### Fixed

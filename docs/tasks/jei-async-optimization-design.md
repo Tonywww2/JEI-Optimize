@@ -130,13 +130,15 @@ Every feature must have a boolean gate. Proposed keys:
 | `async.workerThreads` | Worker thread count, bounded integer. |
 | `async.snapshotBudgetMs` | Per-client-tick snapshot extraction budget. |
 | `async.asyncStartup` | Build and register JEI serially on a cancellable dedicated thread, then run runtime callbacks and publication on the client thread. |
+| `async.mainThreadPlugins` | Plugin IDs or mod IDs whose serial callbacks must be routed to the client thread. |
 
 ### Safety Rules
 
 - Worker thread may read only immutable snapshot DTOs and primitive/string/UID values.
 - Worker thread must not call `IModPlugin`, `IRecipeCategory`, `IIngredientHelper`, `IIngredientRenderer`, `Minecraft`, `Screen`, or mutable `ItemStack` logic.
 - The dedicated `asyncStartup` thread is not a worker-pool task. It may execute `IModPlugin` only
-  as part of JEI's serial build and registration loop; plugin callbacks must never overlap.
+  as part of JEI's serial build and registration loop; plugin callbacks must never overlap. Entries
+  selected by `async.mainThreadPlugins` execute synchronously on the client thread instead.
 - `IModPlugin.onRuntimeAvailable` and runtime publication must execute on the client thread.
 - Every async task carries a generation id and checks it before publishing.
 - `JeiStarter.stop()` or reload invalidates generation and cancels pending tasks.

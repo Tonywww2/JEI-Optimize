@@ -36,7 +36,11 @@ The biggest single cost — the ingredient index — no longer blocks loading; i
 Config file: `config/justenoughthreads-client.toml`. Every optimization can be toggled independently. The legacy `jei_optimize-client.toml` is copied automatically when the new file is absent.
 
 *   `enabled` — master switch for the whole mod.
-*   `asyncStartup` — build JEI serially on a dedicated background thread, then run runtime callbacks and publication on the client thread; world exit, timeout, and server shutdown cancel stale work immediately.
+*   `asyncStartup` — build JEI serially on a dedicated background thread, then run configured plugins, runtime callbacks, and publication on the client thread; world exit, timeout, and server shutdown cancel stale work immediately.
+*   `mainThreadPlugins` — JEI plugin IDs that must use the client thread. The defaults cover Alex's Caves, Experience Obelisk, Collector's Reap, Theurgy, and Productive Trees. Add `modid:path` for one plugin or `modid` for all plugins from a mod.
+
+JEI's own creative-tab enumeration and GUI runtime construction always stay on the client thread;
+they do not need entries in this list.
 *   `asyncIngredientFilter` — build the ingredient search index off-thread in chunks, then publish the sidebar once.
 *   `parallelVanillaRecipes` — experimental recipe ingredient pre-resolution; disabled by default.
 *   `disableAnvilRepairRecipes` / `disableAnvilEnchantRecipes` — hide generated anvil recipes; enabled by default.
@@ -70,7 +74,7 @@ _你会看到:_ JEI 物品列表在你进入世界后稍等片刻才出现,而�
 
 **保持界面响应的串行 JEI 启动**
 
-`asyncStartup` 会在一条专用后台线程上按 JEI 原顺序构建配方与 runtime。插件回调不会并发执行;最终的 `onRuntimeAvailable` 回调和 runtime 发布会返回客户端线程,以兼容 JEI 仅允许在主线程调用的运行时 API。退出世界、连接超时或服务器关闭时,当前 generation 会立即失效,启动线程和派生任务会被取消,旧 runtime 不会发布到下一个世界。
+`asyncStartup` 会在一条专用后台线程上按 JEI 原顺序构建配方与 runtime。插件回调不会并发执行;`mainThreadPlugins` 中的插件、最终的 `onRuntimeAvailable` 回调和 runtime 发布会返回客户端线程,以兼容 JEI 仅允许在主线程调用的 API。退出世界、连接超时或服务器关闭时,当前 generation 会立即失效,启动线程和派生任务会被取消,旧 runtime 不会发布到下一个世界。
 
 **实验性并行预解析配方材料**
 
@@ -99,6 +103,9 @@ JEI 自动生成的材料修复与附魔书组合配方默认隐藏。在超大�
 
 *   `enabled` — 整个 mod 的总开关。
 *   `asyncStartup` — 在专用后台线程上串行启动 JEI;退出世界、连接超时或服务器关闭时立即取消,默认开启。
+*   `mainThreadPlugins` — 必须在客户端主线程执行的 JEI 插件 ID 列表。默认包含 Alex's Caves、Experience Obelisk、Collector's Reap、Theurgy 和 Productive Trees。填写 `modid:path` 可匹配单个插件,只填写 `modid` 可匹配该模组的全部插件。
+
+JEI 自身的创造栏枚举和 GUI runtime 构建始终保留在客户端主线程，无需加入该列表。
 *   `asyncIngredientFilter` — 进入世界后按真实分块离主线程构建物品搜索索引，完成后一次性发布侧栏。
 *   `parallelVanillaRecipes` — 实验性并行预解析配方材料;默认关闭。
 *   `disableAnvilRepairRecipes` / `disableAnvilEnchantRecipes` — 隐藏自动生成的铁砧配方;默认开启。

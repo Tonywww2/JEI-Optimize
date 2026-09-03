@@ -81,12 +81,18 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
         MIXIN_PACKAGE + "RecipeManagerSafeDiagnosticMixin";
     private static final String EXTENDABLE_RECIPE_HELPER_MIXIN =
         MIXIN_PACKAGE + "ExtendableRecipeCategoryHelperMixin";
+    private static final String STORAGE_IN_MOTION_SUBTYPE_MIXIN =
+        MIXIN_PACKAGE + "compat.StorageInMotionSubtypeMixin";
     private static final String SOPHISTICATED_SHULKER_ACCESSOR_MIXIN =
         MIXIN_PACKAGE + "accessor.SophisticatedStorageShulkerRecipeAccessor";
     private static final String EXTENDABLE_RECIPE_HELPER_CLASS =
         "mezz.jei.library.recipes.ExtendableRecipeCategoryHelper";
     private static final String SOPHISTICATED_SHULKER_RECIPE_CLASS =
         "net.p3pp3rf1y.sophisticatedstorage.crafting.ShulkerBoxFromVanillaShapelessRecipe";
+    private static final String SOPHISTICATED_STORAGE_JEI_PLUGIN_CLASS =
+        "net.p3pp3rf1y.sophisticatedstorage.compat.recipeviewers.jei.StorageJeiPlugin";
+    private static final String STORAGE_IN_MOTION_JEI_PLUGIN_CLASS =
+        "net.p3pp3rf1y.sophisticatedstorageinmotion.compat.recipeviewers.jei.StorageInMotionJeiPlugin";
     private static final String ANVIL_RECIPE_MAKER_CLASS =
         "mezz.jei.library.plugins.vanilla.anvil.AnvilRecipeMaker";
     private static final String ANVIL_ENCHANTMENT_DATA_CLASS = ANVIL_RECIPE_MAKER_CLASS + "$EnchantmentData";
@@ -118,6 +124,19 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
         "accept",
         "(Ljava/lang/Object;)V"
     );
+    private static final Requirement SOPHISTICATED_REGISTER_ITEM_SUBTYPES = Requirement.method(
+        "Sophisticated Storage subtype registration",
+        "registerItemSubtypes",
+        "(Lmezz/jei/api/registration/ISubtypeRegistration;)V"
+    );
+    private static final InvocationRequirement SOPHISTICATED_SUBTYPE_TABLE_INVOCATION =
+        new InvocationRequirement(
+            "registerItemSubtypes",
+            "(Lmezz/jei/api/registration/ISubtypeRegistration;)V",
+            "net/p3pp3rf1y/sophisticatedstorage/compat/recipeviewers/common/subtypes/SubtypeInterpreters",
+            "getSubtypeInterpreters",
+            "()Ljava/util/Map;"
+        );
     private static final Requirement THERMAL_REGISTER_RECIPES = Requirement.method(
         "Thermal Stirling Dynamo fuel compaction",
         "registerRecipes",
@@ -401,6 +420,31 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
             new TargetRequirement(
                 ANVIL_ENCHANTMENT_DATA_CLASS,
                 List.of(ANVIL_REPRESENTATIVE_CAN_ENCHANT)
+            )
+        )
+    );
+    private static final AtomicFeature STORAGE_IN_MOTION_SUBTYPE_FEATURE = new AtomicFeature(
+        "Storage in Motion duplicate subtype registration guard",
+        List.of(
+            new TargetRequirement(
+                SOPHISTICATED_STORAGE_JEI_PLUGIN_CLASS,
+                List.of(SOPHISTICATED_REGISTER_ITEM_SUBTYPES)
+            ),
+            new TargetRequirement(
+                STORAGE_IN_MOTION_JEI_PLUGIN_CLASS,
+                List.of(SOPHISTICATED_REGISTER_ITEM_SUBTYPES)
+            )
+        ),
+        List.of(
+            new InvocationTargetRequirement(
+                SOPHISTICATED_STORAGE_JEI_PLUGIN_CLASS,
+                SOPHISTICATED_SUBTYPE_TABLE_INVOCATION,
+                1
+            ),
+            new InvocationTargetRequirement(
+                STORAGE_IN_MOTION_JEI_PLUGIN_CLASS,
+                SOPHISTICATED_SUBTYPE_TABLE_INVOCATION,
+                1
             )
         )
     );
@@ -745,6 +789,7 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
         Map.entry(EMBERS_PLUGIN_MIXIN, EMBERS_DAWNSTONE_ANVIL_FEATURE),
         Map.entry(EMBERS_CATEGORY_MIXIN, EMBERS_DAWNSTONE_ANVIL_FEATURE),
         Map.entry(SFM_FALLING_ANVIL_MIXIN, SFM_FALLING_ANVIL_FEATURE),
+        Map.entry(STORAGE_IN_MOTION_SUBTYPE_MIXIN, STORAGE_IN_MOTION_SUBTYPE_FEATURE),
         Map.entry(JEED_EFFECT_CLICK_MIXIN, JEED_EFFECT_CLICK_FEATURE),
         Map.entry(BREWING_INDEX_FORGE_MIXIN, BREWING_INDEX_FORGE_FEATURE),
         Map.entry(BREWING_INDEX_NEO_MIXIN, BREWING_INDEX_NEO_FEATURE),
@@ -788,6 +833,7 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
         MIXIN_PACKAGE + "compat.MekanismRecipeRegistryHelperMixin",
         MIXIN_PACKAGE + "compat.ProductiveTreesLogStrippingCategoryMixin",
         MIXIN_PACKAGE + "compat.SfmFallingAnvilCategoryMixin",
+        STORAGE_IN_MOTION_SUBTYPE_MIXIN,
         THERMAL_EXPANSION_PLUGIN_MIXIN,
         MIXIN_PACKAGE + "compat.TinkersJeiPluginMixin",
         MIXIN_PACKAGE + "compat.UltimateCarRecipeBuilderMixin",
@@ -1054,13 +1100,6 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
             ).isPresentIn(wrapper);
     }
 
-    static boolean hasAnvilRepresentativeContract(ClassNode recipeMaker, ClassNode enchantmentData) {
-        return recipeMaker != null
-            && enchantmentData != null
-            && ANVIL_REPRESENTATIVE_ENTRY_POINT.isPresentIn(recipeMaker)
-            && ANVIL_REPRESENTATIVE_CAN_ENCHANT.isPresentIn(enchantmentData);
-    }
-
     private boolean isAtomicFeatureCompatible(AtomicFeature feature, boolean variant) {
         Boolean cached = atomicFeatureCompatibility.get(feature);
         if (cached != null) {
@@ -1089,14 +1128,6 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
             }
         }
         return compatible;
-    }
-
-    static boolean hasAtomicFeatureContract(String mixinClassName, Map<String, ClassNode> targets) {
-        String qualifiedName = mixinClassName.startsWith(MIXIN_PACKAGE)
-            ? mixinClassName
-            : MIXIN_PACKAGE + mixinClassName;
-        AtomicFeature feature = ATOMIC_FEATURES.get(qualifiedName);
-        return feature != null && checkAtomicFeature(feature, targets::get).compatible();
     }
 
     private static AtomicFeatureCheck checkAtomicFeature(
@@ -1129,8 +1160,15 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
                 continue;
             }
             sawTarget = true;
-            if (!invocationTarget.requirement().isPresentIn(target) && missing == null) {
-                missing = invocationTarget.className() + " " + invocationTarget.requirement().describe();
+            int invocationCount = invocationTarget.requirement().countIn(target);
+            boolean invocationCompatible = invocationTarget.expectedCount() == 0
+                ? invocationCount > 0
+                : invocationCount == invocationTarget.expectedCount();
+            if (!invocationCompatible && missing == null) {
+                missing = invocationTarget.className() + " " + invocationTarget.requirement().describe()
+                    + (invocationTarget.expectedCount() == 0
+                        ? ""
+                        : " exactly " + invocationTarget.expectedCount() + " time(s)");
             }
         }
         return new AtomicFeatureCheck(missing == null, sawTarget, missing);
@@ -1220,7 +1258,14 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
     private record TargetRequirement(String className, List<Requirement> requirements) {
     }
 
-    private record InvocationTargetRequirement(String className, InvocationRequirement requirement) {
+    private record InvocationTargetRequirement(
+        String className,
+        InvocationRequirement requirement,
+        int expectedCount
+    ) {
+        private InvocationTargetRequirement(String className, InvocationRequirement requirement) {
+            this(className, requirement, 0);
+        }
     }
 
     private record AtomicFeatureCheck(boolean compatible, boolean sawTarget, String missing) {

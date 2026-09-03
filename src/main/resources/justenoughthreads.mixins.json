@@ -55,6 +55,7 @@
     "compat.MekanismRecipeRegistryHelperMixin",
     "compat.ProductiveTreesLogStrippingCategoryMixin",
     "compat.SfmFallingAnvilCategoryMixin",
+    "compat.StorageInMotionSubtypeMixin",
     "compat.ThermalExpansionJeiPluginMixin",
     "compat.TinkersJeiPluginMixin",
     "compat.UltimateCarRecipeBuilderMixin",
