@@ -2,6 +2,35 @@
 
 > Owner: agent3. Maps to: T2.3. Scope: baseline runClient and measurement procedure before optimization implementation.
 
+## ATM9 / GTCEu Registration Stall
+
+The inspected All the Mods 9 `1.1.1` environment uses Minecraft `1.20.1`, Forge `47.4.0`, JEI
+`15.20.0.116`, GTCEu `7.2.0`, Just Enough Threads `0.13.6`, Java `21.0.8`, and a fixed 8 GiB heap.
+Its debug log ends while `gtceu:jei_plugin` has been in recipe registration for 15 seconds. It does
+not contain an out-of-memory error, deadlock proof, crash marker, or normal JEI completion marker,
+so the evidence supports a heavy registration/allocation stall rather than a proven deadlock.
+
+Version `0.13.7` batches only
+`com.gregtechceu.gtceu.integration.jei.recipe.GTRecipeJEICategory.registerRecipes`. The optional
+Mixin activates only when that exact method contains exactly one `List.copyOf(Collection)` call and
+one JEI `IRecipeRegistration.addRecipes(RecipeType, List)` call. Each category of more than 8192
+recipes is submitted in immutable, ordered batches of at most 8192; smaller categories retain the
+original `List.copyOf` path. No recipes or focus indexes are removed.
+
+Repository validation completed:
+
+| Check | Result |
+|---|---|
+| Forge 1.20.1 focused compile | passed |
+| Forge 1.20.1 full build | passed |
+| NeoForge 1.21.1 full build | passed; optional GTCEu Mixin remains absent when GTCEu is absent |
+| Synthetic 20,003-entry ordered registration | passed in immutable batches `[8192, 8192, 3619]`; every entry exactly once |
+| Forge remapped jar inspection | helper class, Mixin class, and Mixin JSON entry present |
+
+Real ATM9 startup validation is still required. Success requires a JEI completion marker, GTCEu
+batch start/completion markers, and no Mixin application error, plugin callback failure,
+task-pump error, out-of-memory error, or crash.
+
 ## 1. Environment
 
 Verified project assumptions:
@@ -211,6 +240,87 @@ Current status: matrices are intentionally not auto-filled by compile/run smoke.
 | Forge JEI `15.48.0.179` | `JEI_15_MODERN`; indexed brewing lookup and hidden anvil/grindstone menu batching | The brewing index reported active for generation 2; JEI started in 2.397 seconds and published 2,670 ingredients in 6 chunks with no fallback. Auto worker selection resolved to 8 threads. |
 | NeoForge JEI `19.27.0.340` | `JEI_19_PLUS`; PotionBrewing-aware indexed lookup; upstream direct grindstone computation retained | The brewing index reported active for generation 2; JEI started in 4.650 seconds and published 1,688 ingredients in 4 chunks with no fallback. Auto worker selection resolved to 8 threads. |
 
+### JEI 15.49+ Artifact and Client Task-Pump Guard
+
+JEI `15.49.0.199-.202` Gradle metadata exposes a standalone-incomplete `-unshaded` runtime
+variant. Compatibility overrides now select Maven's complete default jar, and
+`scripts/test-jei-compat.ps1` rejects `-unshaded`, verifies Forge's relocated Baked Substring
+implementation, and writes the exact runtime/config hashes. Forge and NeoForge log formats have
+separate path extractors; both produced manifests in the final runs.
+
+A temporary probe invoked `Minecraft.managedBlock` from `justenoughthreads-start`. The production
+`ClientTaskPumpGuardMixin` intercepted its single `Minecraft.pollTask()` attempt and returned
+without dequeuing. Render thread completed the queued work, JEI started in 3.118 seconds, and the
+run had no plugin, wrong-thread, empty-queue, or critical Mixin error. The probe was removed before
+the following production-only matrix:
+
+| Runtime | Loaded JEI SHA-256 | JEI time | Guard hits | Relevant errors |
+|---|---|---:|---:|---:|
+| Forge JEI `15.49.0.199` | `8DC48E23211B42FF47660C72A03B3F13A3DD734D6DD237B7FC1CFDE114BFA596` | 3.073 s | 0 | 0 |
+| Forge JEI `15.57.0.207` | `CF252568CC15D10C6DF8A598143C2F85AA2839FAF0768227A97848EF2BFDD237` | 3.677 s | 0 | 0 |
+| Forge `.199` + Re:Avaritia `1.4.1` | `.199` hash above | 3.353 s | 0 | 0 |
+| NeoForge JEI `19.27.0.340` | `1343FD994F411CB53C430DA8674EC31064A7EB6724A6B4A7AF76949AA3E0E13E` | 5.625 s | 0 | 0 |
+| NeoForge 19.27 + Re:Avaritia `1.4.1` | NeoForge hash above | 5.916 s | 0 | 0 |
+
+Every run entered a real singleplayer world and emitted exactly one JEI completion marker.
+"Relevant errors" counts plugin exceptions, runtime `RunningOnDifferentThreadException`,
+`NoSuchElementException`, Baked Substring linkage failures, and critical Mixin failures. Forge
+debug logs mention the `RunningOnDifferentThreadException.class` file once while scanning the
+Minecraft jar; runtime logs contain no thrown instance. Both Re:Avaritia runs identified
+`avaritia:jei_plugin` without requiring a main-thread policy entry.
+
+Pinned Re:Avaritia SHA-512 values remained:
+
+- Forge: `1E75A8A93B1DE4A5A574EE1D1F652E02060DF25FBE7B0A3E0F9FFCE7D94E9DD0A77265DA450621484FC1888B1C49C02A8C35732FF15A20F3C4FA13A099879DA9`
+- NeoForge: `34217CB841F149E8AD697FD79BEE3FCBAFAB096731D9498157A887E78FAFEBAA72F52D09E104E7391F5C529B6CA61A6006C98C9FE9204ADF85228AEE519D400F`
+
+Evidence:
+`build/benchmarks/jei-compat/{forge-15.49.0.199,forge-15.57.0.207,neoforge-default}.task-pump-guard-final.*`
+and the corresponding `task-pump-guard-final-avaritia` files. The original large-pack log omits
+the interval containing the first caller, so the production guard records a complete first-hit
+stack plus active phase/plugin for any future reproduction.
+
+#### Production Forge namespace follow-up
+
+An SDBF production `debug.log` from 2026-09-05 loaded Just Enough Threads `0.13.5` and completed JEI
+once in 26.76 seconds. It contained zero `RunningOnDifferentThreadException`, Client task execution
+errors, `NoSuchElementException`, plugin callback errors, or critical Mixin errors. It nevertheless
+showed that the new guard was not active:
+
+```text
+JEI Optimize turned off its off-main client task-pump guard optimization: this JEI build's
+net.minecraft.util.thread.BlockableEventLoop no longer declares method pollTask()Z.
+```
+
+Forge production exposes the same method as `m_7245_()Z`; the release refmap already targeted that
+name, but the custom ASM precheck used only the development name and rejected the Mixin first.
+Version `0.13.6` accepts either `pollTask()Z` or `m_7245_()Z`, still with the exact descriptor. The
+remapped jar was checked to contain both gate names and the refmap target. A subsequent user-run
+SDBF launch recorded the new DEBUG enable line for `m_7245_()Z` and Mixin's application of
+`ClientTaskPumpGuardMixin` to `BlockableEventLoop`; the old disable warning was absent.
+
+Post-fix development-runtime clients selected `pollTask()Z` explicitly on both loaders. Forge JEI
+`15.49.0.199` completed in 2.844 seconds and NeoForge JEI `19.27.0.340` in 5.763 seconds. Both had
+one guard-enable marker, zero guard-disable markers, zero normal-path guard hits, and zero plugin,
+wrong-thread, empty-queue, or critical Mixin errors. The Forge `0.13.6` remapped jar contains the
+`m_7245_()Z` refmap target for the production namespace.
+
+The production SDBF run used JEI `15.21.0.148`, completed JEI once in 21.59 seconds, remained in a
+singleplayer world for roughly six minutes, and shut down normally. It had zero guard hits,
+`RunningOnDifferentThreadException`, Client task execution errors, `NoSuchElementException`, plugin
+callback errors, critical Mixin errors, crash reports, or lifecycle failures. Because it neither
+triggered the guarded path nor used the original report's JEI `.199`, it verifies deployment and
+normal-path safety rather than an end-to-end reproduction of the original race.
+
+One unrelated `ConcurrentModificationException` occurred on `Thread-17` while NightConfig's
+`WriteAsyncFileConfig` iterated a `LinkedHashMap`, before JEI startup began. The only JET-thread
+ERROR remained Apotheosis `7.4.8` indexing an empty socketing recipe; neither stack entered the
+Minecraft Client task pump from `justenoughthreads-start`.
+
+The same log's only JET-thread ERROR was an independent Apotheosis socketing recipe that failed
+JEI's `setRecipe`; `jei:forge_gui` also emitted one five-second slow-phase report before startup
+completed. Neither matched the queue-race signature.
+
 Thermal Expansion runtime compatibility was also verified on Forge with JEI `15.21.0.148` and
 Thermal Expansion `11.0.1.29`. `ThermalExpansionJeiPluginMixin` applied, and Stirling fuel batches
 compacted from 5 to 5 and from 313 to 14 pages. JEI startup completed in 5.168 seconds with zero
@@ -405,3 +515,12 @@ When a validation run resolves a to-verify item:
 	Render thread, while JEI startup coordination remained on `justenoughthreads-start`. Startup
 	completed in 5.330 seconds with zero wrong-thread, plugin, or Mixin failures. Evidence:
 	`build/benchmarks/jei-compat/neoforge-default.builtin-main-thread-phases.debug.log`.
+- 2026-09-05 — Forced complete JEI artifacts for runtime overrides, added cross-loader artifact
+	manifests, and guarded Minecraft Client task pumping from the JET startup thread. A controlled
+	probe hit the guard once; final Forge `.199`/`.207`, NeoForge 19.27, and both Re:Avaritia clients
+	completed with zero relevant runtime errors.
+- 2026-09-05 — Audited an SDBF production Forge log. The original queue-race signature was absent,
+	but `0.13.5` had failed closed because its custom ABI gate did not recognize Forge's production
+	SRG name `m_7245_()Z`. Version `0.13.6` accepts that exact alias; production launch verification
+	later confirmed the SRG enable marker and actual Mixin application. The clean run used JEI
+	`15.21.0.148` and did not hit the guard, so the original `.199` trigger remains unreproduced.

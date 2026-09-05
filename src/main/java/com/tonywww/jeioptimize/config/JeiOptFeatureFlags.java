@@ -177,6 +177,10 @@ public final class JeiOptFeatureFlags {
         return enabled() && JeiOptConfig.SYNC_DELAY_COMPACT.get();
     }
 
+    public static boolean batchGtceuRecipeRegistration() {
+        return enabled() && JeiOptConfig.SYNC_BATCH_GTCEU_RECIPE_REGISTRATION.get();
+    }
+
     public static boolean lazyRecipeLayouts() {
         JeiOptConfigSnapshot.Snapshot snapshot = JeiOptConfigSnapshot.current();
         return enabled() && (snapshot != null

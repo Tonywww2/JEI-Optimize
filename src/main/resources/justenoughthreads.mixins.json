@@ -48,6 +48,7 @@
     "compat.EmbersDawnstoneAnvilCategoryMixin",
     "compat.EmbersJeiPluginMixin",
     "compat.GeneratorGaloreJeiPluginMixin",
+    "compat.GtceuRecipeRegistrationMixin",
     "compat.IronFurnacesGeneratorCategoryMixin",
     "compat.IronFurnacesJeiPluginMixin",
     "compat.IronsSpellsArcaneAnvilMakerMixin",
@@ -64,6 +65,7 @@
   ],
   "client": [
     "ClientDisconnectHookMixin",
+    "ClientTaskPumpGuardMixin",
     "ClientTickHookMixin",
     "JeiClientInputGuardMixin",
     "JeiGuiRenderGuardMixin",

@@ -4,6 +4,45 @@ All notable changes to Just Enough Threads are documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.13.7
+
+### Fixed
+
+- **Large GTCEu recipe categories are registered with JEI in bounded, ordered batches.** GTCEu
+  `7.2.0` previously created a complete immutable list before JEI allocated another accepted-recipe
+  list and populated its ingredient indexes. Categories larger than 8192 recipes now avoid both
+  full-size transient lists while preserving every recipe, original iteration order, and JEI focus
+  index. The optional Mixin requires the exact verified GTCEu method and call-site ABI; unknown
+  versions keep GTCEu's original registration path.
+
+## 0.13.6
+
+### Fixed
+
+- **The Client task-pump guard now activates in production Forge 1.20.1.** Version `0.13.5`'s
+  Mixin refmap correctly targeted `m_7245_()Z`, but its separate pre-application ABI check only
+  recognized the development name `pollTask()Z` and disabled the guard before injection. The gate
+  now accepts either verified name with the exact descriptor and logs the selected production ABI.
+
+## 0.13.5
+
+### Fixed
+
+- **The asynchronous JEI startup thread can no longer consume Minecraft Client tasks.** A guarded
+  `BlockableEventLoop.pollTask` call returns without dequeuing only when the receiver is the
+  Minecraft client and the caller is `justenoughthreads-start`. The Render thread remains the sole
+  queue consumer, preventing the wrong-thread reschedule storm and concurrent empty-queue removal
+  seen in the reported JEI `15.49.0.199` crash.
+- **JEI compatibility runs now reject standalone-incomplete `-unshaded` artifacts.** Plain runtime
+  version overrides select Maven's complete default jar, verify the relocated Baked Substring class
+  on Forge, and record the exact loaded artifact and configuration hashes for both loaders.
+
+### Diagnostics
+
+- **The first blocked Client task-pump attempt now records its complete stack and active JEI phase.**
+  Plugin UID and class attribution remains available even when registration-count diagnostics are
+  disabled; later attempts are rate-limited to powers of ten.
+
 ## 0.13.4
 
 ### Fixed

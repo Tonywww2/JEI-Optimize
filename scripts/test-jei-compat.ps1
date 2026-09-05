@@ -7,7 +7,9 @@
     Starts `runClient` with quick-play into a world, watches run/logs/latest.log until JEI reports
     "Starting JEI took", waits a few more seconds so late log lines land, then kills the whole
     process tree. The client is always terminated: the kill lives in a `finally`, so a crash, a
-    hang, a parse error or Ctrl-C still leaves no orphaned Minecraft window behind.
+    hang, a parse error or Ctrl-C still leaves no orphaned Minecraft window behind. A plain JEI
+    version override resolves Maven's complete default jar instead of a standalone-incomplete
+    `-unshaded` Gradle variant.
 
 .PARAMETER JeiVersion
     JEI build to resolve at runtime, e.g. 15.48.0.179. Omit to use the version from gradle.properties.
@@ -50,12 +52,14 @@ Set-Location $RepoRoot
 if ($Loader -eq "forge") {
     $GradleProject = ":1.20.1-forge"
     $McVersion = "1.20.1"
+    $ClientLaunchTarget = "forgeclientuserdev"
     # 1.20.1-forge is the active Stonecutter version, so Loom points it at the shared run dir.
     $RunDir = Join-Path $RepoRoot "run"
     if (-not $World) { $World = "sstt" }
 } else {
     $GradleProject = ":1.21.1-neoforge"
     $McVersion = "1.21.1"
+    $ClientLaunchTarget = "forgeclientdev"
     $RunDir = Join-Path $RepoRoot "versions\1.21.1-neoforge\run"
     if (-not $World) { $World = "v121" }
 }
@@ -91,6 +95,30 @@ function Read-LogShared($Path) {
             try { return $reader.ReadToEnd() } finally { $reader.Dispose() }
         } finally { $stream.Dispose() }
     } catch [System.IO.IOException] { return "" }
+}
+
+function Get-JeiRuntimeJarName($Text) {
+    $matches = [regex]::Matches($Text, '(?m)Found mod file "?(?<jar>[^"\r\n]*?jei[^"\r\n]*?\.jar)')
+    if ($matches.Count -eq 0) { return "" }
+    return $matches[$matches.Count - 1].Groups['jar'].Value.Trim()
+}
+
+function Get-JeiRuntimeJarPath($Text) {
+    $matches = [regex]::Matches($Text, '(?m)Generating PackInfo named mod:jei for mod file (?<path>.+?\.jar)\r?$')
+    if ($matches.Count -eq 0) {
+        $matches = [regex]::Matches(
+            $Text,
+            '(?m)Found META-INF/neoforge\.mods\.toml mod of type null: (?<path>.+?[\\/]jei-[^\r\n]*?\.jar)\r?$'
+        )
+    }
+    if ($matches.Count -eq 0) { return "" }
+    return $matches[$matches.Count - 1].Groups['path'].Value.Trim()
+}
+
+function Test-ZipEntry($Path, $EntryName) {
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $archive = [System.IO.Compression.ZipFile]::OpenRead($Path)
+    try { return $null -ne $archive.GetEntry($EntryName) } finally { $archive.Dispose() }
 }
 
 if (-not $KeepConfig) {
@@ -133,6 +161,10 @@ try {
         if ($process.HasExited) { $status = "process-exited"; break }
 
         $text = Read-LogShared $RunLogPath
+        if ($text -match '(?m)Found mod file [^\r\n]*jei[^\r\n]*-unshaded\.jar') {
+            $status = "invalid-jei-runtime"
+            break
+        }
         if ($text -match "Starting JEI took") {
             $status = "jei-started"
             $wait = [DateTime]::UtcNow.AddSeconds($PostJeiWaitSeconds)
@@ -151,7 +183,7 @@ try {
     if ($null -ne $process -and !$process.HasExited) {
         if ($status -eq "timeout") {
             $javaProcess = Get-DescendantProcesses -ProcessId $process.Id |
-                Where-Object { $_.Name -eq "java.exe" -and $_.CommandLine -like "*forgeclientuserdev*" } |
+                Where-Object { $_.Name -eq "java.exe" -and $_.CommandLine -like "*$ClientLaunchTarget*" } |
                 Select-Object -First 1
             $jcmd = Join-Path $JavaHome "bin\jcmd.exe"
             if ($null -ne $javaProcess -and (Test-Path $jcmd)) {
@@ -169,8 +201,53 @@ try {
     $env:Path = $oldPath
 }
 
+$CapturedLogPath = Join-Path $OutDir "$Tag.latest.log"
+$CapturedDebugLogPath = Join-Path $OutDir "$Tag.debug.log"
+$capturedLog = Read-LogShared $CapturedLogPath
+$capturedDebugLog = Read-LogShared $CapturedDebugLogPath
+$runtimeJarName = Get-JeiRuntimeJarName $capturedLog
+$runtimeJarPath = Get-JeiRuntimeJarPath $capturedDebugLog
+$runtimeValidationError = ""
+
+if ($runtimeJarName -match '-unshaded\.jar$') {
+    $status = "invalid-jei-runtime"
+    $runtimeValidationError = "Standalone compatibility run resolved incomplete JEI artifact: $runtimeJarName"
+} elseif ($status -eq "jei-started" -and $JeiVersion) {
+    if (!$runtimeJarName) {
+        $status = "invalid-jei-runtime"
+        $runtimeValidationError = "JEI runtime artifact could not be identified in $CapturedLogPath"
+    } elseif (!$runtimeJarPath -or !(Test-Path $runtimeJarPath)) {
+        $status = "invalid-jei-runtime"
+        $runtimeValidationError = "JEI runtime artifact path could not be verified from $CapturedDebugLogPath"
+    } elseif ($Loader -eq "forge" -and $McVersion -eq "1.20.1" -and
+        !(Test-ZipEntry $runtimeJarPath 'mezz/jei/modshade/net/mezzdev/bakedsubstring/BakedSubstringIndex.class')) {
+        $status = "invalid-jei-runtime"
+        $runtimeValidationError = "JEI runtime artifact is missing its relocated Baked Substring implementation: $runtimeJarPath"
+    }
+}
+
+if ($runtimeJarPath -and (Test-Path $runtimeJarPath)) {
+    $artifactSha256 = (Get-FileHash $runtimeJarPath -Algorithm SHA256).Hash
+    $configSha256 = if (Test-Path $ConfigPath) {
+        (Get-FileHash $ConfigPath -Algorithm SHA256).Hash
+    } else {
+        ""
+    }
+    @(
+        "loader=$Loader"
+        "minecraft=$McVersion"
+        "requestedJei=$(if ($JeiVersion) { $JeiVersion } else { 'default' })"
+        "runtimeJar=$runtimeJarName"
+        "runtimePath=$runtimeJarPath"
+        "runtimeSha256=$artifactSha256"
+        "configSha256=$configSha256"
+        "javaHome=$JavaHome"
+    ) | Set-Content (Join-Path $OutDir "$Tag.runtime.txt") -Encoding UTF8
+}
+
 Write-Host ("loader={0} jei={1} status={2} seconds={3} log={4}" -f `
     $Loader, $(if ($JeiVersion) { $JeiVersion } else { "default" }), $status,
     [int] $stopwatch.Elapsed.TotalSeconds, (Join-Path $OutDir "$Tag.latest.log"))
 
+if ($runtimeValidationError) { Write-Error $runtimeValidationError }
 if ($status -ne "jei-started") { exit 1 }

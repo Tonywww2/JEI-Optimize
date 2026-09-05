@@ -37,6 +37,8 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
     private static final String PLUGIN_CALLER_MIXIN = MIXIN_PACKAGE + "PluginCallerMixin";
     private static final String STARTER_PUBLISH_LEGACY_MIXIN = MIXIN_PACKAGE + "JeiStarterPublishLegacyMixin";
     private static final String STARTER_PUBLISH_MODERN_MIXIN = MIXIN_PACKAGE + "JeiStarterPublishModernMixin";
+    private static final String CLIENT_TASK_PUMP_GUARD_MIXIN =
+        MIXIN_PACKAGE + "ClientTaskPumpGuardMixin";
     private static final String CELESTIAL_REINFORCE_MIXIN =
         MIXIN_PACKAGE + "compat.CelestialForgeReinforceRecipeMixin";
     private static final String ULTIMATE_CAR_BUILDER_MIXIN =
@@ -51,6 +53,10 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
         MIXIN_PACKAGE + "compat.GeneratorGaloreJeiPluginMixin";
     private static final String MEKANISM_RECIPE_REGISTRY_MIXIN =
         MIXIN_PACKAGE + "compat.MekanismRecipeRegistryHelperMixin";
+    private static final String GTCEU_RECIPE_REGISTRATION_MIXIN =
+        MIXIN_PACKAGE + "compat.GtceuRecipeRegistrationMixin";
+    private static final String GTCEU_RECIPE_CATEGORY_CLASS =
+        "com.gregtechceu.gtceu.integration.jei.recipe.GTRecipeJEICategory";
     private static final String THERMAL_EXPANSION_PLUGIN_MIXIN =
         MIXIN_PACKAGE + "compat.ThermalExpansionJeiPluginMixin";
     private static final String TINKERS_PLUGIN_MIXIN = MIXIN_PACKAGE + "compat.TinkersJeiPluginMixin";
@@ -124,6 +130,10 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
         "accept",
         "(Ljava/lang/Object;)V"
     );
+    private static final List<Requirement> CLIENT_TASK_PUMP_GUARD_REQUIREMENTS = List.of(
+        Requirement.method("off-main client task-pump guard", "pollTask", "()Z"),
+        Requirement.method("off-main client task-pump guard", "m_7245_", "()Z")
+    );
     private static final Requirement SOPHISTICATED_REGISTER_ITEM_SUBTYPES = Requirement.method(
         "Sophisticated Storage subtype registration",
         "registerItemSubtypes",
@@ -183,6 +193,25 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
     private static final InvocationRequirement MEKANISM_ADD_RECIPES_INVOCATION = new InvocationRequirement(
         MEKANISM_REGISTER_RECIPES.memberName(),
         MEKANISM_REGISTER_RECIPES.descriptor(),
+        "mezz/jei/api/registration/IRecipeRegistration",
+        "addRecipes",
+        "(Lmezz/jei/api/recipe/RecipeType;Ljava/util/List;)V"
+    );
+    private static final Requirement GTCEU_REGISTER_RECIPES = Requirement.method(
+        "GTCEu recipe registration batching",
+        "registerRecipes",
+        "(Lmezz/jei/api/registration/IRecipeRegistration;)V"
+    );
+    private static final InvocationRequirement GTCEU_COPY_RECIPES_INVOCATION = new InvocationRequirement(
+        GTCEU_REGISTER_RECIPES.memberName(),
+        GTCEU_REGISTER_RECIPES.descriptor(),
+        "java/util/List",
+        "copyOf",
+        "(Ljava/util/Collection;)Ljava/util/List;"
+    );
+    private static final InvocationRequirement GTCEU_ADD_RECIPES_INVOCATION = new InvocationRequirement(
+        GTCEU_REGISTER_RECIPES.memberName(),
+        GTCEU_REGISTER_RECIPES.descriptor(),
         "mezz/jei/api/registration/IRecipeRegistration",
         "addRecipes",
         "(Lmezz/jei/api/recipe/RecipeType;Ljava/util/List;)V"
@@ -332,6 +361,7 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
             "getRecipeItems")),
         Map.entry(GENERATOR_GALORE_PLUGIN_MIXIN, GENERATOR_GALORE_REGISTER_LAMBDA),
         Map.entry(MEKANISM_RECIPE_REGISTRY_MIXIN, MEKANISM_REGISTER_RECIPES),
+        Map.entry(GTCEU_RECIPE_REGISTRATION_MIXIN, GTCEU_REGISTER_RECIPES),
         Map.entry(THERMAL_EXPANSION_PLUGIN_MIXIN, THERMAL_REGISTER_RECIPES),
         Map.entry(CELESTIAL_REINFORCE_MIXIN, Requirement.method(
             "Celestial Forge Item Reinforce caching",
@@ -406,6 +436,7 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
         Map.entry(MENU_COMBINER_GUARD_MIXIN, new ConfigGate("skipRedundantMenuUpdates", true)),
         Map.entry(MENU_GRINDSTONE_GUARD_MIXIN, new ConfigGate("skipRedundantMenuUpdates", true)),
         Map.entry(LEGACY_RECIPE_LAYOUT_MIXIN, new ConfigGate("lazyRecipeLayouts", true)),
+        Map.entry(GTCEU_RECIPE_REGISTRATION_MIXIN, new ConfigGate("batchGtceuRecipeRegistration", true)),
         Map.entry(MIXIN_PACKAGE + "VanillaRecipesMixin", new ConfigGate("parallelVanillaRecipes", false))
     );
     private static final Map<String, Boolean> EARLY_CONFIG_VALUES = new HashMap<>();
@@ -588,6 +619,25 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
             "mekanism.client.jei.RecipeRegistryHelper",
             MEKANISM_ADD_RECIPES_INVOCATION
         ))
+    );
+    private static final AtomicFeature GTCEU_RECIPE_REGISTRATION_FEATURE = new AtomicFeature(
+        "GTCEu recipe registration batching",
+        List.of(new TargetRequirement(
+            GTCEU_RECIPE_CATEGORY_CLASS,
+            List.of(GTCEU_REGISTER_RECIPES)
+        )),
+        List.of(
+            new InvocationTargetRequirement(
+                GTCEU_RECIPE_CATEGORY_CLASS,
+                GTCEU_COPY_RECIPES_INVOCATION,
+                1
+            ),
+            new InvocationTargetRequirement(
+                GTCEU_RECIPE_CATEGORY_CLASS,
+                GTCEU_ADD_RECIPES_INVOCATION,
+                1
+            )
+        )
     );
     private static final AtomicFeature TINKERS_CASTING_FEATURE = new AtomicFeature(
         "Tinkers casting compaction",
@@ -784,6 +834,7 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
         Map.entry(IRON_FURNACES_PLUGIN_MIXIN, IRON_FURNACES_FEATURE),
         Map.entry(IRON_FURNACES_CATEGORY_MIXIN, IRON_FURNACES_FEATURE),
         Map.entry(MEKANISM_RECIPE_REGISTRY_MIXIN, MEKANISM_NUTRITIONAL_FEATURE),
+        Map.entry(GTCEU_RECIPE_REGISTRATION_MIXIN, GTCEU_RECIPE_REGISTRATION_FEATURE),
         Map.entry(THERMAL_EXPANSION_PLUGIN_MIXIN, THERMAL_STIRLING_FEATURE),
         Map.entry(TINKERS_PLUGIN_MIXIN, TINKERS_CASTING_FEATURE),
         Map.entry(EMBERS_PLUGIN_MIXIN, EMBERS_DAWNSTONE_ANVIL_FEATURE),
@@ -830,6 +881,7 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
         MIXIN_PACKAGE + "compat.IronsSpellsArcaneAnvilMakerMixin",
         MIXIN_PACKAGE + "compat.IronsSpellsArcaneAnvilRecipeMixin",
         JEED_EFFECT_CLICK_MIXIN,
+        GTCEU_RECIPE_REGISTRATION_MIXIN,
         MIXIN_PACKAGE + "compat.MekanismRecipeRegistryHelperMixin",
         MIXIN_PACKAGE + "compat.ProductiveTreesLogStrippingCategoryMixin",
         MIXIN_PACKAGE + "compat.SfmFallingAnvilCategoryMixin",
@@ -854,7 +906,9 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
         if (!readEarlyBoolean("enabled", true)) {
             return false;
         }
-        if (STARTER_MIXIN.equals(mixinClassName)) {
+        if (CLIENT_TASK_PUMP_GUARD_MIXIN.equals(mixinClassName)) {
+            return shouldApplyClientTaskPumpGuard(targetClassName);
+        } else if (STARTER_MIXIN.equals(mixinClassName)) {
             updateAsyncStartupCompatibility();
         } else if (PLUGIN_CALLER_MIXIN.equals(mixinClassName)) {
             boolean compatible = hasPluginCallbackRoutingContract(readTarget(targetClassName));
@@ -943,6 +997,29 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
             "JEI Optimize turned off its {} optimization: this JEI build's {} no longer declares {}. "
                 + "JEI keeps its normal behavior; the mod needs an update for this JEI version.",
             requirement.feature(), targetClassName, requirement.describe());
+        return false;
+    }
+
+    private boolean shouldApplyClientTaskPumpGuard(String targetClassName) {
+        ClassNode target = readTarget(targetClassName);
+        if (target != null) {
+            for (Requirement requirement : CLIENT_TASK_PUMP_GUARD_REQUIREMENTS) {
+                if (requirement.isPresentIn(target)) {
+                    LOGGER.debug(
+                        "JEI Optimize enabled its off-main client task-pump guard against {} {}.",
+                        targetClassName,
+                        requirement.describe()
+                    );
+                    return true;
+                }
+            }
+        }
+        LOGGER.warn(
+            "JEI Optimize turned off its off-main client task-pump guard: {} declares neither verified "
+                + "pollTask()Z nor m_7245_()Z. JEI keeps its normal behavior; the mod needs an update for this "
+                + "Minecraft version.",
+            targetClassName
+        );
         return false;
     }
 

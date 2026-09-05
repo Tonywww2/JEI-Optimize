@@ -13,6 +13,7 @@ import java.util.Optional;
 
 public final class JeiPluginCallContext {
     private static final ThreadLocal<ResourceLocation> CURRENT_PLUGIN = new ThreadLocal<>();
+    private static final ThreadLocal<ActivePluginCall> CURRENT_CALL = new ThreadLocal<>();
     private static final Object LOCK = new Object();
     private static final Map<ResourceLocation, EnumMap<RegistrationMetric, Long>> COUNTS = new LinkedHashMap<>();
 
@@ -20,9 +21,6 @@ public final class JeiPluginCallContext {
     }
 
     public static void pushPlugin(ResourceLocation pluginUid) {
-        if (!JeiOptFeatureFlags.registrationCounts()) {
-            return;
-        }
         CURRENT_PLUGIN.set(pluginUid);
     }
 
@@ -30,15 +28,13 @@ public final class JeiPluginCallContext {
         CURRENT_PLUGIN.remove();
     }
 
-    public static void runWithPlugin(IModPlugin plugin, Runnable runnable) {
+    public static void runWithPlugin(String phase, IModPlugin plugin, Runnable runnable) {
         Objects.requireNonNull(runnable, "runnable");
-        if (!JeiOptFeatureFlags.registrationCounts()) {
-            runnable.run();
-            return;
-        }
-
         ResourceLocation previousPlugin = CURRENT_PLUGIN.get();
-        pushPlugin(safePluginUid(plugin));
+        ActivePluginCall previousCall = CURRENT_CALL.get();
+        ResourceLocation pluginUid = safePluginUid(plugin);
+        pushPlugin(pluginUid);
+        CURRENT_CALL.set(new ActivePluginCall(phase, pluginUid, plugin.getClass().getName()));
         try {
             runnable.run();
         } finally {
@@ -47,14 +43,20 @@ public final class JeiPluginCallContext {
             } else {
                 CURRENT_PLUGIN.set(previousPlugin);
             }
+            if (previousCall == null) {
+                CURRENT_CALL.remove();
+            } else {
+                CURRENT_CALL.set(previousCall);
+            }
         }
     }
 
     public static Optional<ResourceLocation> currentPlugin() {
-        if (!JeiOptFeatureFlags.registrationCounts()) {
-            return Optional.empty();
-        }
         return Optional.ofNullable(CURRENT_PLUGIN.get());
+    }
+
+    public static Optional<ActivePluginCall> currentCall() {
+        return Optional.ofNullable(CURRENT_CALL.get());
     }
 
     public static void record(RegistrationMetric metric, long amount) {
@@ -93,6 +95,9 @@ public final class JeiPluginCallContext {
         INGREDIENT_INFO_RECIPES,
         RECIPE_CATEGORIES,
         RECIPE_CATALYSTS
+    }
+
+    public record ActivePluginCall(String phase, ResourceLocation pluginUid, String pluginClass) {
     }
 
     private static ResourceLocation safePluginUid(IModPlugin plugin) {

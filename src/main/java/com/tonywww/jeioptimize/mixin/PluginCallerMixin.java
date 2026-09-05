@@ -57,7 +57,7 @@ public abstract class PluginCallerMixin {
         Runnable pluginCall = () -> {
             try {
                 JeiOptDiagnostics.callPluginWithTiming(title, modPlugin, () ->
-                    JeiPluginCallContext.runWithPlugin(modPlugin, () -> consumer.accept(modPlugin)));
+                    JeiPluginCallContext.runWithPlugin(title, modPlugin, () -> consumer.accept(modPlugin)));
             } finally {
                 JeiRecipeGenerationLimiter.clearAll();
                 SfmFallingAnvilCache.abortCapture();

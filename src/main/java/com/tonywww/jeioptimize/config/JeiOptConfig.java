@@ -78,6 +78,7 @@ public final class JeiOptConfig {
     static final BooleanValue SYNC_BATCH_INGREDIENT_FILTER_INIT;
     static final BooleanValue SYNC_SORT_KEY_CACHE;
     static final BooleanValue SYNC_DELAY_COMPACT;
+    static final BooleanValue SYNC_BATCH_GTCEU_RECIPE_REGISTRATION;
     static final BooleanValue SYNC_LAZY_RECIPE_LAYOUTS;
     static final IntValue SYNC_LAZY_RECIPE_LAYOUT_THRESHOLD;
 
@@ -290,6 +291,11 @@ public final class JeiOptConfig {
                 "Move JEI's recipe list compaction off the blocking startup path onto a later client tick.",
                 "It still runs on the main thread, so JEI never serves queries from a list being trimmed.")
             .define("delayCompact", true);
+        SYNC_BATCH_GTCEU_RECIPE_REGISTRATION = builder
+            .comment(
+                "Register large GTCEu recipe categories with JEI in bounded, ordered batches.",
+                "Preserves every recipe and focus index while reducing temporary startup allocations.")
+            .define("batchGtceuRecipeRegistration", true);
         SYNC_LAZY_RECIPE_LAYOUTS = builder
             .comment(
                 "Build large recipe category layouts one visible page at a time on older JEI versions.",

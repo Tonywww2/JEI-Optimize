@@ -20,7 +20,12 @@ val neoforgeVersionRange = (findProperty("vers.neoforge.versionRange") ?: "").to
 val jeiVersion = property("deps.jei").toString()
 // Runtime-only override so a build compiled against deps.jei can be smoke-tested against another
 // JEI release: ./gradlew runClient -Pjei.runtime.1.20.1=15.48.0.179
-val jeiRuntimeVersion = (findProperty("jei.runtime.$mcVersion") ?: jeiVersion).toString()
+// Force Maven's default jar for overrides because JEI 15.49-15.56 also publish an unshaded
+// java-runtime variant that is incomplete when loaded as a standalone mod.
+val jeiRuntimeOverride = findProperty("jei.runtime.$mcVersion")?.toString()
+val jeiRuntimeVersion = jeiRuntimeOverride
+    ?.let { if ('@' in it) it else "$it@jar" }
+    ?: jeiVersion
 val mekanismVersion = (findProperty("deps.mekanism") ?: "").toString()
 val cofhCoreVersion = (findProperty("deps.cofhCore") ?: "").toString()
 val thermalCoreVersion = (findProperty("deps.thermalCore") ?: "").toString()
