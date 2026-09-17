@@ -50,6 +50,20 @@ then writes `JeiStarter.running=true`.
 
 ## 4. Ingredient / Search / Sort Targets
 
+Tooltip design Phase 0 adds `ListElementInfoTooltipCaptureMixin` at the RETURN of
+`getTooltipStrings(IIngredientFilterConfig, IIngredientManager): Set`. It observes only an active
+client-thread capture scope and never changes the return value. The pre-application gate checks
+the exact getter, parser/query ABI, detects the tooltip prefix from its mode-getter method handle,
+and rejects JEI-Async's deferred tooltip path. Runtime capture and 64 native query comparisons
+passed on Forge JEI 15.20.0.120, Forge JEI 15.48.0.179, and NeoForge JEI 19.27.0.340.
+JEI-Async coexistence itself has not been exercised in a client.
+
+`TooltipResourceReloadMixin` observes `ResourceReloadHandler.onResourceManagerReload` at HEAD
+to invalidate any in-flight tooltip capture context. Published filter rebuilds keep JEI's native
+synchronous rebuild behavior. The optimized startup gate requires this reload hook's ABI.
+`accessor.ElementSearchTooltipAccessor` exposes only the existing `prefixedSearchables: Map`
+for stock-storage inspection on the client thread; detection never calls a storage factory.
+
 | Purpose | Target class | Verified members | Evidence | Notes |
 |---|---|---|---|---|
 | Batch filter init and async search access | `mezz.jei.gui.ingredients.IngredientFilter` | fields `clientConfig`, `ingredientManager`, `ingredientComparator`, `modIdHelper`, `ingredientVisibility`, `elementPrefixParser`, mutable `elementSearch`, `ingredientListCached`, `listeners`; ctor; private static `createElementSearch`; public `addIngredient`, `invalidateCache`, `rebuildItemFilter`, `getElements`; private `updateHiddenState`, `getIngredientListUncached`, `getSearchResults`, `notifyListenersOfChange` | source lines `49`-`61`, `63`, `102`, `110`, `119`, `123`, `147`, `172`, `192`, `279`, `329`; `javap` confirms | Requires accessors/invokers for private field/methods. Constructor redirect feasibility is to-verify. |
@@ -61,6 +75,23 @@ then writes `JeiStarter.running=true`.
 
 ## 5. Recipe / Catalyst Targets
 
+Compatibility follow-up (2026-09-17): MineColonies plugin scope/equipment cache use a
+core-only atomic contract; the optional Tweaks empty-rule hooks require both core and
+Tweaks contracts. Iron's Spells maker/recipe hooks instead share one atomic contract
+including fields, tuple, spell accessors and scroll APIs. Missing optional Tweaks must not
+disable core caching; missing Iron's Spells materialization APIs must disable both hooks.
+Exact released-JAR fixtures and rejection cases are recorded in [validation.md](validation.md).
+
+The Forge-only `MineColoniesAttributeModifiersMixin` targets the single
+`Collection.forEach(Consumer): void` call inside
+`ItemStackUtils.getItemStackAttributeValue(ItemStack, Attribute): double`. Its gate
+requires the static exact descriptor, one temporary AttributeInstance constructor,
+one Multimap.get, one forEach, and the named or mapped addTransientModifier consumer
+and getValue call. The local temporary instance is captured by type. The hook additionally
+requires the JEI plugin callback routing contract and runs only under the independent
+repair flag within MineColonies recipe registration. Production ATM9 verification
+confirmed injection and zero duplicate-attribute failures; normal gameplay is untouched.
+
 | Purpose | Target class | Verified members | Evidence | Notes |
 |---|---|---|---|---|
 | Grindstone representative generation | `mezz.jei.library.plugins.vanilla.grindstone.GrindstoneRecipeMaker` | JEI 15.49.0.199 calls `IPlatformRecipeHelper.isItemEnchantable(ItemStack, Enchantment)` directly from `getDisenchantRecipes`; 15.49.0.200 calls private static `canEnchant(IPlatformRecipeHelper, ItemStack, Enchantment, ResourceLocation)` instead | Byte-for-byte class inspection of released Forge jars and successful quick-play smoke on both versions | `JeiOptMixinPlugin` verifies the actual call graph. Legacy and modern Mixin variants are mutually exclusive; an unknown or hybrid graph disables the complete optimization instead of silently applying a partial limiter. |
@@ -70,6 +101,28 @@ then writes `JeiStarter.running=true`.
 | Recipe layout ingredient extraction | `mezz.jei.library.util.IngredientSupplierHelper` | static `getIngredientSupplier(T, IRecipeCategory<T>, IIngredientManager)`; source calls `recipeCategory.setRecipe(builder, recipe, FocusGroup.EMPTY)` | source lines `19`, `22`; `javap` confirms | Must remain client thread / JEI thread. Snapshot builder may call it before worker phase. |
 
 ## 6. GUI Startup / Reload Targets
+
+ATM9 remediation (2026-09-17) adds `JeiStartupGridRefreshMixin` against JEI15.59.0.212
+`IngredientGridWithNavigation.lambda$new$0()V`. The gate verifies calls to
+`getPageAnchorElement(): IElement` and `updateLayoutKeepingPageAnchorVisible(IElement): void`
+before enabling the hook. It coalesces only this grid's own layout refresh during
+`JeiOptRuntimePublication`'s initial callback scope; live changes and third-party listeners
+are untouched. An unknown listener shape disables this optimization. The actual released
+JAR contract is covered by `TooltipAbiTest`, scope semantics by `TooltipUiRefreshBatchTest`.
+
+Both legacy and modern filter constructors now use `canDeferFilter` independently of
+`tooltipSearchIndex`. The GUI callback submits a complete native budgeted build, then
+returns; only the dedicated startup thread waits on the existing filter completion gate.
+The low-memory path is unchanged. Large-pack runtime and cancellation validation are
+tracked in [atm9-startup-remediation.md](atm9-startup-remediation.md).
+
+`JeiNativeSearchBuilderMixin` wraps the exact `ISearchStorageBuilder.build(): ISearchStorage`
+invocation inside modern `ElementSearch` construction. During scoped native budgeted
+startup, only stock `BakedSubstringIndexBuilder` is deferred to retain the initial baked
+index; runtime puts must not replace the whole initial index with suffix-tree overflow.
+All extraction and final builder sealing stay on the client thread. Real JEI15.59 storage
+differential tests and Forge15.59/Neo19.56 client smokes verify this path. Unknown builder
+types and tooltip/differential modes keep the previous behavior.
 
 | Purpose | Target class | Verified members | Evidence | Notes |
 |---|---|---|---|---|

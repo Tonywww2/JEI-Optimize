@@ -2,6 +2,138 @@
 
 > Owner: agent3. Maps to: T2.3. Scope: baseline runClient and measurement procedure before optimization implementation.
 
+## MineColonies / Tweaks Tool Scan Stall
+
+### Attribute Modifier Repair (2026-09-17)
+
+ATM9 MineColonies1.1.1065-snapshot emitted104 duplicate modifier exceptions during JEI
+recipe registration. `ItemStackUtils.getItemStackAttributeValue(ItemStack, Attribute)`
+constructs a temporary AttributeInstance and passes its addTransientModifier consumer
+to Collection.forEach. A duplicate UUID aborts the computation and the original catch
+returns0, potentially misclassifying armor. This is separate from the tool-scan cache.
+
+`MineColoniesAttributeModifiersMixin` wraps only that consumer in the verified Forge
+method, using the same removeModifier(modifier)-then-add behavior as Minecraft's
+AttributeMap.addTransientAttributeModifiers. The original modifiers, their order, getter
+invocations, temporary instance and final getValue computation remain unchanged. The
+hook is active only for the exact MineColonies JEI plugin during Registering recipes,
+behind an independent startup-snapshotted `fixMineColoniesAttributeModifiers` flag.
+Normal gameplay, other plugins and other phases retain the original behavior.
+
+Do not simplify this to UUID deduplication: Forge1.20.1 removeModifier(modifier) removes
+from the incoming modifier's operation set. With conflicting operations, a pre-deduplicated
+list differs numerically from actual vanilla equipment updates. The first prototype failed
+the real-Minecraft differential check and was removed before deployment.
+
+Verified locally: original duplicate exception reproduced;200 deterministic mixed-operation
+and clamped-value tests match real AttributeInstance equipment updates; scope/off/unchanged
+input/error propagation tests pass. Named and production-mapped method contracts are
+tested, including the real ATM9 MineColonies JAR and rejection of ambiguous collections,
+missing transient consumer/value read, missing temporary instance and changed method shape.
+The native numerical test is required by Forge check. NeoForge compiles the shared helper
+and tests but does not register this Forge-specific Mixin. Both loader builds/check tasks
+pass with nine test entrypoints, including the required Forge numerical differential.
+
+ATM9 production runtime verification completed with MineColonies1.1.1065-snapshot and
+JEI15.59.0.212. The installed artifact matches the tested build. The debug log confirms
+Mixin application to ItemStackUtils, MineColonies completed878346 equipment checks and
+recipe registration, and JEI completed startup. Duplicate modifier exceptions and
+`Could not get attribute value` warnings both fell from104 in compatibility-04 to0.
+This verifies the reported exception path, not a whole-pack stability or performance pass.
+
+Evidence: `build/benchmarks/tooltip-pack/minecolonies-attributes-05-runtime` contains
+latest/debug logs, configuration and verification.json. JET SHA256:
+`A3173D586030FF88DD47375B0B9D8AFD7F0F2145939026B227A621A5BCA9400D`.
+The benchmark collector could not attach because Prism launched without the requested
+benchmark JVM arguments; `minecolonies-attributes-05-off` is client-not-started, not a
+valid JFR sample. The separately saved runtime evidence above is from that actual
+non-benchmark client. No FPS/GC/latency improvement is claimed. Temporary JVM arguments
+were cleared after Prism exited; the game process was not terminated. The repair remains
+enabled, with the prior JET/config/logs backed up under before-minecolonies-attributes-05.
+
+### Equipment Cache
+
+MineColonies `1.1.1282-snapshot` was reported spending 45-63 seconds in its JEI plugin while
+MineColonies Tweaks `2.107` repeatedly evaluated equipment tags and custom tool implementations.
+Current MineColonies 1.20.1 source retains the same duplicate path: `ToolsAnalyzer.findTools`
+first calls `EquipmentTypeEntry.checkIsEquipment`, then `tryAddingToolWithLevel` calls
+`EquipmentTypeEntry.getMiningLevel`; Tweaks injects into the latter and calls
+`checkIsEquipment` again.
+
+Version `0.13.8` scopes one identity-based last-value cache to
+`ToolRecipeCategory.findRecipes`. It stores Tweaks' final `checkIsEquipment` result only long enough
+for MineColonies's immediately following `getMiningLevel` path to reuse it. The cache has constant
+memory, distinguishes mutable or enchanted `ItemStack` copies by identity, and clears in `finally`.
+When Tweaks has no non-empty `custom_tools` or `tool_blacklists` item tags and its custom tool type
+list is empty, guarded injections in Tweaks return the same empty-rule defaults directly. Any
+configured rule disables that fast path and retains Tweaks' original implementation. All four
+Mixins originally shared a single MineColonies/Tweaks contract. The 2026-09-17 ATM9 follow-up
+splits this into a core pair (plugin scope and equipment cache) and an optional Tweaks pair.
+The latter still requires the complete core and Tweaks contracts; missing or incompatible
+Tweaks no longer disables the independent core cache. No cache lifetime or recipe rule changed.
+
+Repository validation completed:
+
+| Check | Result |
+|---|---|
+| Forge 1.20.1 focused compile | passed; existing deprecation warnings only |
+| Forge 1.20.1 + NeoForge 1.21.1 full build | passed; optional targets package safely when absent |
+| Exact released ABI | passed with MineColonies `1.1.1282-snapshot` (CF `8782113`) and Tweaks `2.107` (CF `8600075`) |
+| Empty-rule enlarged runtime | passed: 128,113 classifications; 1,058 reused and 255,658 empty checks bypassed; tool scan `~168 ms -> 85 ms` |
+| Configured-rule runtime | passed: one custom-level tag and one blacklist tag forced the original Tweaks path (`bypassed=0`) |
+| Recipe equivalence | passed: all 32 MineColonies categories matched; 3,906 recipes in the enlarged fixture and 3,038 with configured tags |
+| Runtime safety | JEI completed in every final sample; no Mixin application, lifecycle, or crash error |
+| Remapped JAR inspection | both 0.13.8 artifacts contain the cache, four Mixins, JSON entries, and correct version metadata |
+
+The isolated fixtures do not reproduce the reported 45-63 second whole-plugin duration. The
+largest local fixture reduced the directly affected tool scan by about 49%, while the complete
+MineColonies callback remained dominated by unrelated recipe generation and normal run-to-run
+variance. Validation therefore confirms the exact versions, behavior, fallback, and targeted hot
+path, but does not claim a 45-63 second full-modpack benchmark without the reporting pack.
+
+ATM9 compatibility follow-up validation (2026-09-17):
+
+| Check | Result |
+|---|---|
+| MineColonies `1.1.1065-snapshot`, no Tweaks, released JAR | core pair eligible; optional Tweaks pair rejected |
+| Synthetic missing/partial/changed Tweaks | core eligibility unchanged; optional pair rejected |
+| Missing core members or changed call graph | both pairs rejected |
+| Iron's Spells `1.20.1-3.4.0.11`, released ATM9 JAR | both compaction Mixins rejected before application; original recipes retained |
+| Iron's Spells `1.20.1-3.16.3` and `1.21.1-3.16.3`, local released JARs | complete compaction contract accepted |
+| Iron's Spells missing dependency, changed signatures/access, unknown scroll holder | both compaction Mixins rejected |
+| Forge + NeoForge full builds/check | passed, including existing eight test entrypoints |
+
+The ABI checks above parse class files without initializing mod classes. A subsequent
+user-requested ATM9 retest (`compatibility-04-off`) deployed the candidate and verified
+that the core cache actually runs without Tweaks:0 hits in878346 classifications,349ms
+tool scan,14.05s whole plugin callback. The104 duplicate attribute modifier errors remain.
+Old Iron's Spells compaction was disabled before application; its6.710s original callback
+completed without the previous compactor ClassNotFound fallback. Both thread-routed
+plugins remain on Render thread. These are compatibility results, not proof of a cache
+speedup or of old-format Iron's Spells optimization.
+
+The run completed120 queries with counts matching the previous complete sample, but is
+still `runtime-error` due to UtiliTiX linkage/category and Apotheosis recipe errors.
+Full results, artifact/recording hashes and performance limitations are recorded in
+[atm9-startup-remediation.md](atm9-startup-remediation.md). No overall stability pass.
+
+`runTooltipAbiTest` also accepts `-PtooltipTest.jars` entries in the form
+`minecolonies=<jar>`, `irons-supported=<jar>` and `irons-unsupported=<jar>` separated by
+semicolons. Use that specific task for these fixtures. Existing JEI JAR arguments remain valid.
+
+## Iron's Spells Atomic Compatibility
+
+The Arcane Anvil maker and recipe Mixins now share one complete pre-application gate,
+controlled by the existing `compactIronsSpellsImbuing` flag. It checks the exact maker
+signature, recipe fields and tuple-returning getter, tuple constructor, spell registry
+and level accessors, scroll-container factory, and supported Forge/NeoForge SCROLL holder.
+Both injection points use the same exact descriptors. Static/instance and public access
+requirements for reflective calls are checked before either patch applies.
+
+ATM9's old version lacks `ArcaneAnvilJeiRecipe`. This repair prevents the previously
+half-enabled maker hook from entering the compactor and failing at runtime; it does not
+implement the old recipe format, skip recipes, or claim faster old-version registration.
+
 ## ATM9 / GTCEu Registration Stall
 
 The inspected All the Mods 9 `1.1.1` environment uses Minecraft `1.20.1`, Forge `47.4.0`, JEI
@@ -239,6 +371,39 @@ Current status: matrices are intentionally not auto-filled by compile/run smoke.
 | Forge JEI `15.48.0.178` | Indexed brewing lookup and hidden anvil/grindstone menu batching | JEI startup took 3.123 seconds; 2,670 ingredients published in 6 chunks. Old JEI config keys produced expected version-switch noise. |
 | Forge JEI `15.48.0.179` | `JEI_15_MODERN`; indexed brewing lookup and hidden anvil/grindstone menu batching | The brewing index reported active for generation 2; JEI started in 2.397 seconds and published 2,670 ingredients in 6 chunks with no fallback. Auto worker selection resolved to 8 threads. |
 | NeoForge JEI `19.27.0.340` | `JEI_19_PLUS`; PotionBrewing-aware indexed lookup; upstream direct grindstone computation retained | The brewing index reported active for generation 2; JEI started in 4.650 seconds and published 1,688 ingredients in 4 chunks with no fallback. Auto worker selection resolved to 8 threads. |
+
+#### Latest official JEI compatibility (2026-09-17)
+
+The latest official JEI releases available for the two supported Minecraft versions were tested by
+quick-playing into real singleplayer worlds and waiting for JEI's completion marker. The harness
+also rejected runs containing caught plugin failures, critical Mixin failures, injection failures,
+or linkage errors, so a completion marker after a recovered startup error did not count as a pass.
+
+| Runtime | World | Harness / JEI time | Loaded JEI SHA-256 | Result and optimization boundary |
+|---|---|---:|---|---|
+| Forge `47.4.4`, JEI `15.59.0.212` | `sstt` | 74 s / 3.231 s | `56F4F5CE98405CCAC8DC1AF8C0A81981901A3441276FA508E3C114FC7D2D5D88` | Passed with zero relevant errors. The modern ingredient filter, client input guard, screen render guard, and one-argument background render guard applied. |
+| NeoForge `21.1.238`, MezzConfig `0.5.6`, JEI `19.56.0.441` | `v121` | 65 s / 6.341 s | `1B395FB1186B1E742995C2DE4DB84963389979423B0B60AE13E2AABF8EADE05F` | Passed with zero relevant errors. Background startup render guards, the screen render guard, representative anvil/grindstone generation, and modern async ingredient filtering were disabled by exact ABI checks; JEI retained its native paths. The package-agnostic client input guard applied. |
+| Default NeoForge `21.1.235`, JEI `19.27.0.340` regression | `v121` | 93 s / 8.221 s | configured baseline artifact | Passed after the latest-JEI input-guard changes, with zero relevant errors. |
+
+Commands:
+
+```powershell
+.\scripts\test-jei-compat.ps1 -Loader forge -JeiVersion '15.59.0.212' -Label 'latest-20260917-final' -TimeoutSeconds 300 -PostJeiWaitSeconds 15
+.\scripts\test-jei-compat.ps1 -Loader neoforge -JeiVersion '19.56.0.441' -NeoForgeVersion '21.1.238' -MezzConfigVersion '0.5.6' -Label 'latest-20260917-final' -TimeoutSeconds 300 -PostJeiWaitSeconds 15
+.\scripts\test-jei-compat.ps1 -Loader neoforge -Label 'baseline-after-latest-fix' -TimeoutSeconds 300 -PostJeiWaitSeconds 15
+```
+
+JEI `19.56.0.441` requires NeoForge `21.1.238` or newer and MezzConfig `0.5.6`; it does not run
+against the repository's default NeoForge `21.1.235` dependency set. NeoForge `21.1.248` was also
+evaluated, but the current Architectury Loom `1.11.458` remap pipeline could not consume that
+loader build, so the final compatibility run used the minimum supported `21.1.238`. These runtime
+overrides are isolated compatibility-test inputs and do not change the versions in
+`gradle.properties`.
+
+Evidence:
+`build/benchmarks/jei-compat/forge-15.59.0.212.latest-20260917-final.*`,
+`neoforge-19.56.0.441.latest-20260917-final.*`, and
+`neoforge-default.baseline-after-latest-fix.*`.
 
 ### JEI 15.49+ Artifact and Client Task-Pump Guard
 

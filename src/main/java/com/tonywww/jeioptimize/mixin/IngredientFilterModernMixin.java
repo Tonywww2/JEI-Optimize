@@ -3,6 +3,9 @@ package com.tonywww.jeioptimize.mixin;
 import com.tonywww.jeioptimize.JeiOptimize;
 import com.tonywww.jeioptimize.config.JeiOptFeatureFlags;
 import com.tonywww.jeioptimize.index.AsyncIngredientFilterBuilder;
+import com.tonywww.jeioptimize.index.DeferredNativeSearchStorage;
+import com.tonywww.jeioptimize.index.TooltipSearchShadow;
+import com.tonywww.jeioptimize.index.TooltipSearchAdapter;
 import com.tonywww.jeioptimize.runtime.JeiOptExecutors;
 import com.tonywww.jeioptimize.runtime.JeiOptFilterBootstrap;
 import com.tonywww.jeioptimize.runtime.JeiOptRuntimeState;
@@ -46,7 +49,21 @@ public abstract class IngredientFilterModernMixin {
     private IIngredientVisibility ingredientVisibility;
 
     @Shadow
+    @Final
+    private ElementPrefixParser elementPrefixParser;
+
+    @Shadow
+    @Final
+    private IClientConfig clientConfig;
+
+    @Shadow
     public abstract void invalidateCache();
+
+    @Shadow
+    public abstract void rebuildItemFilter();
+
+    @Invoker("notifyListenersOfChange")
+    protected abstract void jeiopt$notifyTooltipReady();
 
     @Invoker("createElementSearch")
     private static IElementSearch jeiopt$invokeCreateElementSearch(
@@ -78,17 +95,22 @@ public abstract class IngredientFilterModernMixin {
         List<IListElementInfo<?>> elementInfos,
         IIngredientManager ingredientManager
     ) {
-        if (clientConfig.isLowMemorySlowSearchEnabled()
-            || !JeiOptExecutors.isJeiStartThread()
-            || (!JeiOptFeatureFlags.asyncIngredientFilter() && !JeiOptFeatureFlags.deferredIngredientFilter())) {
+        if (TooltipSearchAdapter.lowMemory(clientConfig)) {
             return jeiopt$invokeCreateElementSearch(clientConfig, elementPrefixParser, elementInfos, ingredientManager);
         }
-        IElementSearch emptySearch = jeiopt$invokeCreateElementSearch(
-            clientConfig,
-            elementPrefixParser,
-            List.of(),
-            ingredientManager
-        );
+        if (!JeiOptFilterBootstrap.canDeferFilter() && (!JeiOptExecutors.isJeiStartThread()
+            || (!JeiOptFeatureFlags.asyncIngredientFilter() && !JeiOptFeatureFlags.deferredIngredientFilter()))) {
+            return TooltipSearchShadow.observeNativeBuild(elementInfos, elementPrefixParser, () ->
+                jeiopt$invokeCreateElementSearch(clientConfig, elementPrefixParser, elementInfos, ingredientManager));
+        }
+        if (JeiOptFilterBootstrap.canDeferFilter() && !JeiOptFilterBootstrap.canDeferTooltip()
+            && !JeiOptFeatureFlags.tooltipSearchMetrics()) {
+            var captured = DeferredNativeSearchStorage.capture(() -> jeiopt$invokeCreateElementSearch(
+                clientConfig, elementPrefixParser, List.of(), ingredientManager));
+            JeiOptFilterBootstrap.capture(elementInfos, ingredientManager, captured.value(), captured.storages());
+            return captured.value();
+        }
+        IElementSearch emptySearch = jeiopt$invokeCreateElementSearch(clientConfig, elementPrefixParser, List.of(), ingredientManager);
         JeiOptFilterBootstrap.capture(
             elementInfos,
             ingredientManager,
@@ -101,6 +123,24 @@ public abstract class IngredientFilterModernMixin {
     private void jeiopt$scheduleAsyncBuild(CallbackInfo callbackInfo) {
         JeiOptFilterBootstrap.Pending pending = JeiOptFilterBootstrap.take();
         if (pending == null) {
+            return;
+        }
+
+        if (JeiOptFilterBootstrap.canDeferTooltip()) {
+            JeiOptFilterBootstrap.scheduleTooltip(pending.ingredients(), pending.ingredientManager(), this.ingredientVisibility,
+                this.elementPrefixParser, pending.emptySearch(),
+                () -> jeiopt$invokeCreateElementSearch(this.clientConfig, this.elementPrefixParser, List.of(), pending.ingredientManager()),
+                () -> jeiopt$invokeCreateElementSearch(this.clientConfig, this.elementPrefixParser, pending.ingredients(), pending.ingredientManager()),
+                search -> this.elementSearch = search,
+                this::rebuildItemFilter,
+                () -> { invalidateCache(); jeiopt$notifyTooltipReady(); });
+            return;
+        }
+
+        if (JeiOptFilterBootstrap.canDeferFilter()) {
+            JeiOptFilterBootstrap.scheduleNative(pending.ingredients(), pending.ingredientManager(), this.ingredientVisibility,
+                this.elementPrefixParser, pending.emptySearch(), search -> this.elementSearch = search,
+                this::rebuildItemFilter, () -> { invalidateCache(); jeiopt$notifyTooltipReady(); }, pending.storages());
             return;
         }
 
@@ -120,7 +160,8 @@ public abstract class IngredientFilterModernMixin {
             pending.emptySearch(),
             (search, element) -> jeiopt$addElement(search, element, pending.ingredientManager()),
             chunkSize,
-            generation
+            generation,
+            this.elementPrefixParser
         );
         long startNanos = System.nanoTime();
         JeiOptimize.LOGGER.info(

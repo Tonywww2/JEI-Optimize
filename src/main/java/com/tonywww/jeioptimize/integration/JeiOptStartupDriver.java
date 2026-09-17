@@ -3,6 +3,8 @@ package com.tonywww.jeioptimize.integration;
 import com.tonywww.jeioptimize.JeiOptimize;
 import com.tonywww.jeioptimize.config.JeiOptFeatureFlags;
 import com.tonywww.jeioptimize.index.AsyncIngredientFilterBuilder;
+import com.tonywww.jeioptimize.index.TooltipSearchShadow;
+import com.tonywww.jeioptimize.index.TooltipFilterBuild;
 import com.tonywww.jeioptimize.instrumentation.JeiOptDiagnostics;
 import com.tonywww.jeioptimize.recipe.JeiRecipeGenerationLimiter;
 import com.tonywww.jeioptimize.runtime.JeiOptClientTickQueue;
@@ -19,6 +21,7 @@ public final class JeiOptStartupDriver {
 
     public static void onJeiStarting() {
         clearRuntimeWork();
+        JeiOptFilterBootstrap.begin(JeiOptRuntimeState.currentGeneration());
     }
 
     public static void onRuntimeAvailable() {
@@ -63,6 +66,8 @@ public final class JeiOptStartupDriver {
 
     private static void clearRuntimeWork() {
         AsyncIngredientFilterBuilder.cancelInFlight();
+        TooltipFilterBuild.cancelAll();
+        TooltipSearchShadow.cancelAll();
         JeiRecipeGenerationLimiter.clearAll();
         JeiOptCacheScope.clear();
         CelestialForgeReinforceCache.clear();

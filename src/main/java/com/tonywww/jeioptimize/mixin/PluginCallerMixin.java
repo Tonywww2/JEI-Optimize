@@ -9,6 +9,7 @@ import com.tonywww.jeioptimize.integration.SfmFallingAnvilRepresentativeLimiter;
 import com.tonywww.jeioptimize.recipe.JeiRecipeGenerationLimiter;
 import com.tonywww.jeioptimize.runtime.JeiOptClientTickQueue;
 import com.tonywww.jeioptimize.runtime.JeiOptExecutors;
+import com.tonywww.jeioptimize.runtime.JeiOptFilterBootstrap;
 import mezz.jei.api.IModPlugin;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
@@ -50,6 +51,8 @@ public abstract class PluginCallerMixin {
         String pluginUid = jeiOptimize$safePluginUid(modPlugin);
         boolean requiresMainThread = isAliPlugin
             || pluginUid == null
+            || "blue_skies:jei_plugin".equals(pluginUid)
+            || "delightful:jei_plugin".equals(pluginUid)
             || JEI_VANILLA_PLUGIN.equals(pluginUid) && REGISTERING_INGREDIENTS.equals(title)
             || (JEI_FORGE_GUI_PLUGIN.equals(pluginUid) || JEI_NEOFORGE_GUI_PLUGIN.equals(pluginUid))
                 && REGISTERING_RUNTIME.equals(title)
@@ -78,8 +81,14 @@ public abstract class PluginCallerMixin {
                             pluginUid != null ? pluginUid : modPlugin.getClass().getName(),
                             title
                         );
-                        pluginCall.run();
+                        if ((JEI_FORGE_GUI_PLUGIN.equals(pluginUid) || JEI_NEOFORGE_GUI_PLUGIN.equals(pluginUid))
+                            && REGISTERING_RUNTIME.equals(title)) {
+                            JeiOptFilterBootstrap.runGuiRegistration(pluginCall);
+                        } else {
+                            pluginCall.run();
+                        }
                     });
+                    JeiOptFilterBootstrap.awaitBuilds();
                 } else {
                     pluginCall.run();
                 }

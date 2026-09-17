@@ -167,6 +167,9 @@ Feature facade: `com.tonywww.jeioptimize.config.JeiOptFeatureFlags`.
 | `general.enabled` | `true` | If false, all mixin behavior no-ops or falls back to JEI baseline. |
 | `diagnostics.pluginTiming` | `false` | Plugin timing mixin records nothing and emits no timing logs. |
 | `diagnostics.registrationCounts` | `false` | Registration count mixins record nothing. |
+| `diagnostics.tooltipSearchMetrics` | `false` | No shadow/reference comparison. Capture still operates when `tooltipSearchIndex` is enabled. See CR-2/CR-3 and [tooltip-optimization-design.md](tooltip-optimization-design.md). |
+| `async.tooltipSearchIndex` | `false` | No tooltip suppression, worker index or GUI registration completion gate; JEI native filter remains active. Requires restart. See CR-3. |
+| `syncOptimizations.tooltipStringCache` | `true` | No build-local tooltip replay cache; fallback extracts strings again on the client thread. Also controlled by `cacheScope`. |
 | `diagnostics.stallWatchdog` | `true` | No long-phase stack sampling is performed. |
 | `jeiContent.disableAnvilRepairRecipes` | `false` | JEI generates and displays material-repair recipes. |
 | `jeiContent.disableAnvilEnchantRecipes` | `false` | JEI generates and displays enchanted-book recipes. |
@@ -174,6 +177,7 @@ Feature facade: `com.tonywww.jeioptimize.config.JeiOptFeatureFlags`.
 | `syncOptimizations.batchIngredientFilterInit` | `true` | `IngredientFilter` constructor uses JEI baseline behavior. |
 | `syncOptimizations.sortKeyCache` | `true` | Sort/tag helper cache is bypassed. |
 | `syncOptimizations.delayCompact` | `true` | JEI compact runs at original timing. |
+| `syncOptimizations.fixMineColoniesAttributeModifiers` | `true` | MineColonies retains its original attribute calculation, including duplicate modifier failures. Forge-only verified hook; active only in MineColonies JEI recipe registration. Restart required after changing the Mixin gate. See CR-7. |
 | `syncOptimizations.lazyRecipeLayouts` | `true` | Legacy JEI eagerly creates and sorts every recipe layout. |
 | `jeiContent.indexedBrewingLookup` | `true` | JEI scans its brewing recipe collection for every candidate. |
 | `jeiContent.skipRedundantMenuUpdates` | `true` | JEI runs all intermediate hidden-menu result updates. |
@@ -336,6 +340,11 @@ Lifecycle:
 - Cache data must not be static without generation scoping.
 
 ## 8. Diagnostics Contract
+
+CR-3 tooltip acceptance diagnostics are an explicit exception to the no-extra-callback observation
+rule: when enabled alongside `tooltipSearchIndex`, they build a native reference index before
+publication. Replay avoids duplicate tooltip calls when the bounded cache hits; cache misses may
+call the original getter again. Keep diagnostics off for production performance measurement.
 
 - Diagnostics are off by default.
 - `diagnostics.pluginTiming` controls timing logs.

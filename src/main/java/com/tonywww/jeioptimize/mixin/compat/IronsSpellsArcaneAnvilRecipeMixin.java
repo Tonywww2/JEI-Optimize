@@ -11,7 +11,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Pseudo
 @Mixin(targets = "io.redspace.ironsspellbooks.jei.ArcaneAnvilJeiRecipe", remap = false)
 public abstract class IronsSpellsArcaneAnvilRecipeMixin {
-    @Inject(method = "getRecipeItems", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "getRecipeItems()Lio/redspace/ironsspellbooks/jei/ArcaneAnvilJeiRecipe$Tuple;",
+        at = @At("HEAD"), cancellable = true)
     private void jeiOptimize$materializeRepresentativeRecipe(CallbackInfoReturnable<Object> callbackInfo) {
         if (!JeiOptFeatureFlags.compactIronsSpellsImbuing()) {
             return;

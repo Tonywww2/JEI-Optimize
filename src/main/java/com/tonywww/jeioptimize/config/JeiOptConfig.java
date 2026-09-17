@@ -73,12 +73,15 @@ public final class JeiOptConfig {
     static final BooleanValue DIAGNOSTICS_REGISTRATION_COUNTS;
     static final BooleanValue DIAGNOSTICS_STALL_WATCHDOG;
     static final IntValue DIAGNOSTICS_STALL_THRESHOLD_SECONDS;
+    static final BooleanValue DIAGNOSTICS_TOOLTIP_SEARCH_METRICS;
 
     static final BooleanValue SYNC_CACHE_SCOPE;
     static final BooleanValue SYNC_BATCH_INGREDIENT_FILTER_INIT;
     static final BooleanValue SYNC_SORT_KEY_CACHE;
     static final BooleanValue SYNC_DELAY_COMPACT;
     static final BooleanValue SYNC_BATCH_GTCEU_RECIPE_REGISTRATION;
+    static final BooleanValue SYNC_CACHE_MINECOLONIES_TOOL_SCAN;
+    static final BooleanValue SYNC_FIX_MINECOLONIES_ATTRIBUTE_MODIFIERS;
     static final BooleanValue SYNC_LAZY_RECIPE_LAYOUTS;
     static final IntValue SYNC_LAZY_RECIPE_LAYOUT_THRESHOLD;
 
@@ -93,6 +96,8 @@ public final class JeiOptConfig {
     static final IntValue ASYNC_SNAPSHOT_BUDGET_MS;
 
     static final BooleanValue ASYNC_DEFERRED_INGREDIENT_FILTER;
+    static final BooleanValue ASYNC_TOOLTIP_SEARCH_INDEX;
+    static final BooleanValue SYNC_TOOLTIP_STRING_CACHE;
     static final IntValue ASYNC_INGREDIENT_FILTER_BUDGET_MS;
     static final IntValue ASYNC_INGREDIENT_FILTER_CHUNK_SIZE;
     static final BooleanValue ASYNC_PARALLEL_INGREDIENT_FILTER;
@@ -262,6 +267,12 @@ public final class JeiOptConfig {
         DIAGNOSTICS_REGISTRATION_COUNTS = builder
             .comment("Enable JEI registration count diagnostics.")
             .define("registrationCounts", false);
+        DIAGNOSTICS_TOOLTIP_SEARCH_METRICS = builder
+            .comment(
+                "Validate tooltip search against a temporary reference index and report build metrics.",
+                "With tooltipSearchIndex enabled, validation delays publication and may repeat tooltip calls on cache misses.",
+                "Without tooltipSearchIndex, shadow mode retains native search. Keep disabled for performance measurements.")
+            .define("tooltipSearchMetrics", false);
         DIAGNOSTICS_STALL_WATCHDOG = builder
             .comment(
                 "Report which code is responsible when a JEI startup phase runs far longer than expected.",
@@ -280,6 +291,9 @@ public final class JeiOptConfig {
         SYNC_CACHE_SCOPE = builder
             .comment("Enable one-start UID/string/sort helper caches.")
             .define("cacheScope", true);
+        SYNC_TOOLTIP_STRING_CACHE = builder
+            .comment("Retain at most 16 MiB of build-local tooltip snapshots for native fallback replay; cleared after publication.")
+            .define("tooltipStringCache", true);
         SYNC_BATCH_INGREDIENT_FILTER_INIT = builder
             .comment("Enable IngredientFilter batch initialization optimization.")
             .define("batchIngredientFilterInit", true);
@@ -296,6 +310,17 @@ public final class JeiOptConfig {
                 "Register large GTCEu recipe categories with JEI in bounded, ordered batches.",
                 "Preserves every recipe and focus index while reducing temporary startup allocations.")
             .define("batchGtceuRecipeRegistration", true);
+        SYNC_CACHE_MINECOLONIES_TOOL_SCAN = builder
+            .comment(
+                "Reuse repeated MineColonies Tweaks equipment checks while JEI generates tool recipes.",
+                "Empty Tweaks rule sets are skipped; configured rules keep their original path.",
+                "The one-entry identity cache is discarded immediately after that category finishes.")
+            .define("cacheMineColoniesToolScan", true);
+        SYNC_FIX_MINECOLONIES_ATTRIBUTE_MODIFIERS = builder
+            .comment(
+                "Apply attribute modifiers in MineColonies JEI recipe calculations using vanilla equipment remove-then-add rules.",
+                "Does not change item modifiers, citizen AI or player attributes. Only applies to verified MineColonies attribute calculation code.")
+            .define("fixMineColoniesAttributeModifiers", true);
         SYNC_LAZY_RECIPE_LAYOUTS = builder
             .comment(
                 "Build large recipe category layouts one visible page at a time on older JEI versions.",
@@ -339,6 +364,10 @@ public final class JeiOptConfig {
         ASYNC_DEFERRED_INGREDIENT_FILTER = builder
             .comment("Populate one isolated JEI ingredient search in client-tick-budgeted steps.")
             .define("deferredIngredientFilter", true);
+        ASYNC_TOOLTIP_SEARCH_INDEX = builder
+            .comment("Experimental: capture tooltips on client ticks and build their native substring index on a worker.",
+                "Requires asynchronous startup and a supported stock JEI search backend. Publishes only complete results.")
+            .define("tooltipSearchIndex", false);
         ASYNC_INGREDIENT_FILTER_BUDGET_MS = builder
             .comment("Per-client-tick budget in milliseconds for isolated ingredient search construction.")
             .defineInRange("ingredientFilterBudgetMs", 10, 1, 40);

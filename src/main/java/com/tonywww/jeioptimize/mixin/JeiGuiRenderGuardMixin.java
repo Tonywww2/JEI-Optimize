@@ -63,20 +63,4 @@ public abstract class JeiGuiRenderGuardMixin {
             callbackInfo.cancel();
         }
     }
-
-    @Inject(
-        method = "onDrawBackgroundPost(Lnet/minecraft/client/gui/screens/Screen;Lnet/minecraft/client/gui/GuiGraphics;)V",
-        at = @At("HEAD"),
-        cancellable = true,
-        require = 0
-    )
-    private void jeiOptimize$skipJeiBackgroundUntilRuntimeReady(
-        Screen screen,
-        GuiGraphics guiGraphics,
-        CallbackInfo callbackInfo
-    ) {
-        if (JeiOptStartupProgressState.blocksJeiInput()) {
-            callbackInfo.cancel();
-        }
-    }
 }

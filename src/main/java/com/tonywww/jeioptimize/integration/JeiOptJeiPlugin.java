@@ -1,6 +1,7 @@
 package com.tonywww.jeioptimize.integration;
 
 import com.tonywww.jeioptimize.JeiOptimize;
+import com.tonywww.jeioptimize.instrumentation.JeiOptBenchmark;
 import mezz.jei.api.IModPlugin;
 import mezz.jei.api.JeiPlugin;
 import mezz.jei.api.runtime.IJeiRuntime;
@@ -27,11 +28,13 @@ public final class JeiOptJeiPlugin implements IModPlugin {
 
     @Override
     public void onRuntimeAvailable(IJeiRuntime jeiRuntime) {
+        JeiOptBenchmark.runtimeAvailable(jeiRuntime);
         JeiOptStartupDriver.onRuntimeAvailable();
     }
 
     @Override
     public void onRuntimeUnavailable() {
+        JeiOptBenchmark.clear();
         JeiOptStartupDriver.onRuntimeUnavailable();
     }
 }

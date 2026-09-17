@@ -15,6 +15,10 @@ public final class JeiOptConfigSnapshot {
         }
         current = new Snapshot(
             JeiOptConfig.GENERAL_ENABLED.get(),
+            JeiOptConfig.DIAGNOSTICS_TOOLTIP_SEARCH_METRICS.get(),
+            JeiOptConfig.ASYNC_TOOLTIP_SEARCH_INDEX.get(),
+            JeiOptConfig.SYNC_TOOLTIP_STRING_CACHE.get() && JeiOptConfig.SYNC_CACHE_SCOPE.get(),
+            JeiOptConfig.SYNC_FIX_MINECOLONIES_ATTRIBUTE_MODIFIERS.get(),
             JeiOptConfig.CONTENT_INDEXED_BREWING_LOOKUP.get(),
             JeiOptConfig.CONTENT_SKIP_REDUNDANT_MENU_UPDATES.get(),
             JeiOptConfig.SYNC_LAZY_RECIPE_LAYOUTS.get(),
@@ -41,6 +45,10 @@ public final class JeiOptConfigSnapshot {
 
     record Snapshot(
         boolean enabled,
+        boolean tooltipSearchMetrics,
+        boolean tooltipSearchIndex,
+        boolean tooltipStringCache,
+        boolean fixMineColoniesAttributeModifiers,
         boolean indexedBrewingLookup,
         boolean skipRedundantMenuUpdates,
         boolean lazyRecipeLayouts,

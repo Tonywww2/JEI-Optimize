@@ -4,6 +4,108 @@ All notable changes to Just Enough Threads are documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.14.0
+
+### JEI Compatibility
+
+- **Updated compatibility for Forge JEI `15.59.0.212` and NeoForge JEI `19.56.0.441`.**
+  Both exact releases passed client-world tooltip query comparisons and complete-index
+  publication checks during development. The NeoForge test used NeoForge `21.1.238` and
+  MezzConfig `0.5.6`. These checks do not imply support for every newer JEI or modpack.
+- **JEI 19.56's MezzConfig migration no longer silently disables the supported search path.**
+  Tooltip mode, advanced-tooltip settings, and low-memory settings now support the verified
+  `IConfigValue` interfaces alongside older getters. SearchMode package changes, prefix
+  metadata, stock storage types, and Forge/NeoForge `findElement` return signatures are
+  handled explicitly instead of assuming the older JEI ABI.
+- **Production resource-reload hooks recognize both mapped and development names.**
+  Feature-specific ABI checks run before injection; unsupported search implementations retain
+  the native path. Published filter reloads still use JEI's synchronous rebuild.
+- **Older tested JEI branches remain covered.** Forge `15.20.0.120`, Forge `15.48.0.179`,
+  and NeoForge `19.27.0.340` passed tooltip query/publication regression checks. Each
+  optimization still requires its own matching ABI, not just a matching version number.
+
+### Fixed
+
+- **Large startup-time ingredient removals no longer repeatedly rebuild the JEI sidebar on
+  supported modern Forge versions.** TConstruct and KubeJS could trigger a full visible-list
+  filter/sort for each removed item while runtime callbacks blocked the client thread.
+  JEI's own grid-layout notifications are now coalesced until those startup callbacks finish,
+  before runtime publication. Visibility changes, cache invalidation, third-party listeners,
+  and explicit queries remain immediate. Unknown grid-listener shapes are not patched.
+- **The default ingredient-filter budget now reaches the actual GUI registration path even
+  with tooltip indexing disabled.** Earlier code checked for the dedicated startup thread
+  while GUI construction was already on the client thread, leaving a synchronous full-index
+  build despite the enabled filter options. GUI registration now submits the budgeted build
+  and returns; only the startup thread waits for the complete result.
+- **Modern native builds retain JEI's bulk search builders.** Creating an empty baked index
+  and then adding every initial ingredient had populated its mutable suffix-tree overflow,
+  increasing startup waiting and query costs. Verified stock builders now receive the initial
+  data and are sealed on client ticks before publication; later additions retain native behavior.
+- **Blue Skies and Delightful recipe registration are explicitly routed to the client thread.**
+  Their calls to JEI's runtime ingredient-removal API previously failed its thread assertion
+  on `justenoughthreads-start`. Plugin execution remains serial, with no partial-call retries.
+- **MineColonies core tool-scan caching no longer depends on optional MineColonies Tweaks.**
+  The earlier combined gate disabled the core cache when Tweaks was absent. The two core hooks
+  and the optional Tweaks hooks now have separate dependency checks. This repairs activation;
+  the tested ATM9 instance without Tweaks recorded zero cache hits, so no cache speedup is claimed.
+- **MineColonies JEI attribute calculations no longer abort on duplicate modifier UUIDs.**
+  The temporary calculation now uses Minecraft's equipment remove-then-add rules instead of
+  throwing and returning an incorrect zero attribute value. The fix is limited to MineColonies
+  JEI recipe registration, does not change player or citizen attributes, and is controlled by
+  `syncOptimizations.fixMineColoniesAttributeModifiers=true`. In the tested Forge ATM9 instance,
+  the previous 104 attribute warnings and duplicate-modifier exceptions fell to zero.
+- **Iron's Spells compaction no longer activates only half of its required hooks.** The maker,
+  recipe fields/getter, tuple constructor, spell APIs, and scroll holder now share one exact
+  compatibility gate. ATM9's `3.4.0.11` keeps its original recipes without entering the failing
+  compactor; the local Forge and NeoForge `3.16.3` JAR contracts remain accepted. This is not
+  an implementation of compaction for the older recipe format.
+
+### Added
+
+- **Experimental tooltip search indexing, disabled by default.** `async.tooltipSearchIndex`
+  captures strings on the client thread and builds an ordinal-only native suffix index on a
+  single worker writer. Bounded batch/byte queues provide backpressure without client waits;
+  submitting 128 elements no longer forces a tick boundary when budget and capacity remain.
+  Results publish only when complete. Cancellation has an independent writer-stop signal,
+  and failure discards the candidate before a complete native fallback is built.
+- **Build-local tooltip replay cache and optional differential checks.**
+  `syncOptimizations.tooltipStringCache=true` permits up to 16 MiB of estimated replay-cache
+  entries; this is not a cap on total index memory. No disk or cross-world cache is used.
+  `diagnostics.tooltipSearchMetrics=false` enables query comparisons when turned on and may
+  repeat tooltip calls on cache misses; keep it off for performance measurements.
+
+### Validation and Limitations
+
+- **Focused tests supplement real client runs again.** Both loader builds include capture,
+  cancellation, queue, publication, storage, ABI, and attribute tests. The Forge attribute
+  test reproduces the original failure and compares 200 mixed-operation cases with Minecraft.
+- **Startup measurements distinguish getter, native add, worker, client-tick, and frame time.**
+  Tick timing alone missed work blocking the Render thread outside `Minecraft.tick`; frame
+  intervals crossing publication are now included in every overlapping measurement window.
+  Runtime publication is not treated as the first visible sidebar frame. Completed JFRs are
+  archived separately from active recordings, and plugin/linkage failures invalidate stability runs.
+- **Large-pack results are targeted regression evidence, not a general speedup guarantee.**
+  One ATM9 follow-up reduced runtime callback delivery from about 165 seconds to 6.06 seconds
+  and the longest measured frame interval from 165.73 seconds to 7.99 seconds. However, JEI
+  startup still took about 204 seconds and vanilla-category recipe registration about 65 seconds.
+  No matched JET-disabled baseline or five-pair A/B series has established overall improvement.
+- **Known third-party failures remain.** UtiliTiX's removed JEI field/category dependency and
+  Apotheosis socketing recipe-layout errors are not fixed by this release. Full large-pack
+  reload, cancellation, second-world, and dynamic-update acceptance remains incomplete.
+  Tooltip indexing stays opt-in; no stability claim is based solely on JEI reaching startup completion.
+
+## 0.13.8
+
+### Fixed
+
+- **MineColonies Tweaks equipment classification is reused while MineColonies generates JEI tool
+  recipes.** A thread-confined, one-entry identity cache now reuses Tweaks' final equipment result
+  when MineColonies immediately classifies the same stack again for its mining level. When Tweaks
+  has no non-empty blacklist/custom-tool tags and no registered custom tool types, its otherwise
+  empty rule checks are skipped. Any configured rule keeps Tweaks' original path. The optimization
+  exists only around `ToolRecipeCategory.findRecipes`, preserves every recipe, and activates only
+  when the complete MineColonies and Tweaks call-site ABI matches.
+
 ## 0.13.7
 
 ### Fixed

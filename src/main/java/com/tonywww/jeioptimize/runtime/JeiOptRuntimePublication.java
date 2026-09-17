@@ -21,14 +21,19 @@ public final class JeiOptRuntimePublication {
 
     public static void runCallbacksAndPublish(Runnable publication) {
         Objects.requireNonNull(publication, "publication");
+        JeiOptFilterBootstrap.awaitBuilds();
         PendingCallbacks pending = PENDING_CALLBACKS.get();
         PENDING_CALLBACKS.remove();
         JeiOptExecutors.runOnMainThreadAndWait(() -> {
             if (pending != null) {
-                pending.callbacks().run();
+                int refreshed = JeiOptUiRefreshBatch.run(pending.callbacks(),
+                    () -> JeiOptRuntimeState.isCurrent(pending.generation()));
                 JeiOptExecutors.checkJeiStartGeneration(pending.generation());
+                com.tonywww.jeioptimize.JeiOptimize.LOGGER.info(
+                    "JEI startup layout notifications coalesced: generation={}, refreshedGrids={}", pending.generation(), refreshed);
             }
             publication.run();
+            JeiOptFilterBootstrap.runtimePublished();
         });
     }
 

@@ -7,6 +7,7 @@ import mezz.jei.api.ingredients.ITypedIngredient;
 import mezz.jei.api.runtime.IIngredientVisibility;
 import mezz.jei.gui.ingredients.IListElement;
 import mezz.jei.gui.ingredients.IListElementInfo;
+import mezz.jei.gui.search.ElementPrefixParser;
 import mezz.jei.gui.search.IElementSearch;
 
 import java.util.List;
@@ -34,11 +35,24 @@ public final class AsyncIngredientFilterBuilder {
         int requestedChunkSize,
         long generation
     ) {
+        return buildBudgetedAsync(elements, ingredientVisibility, search, elementAppender, requestedChunkSize, generation, null);
+    }
+
+    public static CompletableFuture<IElementSearch> buildBudgetedAsync(
+        List<? extends IListElementInfo<?>> elements,
+        IIngredientVisibility ingredientVisibility,
+        IElementSearch search,
+        ElementAppender elementAppender,
+        int requestedChunkSize,
+        long generation,
+        ElementPrefixParser parser
+    ) {
         int chunkSize = Math.max(1, requestedChunkSize);
         int chunkCount = (elements.size() + chunkSize - 1) / chunkSize;
         JeiOptStartupProgressState.registerBuild(generation, chunkCount, elements.size());
 
         CompletableFuture<IElementSearch> future = new CompletableFuture<>();
+        TooltipSearchShadow shadow = TooltipSearchShadow.create(generation, parser, elements.size());
         AtomicInteger nextIndex = new AtomicInteger();
         CompletableFuture<IElementSearch> previous = IN_FLIGHT.getAndSet(future);
         if (previous != null) {
@@ -46,6 +60,9 @@ public final class AsyncIngredientFilterBuilder {
         }
         JeiOptClientTickQueue.enqueue(() -> {
             if (future.isCancelled() || !JeiOptRuntimeState.isCurrent(generation)) {
+                if (shadow != null) {
+                    shadow.cancel();
+                }
                 future.cancel(false);
                 IN_FLIGHT.compareAndSet(future, null);
                 return true;
@@ -54,11 +71,16 @@ public final class AsyncIngredientFilterBuilder {
             try {
                 boolean processed = false;
                 while (nextIndex.get() < elements.size()
+                    && (shadow == null || shadow.canCapture())
                     && (!processed || JeiOptClientTickQueue.hasTimeRemaining())) {
                     int index = nextIndex.getAndIncrement();
                     IListElementInfo<?> info = elements.get(index);
                     updateHiddenState(info.getElement(), ingredientVisibility);
-                    elementAppender.add(search, info);
+                    if (shadow == null) {
+                        elementAppender.add(search, info);
+                    } else {
+                        shadow.add(search, info, elementAppender);
+                    }
                     int completed = index + 1;
                     if (completed % chunkSize == 0 || completed == elements.size()) {
                         JeiOptStartupProgressState.markChunkCompleted(generation);
@@ -69,11 +91,17 @@ public final class AsyncIngredientFilterBuilder {
                 if (nextIndex.get() < elements.size()) {
                     return false;
                 }
+                if (shadow != null && !shadow.finish(search)) {
+                    return false;
+                }
                 JeiOptStartupProgressState.markReady(generation);
                 future.complete(search);
                 IN_FLIGHT.compareAndSet(future, null);
                 return true;
             } catch (RuntimeException | LinkageError e) {
+                if (shadow != null) {
+                    shadow.cancel();
+                }
                 future.completeExceptionally(e);
                 IN_FLIGHT.compareAndSet(future, null);
                 return true;

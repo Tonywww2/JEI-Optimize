@@ -54,6 +54,13 @@
     "compat.IronsSpellsArcaneAnvilMakerMixin",
     "compat.IronsSpellsArcaneAnvilRecipeMixin",
     "compat.MekanismRecipeRegistryHelperMixin",
+    "compat.MineColoniesJeiPluginMixin",
+    "compat.MineColoniesEquipmentTypeEntryMixin",
+    //? if forge {
+    "compat.MineColoniesAttributeModifiersMixin",
+    //?}
+    "compat.MineColoniesTweaksToolTypeExtensionMixin",
+    "compat.MineColoniesTweaksToolTypeTagsMixin",
     "compat.ProductiveTreesLogStrippingCategoryMixin",
     "compat.SfmFallingAnvilCategoryMixin",
     "compat.StorageInMotionSubtypeMixin",
@@ -64,10 +71,18 @@
     "accessor.SophisticatedStorageShulkerRecipeAccessor"
   ],
   "client": [
+    "JeiNativeSearchBuilderMixin",
+    "JeiStartupGridRefreshMixin",
+    "TooltipBenchmarkOverlayMixin",
+    "ListElementInfoTooltipCaptureMixin",
+    "TooltipResourceReloadMixin",
+    "accessor.ElementSearchTooltipAccessor",
     "ClientDisconnectHookMixin",
     "ClientTaskPumpGuardMixin",
     "ClientTickHookMixin",
     "JeiClientInputGuardMixin",
+    "JeiGuiBackgroundRenderGuardLegacyMixin",
+    "JeiGuiBackgroundRenderGuardModernMixin",
     "JeiGuiRenderGuardMixin",
     "JeiLoadingOverlayMixin",
     "JeiRecipesGuiGuardMixin",

@@ -13,7 +13,8 @@ import java.util.List;
 @Pseudo
 @Mixin(targets = "io.redspace.ironsspellbooks.jei.ArcaneAnvilRecipeMaker", remap = false)
 public abstract class IronsSpellsArcaneAnvilMakerMixin {
-    @Inject(method = "getRecipes", at = @At("RETURN"), cancellable = true)
+    @Inject(method = "getRecipes(Lmezz/jei/api/recipe/vanilla/IVanillaRecipeFactory;Lio/redspace/ironsspellbooks/jei/JeiPlugin$ItemFinder;)Ljava/util/List;",
+        at = @At("RETURN"), cancellable = true)
     private static void jeiOptimize$compactImbuingRecipes(CallbackInfoReturnable<List<?>> callbackInfo) {
         if (JeiOptFeatureFlags.compactIronsSpellsImbuing() && callbackInfo.getReturnValue() != null) {
             callbackInfo.setReturnValue(IronsSpellsRecipeCompactor.compact(callbackInfo.getReturnValue()));

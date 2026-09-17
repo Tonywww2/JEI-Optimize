@@ -26,6 +26,9 @@ val jeiRuntimeOverride = findProperty("jei.runtime.$mcVersion")?.toString()
 val jeiRuntimeVersion = jeiRuntimeOverride
     ?.let { if ('@' in it) it else "$it@jar" }
     ?: jeiVersion
+val neoforgeRuntimeVersion = (findProperty("neoforge.runtime.$mcVersion")
+    ?: property("vers.deps.fml")).toString()
+val mezzConfigRuntimeVersion = findProperty("mezzConfig.runtime.$mcVersion")?.toString()
 val mekanismVersion = (findProperty("deps.mekanism") ?: "").toString()
 val cofhCoreVersion = (findProperty("deps.cofhCore") ?: "").toString()
 val thermalCoreVersion = (findProperty("deps.thermalCore") ?: "").toString()
@@ -59,6 +62,13 @@ loom {
             ideConfigGenerated(true)
             runDir("../../run")
         }
+    }
+    findProperty("compatTest.runDirectory.$mcVersion")?.toString()?.let { directory ->
+        val target = rootProject.file(directory).canonicalFile
+        require(target.toPath().startsWith(rootProject.projectDir.canonicalFile.toPath())) {
+            "Compatibility test run directory must stay inside the workspace"
+        }
+        runConfigs.all { runDir(target.relativeTo(projectDir).invariantSeparatorsPath) }
     }
 }
 
@@ -95,7 +105,7 @@ dependencies {
         "forgeRuntimeLibrary"("io.github.llamalad7:mixinextras-common:$mixinExtrasCommonVersion")
         modRuntimeOnly("io.github.llamalad7:mixinextras-forge:$mixinExtrasForgeVersion")
     } else {
-        "neoForge"("net.neoforged:neoforge:${property("vers.deps.fml")}")
+        "neoForge"("net.neoforged:neoforge:$neoforgeRuntimeVersion")
 
         // JEI 19.x (1.21.1) NeoForge artifact coordinates. Sub-artifact split may need
         // adjustment once the JEI internals are ported (see docs plan, phase 3).
@@ -105,6 +115,9 @@ dependencies {
         compileOnly("mezz.jei:jei-$mcVersion-lib:$jeiVersion")
         compileOnly("mezz.jei:jei-$mcVersion-gui:$jeiVersion")
         modRuntimeOnly("mezz.jei:jei-$mcVersion-neoforge:$jeiRuntimeVersion")
+        if (mezzConfigRuntimeVersion != null) {
+            modRuntimeOnly("net.mezzdev.config:mezz_config-$mcVersion-neoforge:$mezzConfigRuntimeVersion")
+        }
     }
 }
 
@@ -145,6 +158,54 @@ java {
     withSourcesJar()
     toolchain.languageVersion = JavaLanguageVersion.of(javaVersion)
 }
+
+val tooltipJavaVersion = javaVersion
+sourceSets.test { java.exclude("**/Tooltip*Test.java") }
+val tooltipTestSources = fileTree(rootProject.file("src/test/java")) {
+    include("**/Tooltip*Test.java")
+}
+val compileTooltipTests = tasks.register<JavaCompile>("compileTooltipTests") {
+    dependsOn(tasks.named("classes"))
+    source(tooltipTestSources)
+    classpath = sourceSets.main.get().output + sourceSets.main.get().compileClasspath
+    destinationDirectory.set(layout.buildDirectory.dir("classes/tooltipTest"))
+    javaCompiler.set(javaToolchains.compilerFor {
+        languageVersion.set(JavaLanguageVersion.of(javaVersion))
+    })
+}
+val tooltipTests = listOf(
+    "integration.TooltipMineColoniesAttributesTest",
+    "index.TooltipDeferredStorageTest",
+    "runtime.TooltipUiRefreshBatchTest",
+    "index.TooltipPipelineTest",
+    "runtime.TooltipBuildGateTest",
+    "index.TooltipBackendTest",
+    "runtime.TooltipCaptureContextTest",
+    "index.TooltipSearchIndexTest",
+    "TooltipAbiTest"
+).map { testClass ->
+    tasks.register<JavaExec>("run" + testClass.substringAfterLast('.')) {
+        dependsOn(compileTooltipTests)
+        classpath = files(compileTooltipTests.flatMap { it.destinationDirectory }) +
+            sourceSets.main.get().output + sourceSets.main.get().compileClasspath
+        mainClass.set("com.tonywww.jeioptimize.$testClass")
+        if (testClass == "integration.TooltipMineColoniesAttributesTest" && loader == ModPlatform.FORGE) {
+            args("--native-attributes")
+        }
+        javaLauncher.set(javaToolchains.launcherFor {
+            languageVersion.set(JavaLanguageVersion.of(tooltipJavaVersion))
+        })
+        findProperty("tooltipTest.jars")?.toString()?.let { jars ->
+            args(jars.split(';').filter(String::isNotBlank))
+        }
+    }
+}
+tasks.register("tooltipTest") {
+    group = "verification"
+    description = "Runs tooltip capture, reference substring index and ABI tests without launching Minecraft."
+    dependsOn(tooltipTests)
+}
+tasks.named("check") { dependsOn("tooltipTest") }
 
 // ---------------------------------------------------------------------------------------------------
 // CurseForge publishing via me.modmuss50.mod-publish-plugin.

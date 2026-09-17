@@ -27,8 +27,27 @@ public final class JeiOptFeatureFlags {
         return enabled() && JeiOptConfig.DIAGNOSTICS_REGISTRATION_COUNTS.get();
     }
 
+    public static boolean tooltipSearchMetrics() {
+        JeiOptConfigSnapshot.Snapshot snapshot = JeiOptConfigSnapshot.current();
+        return enabled() && (snapshot != null
+            ? snapshot.tooltipSearchMetrics()
+            : configReady() && JeiOptConfig.DIAGNOSTICS_TOOLTIP_SEARCH_METRICS.get());
+    }
+
     public static boolean stallWatchdog() {
         return enabled() && JeiOptConfig.DIAGNOSTICS_STALL_WATCHDOG.get();
+    }
+
+    public static boolean tooltipSearchIndex() {
+        JeiOptConfigSnapshot.Snapshot snapshot = JeiOptConfigSnapshot.current();
+        return enabled() && (snapshot != null ? snapshot.tooltipSearchIndex()
+            : configReady() && JeiOptConfig.ASYNC_TOOLTIP_SEARCH_INDEX.get());
+    }
+
+    public static boolean tooltipStringCache() {
+        JeiOptConfigSnapshot.Snapshot snapshot = JeiOptConfigSnapshot.current();
+        return enabled() && (snapshot != null ? snapshot.tooltipStringCache()
+            : configReady() && JeiOptConfig.SYNC_TOOLTIP_STRING_CACHE.get() && JeiOptConfig.SYNC_CACHE_SCOPE.get());
     }
 
     public static int stallThresholdSeconds() {
@@ -179,6 +198,17 @@ public final class JeiOptFeatureFlags {
 
     public static boolean batchGtceuRecipeRegistration() {
         return enabled() && JeiOptConfig.SYNC_BATCH_GTCEU_RECIPE_REGISTRATION.get();
+    }
+
+    public static boolean cacheMineColoniesToolScan() {
+        return enabled() && JeiOptConfig.SYNC_CACHE_MINECOLONIES_TOOL_SCAN.get();
+    }
+
+    public static boolean fixMineColoniesAttributeModifiers() {
+        JeiOptConfigSnapshot.Snapshot snapshot = JeiOptConfigSnapshot.current();
+        return enabled() && (snapshot != null
+            ? snapshot.fixMineColoniesAttributeModifiers()
+            : configReady() && JeiOptConfig.SYNC_FIX_MINECOLONIES_ATTRIBUTE_MODIFIERS.get());
     }
 
     public static boolean lazyRecipeLayouts() {

@@ -3,7 +3,9 @@ package com.tonywww.jeioptimize.mixin;
 import com.tonywww.jeioptimize.JeiOptimize;
 import com.tonywww.jeioptimize.config.JeiOptFeatureFlags;
 import com.tonywww.jeioptimize.index.AsyncIngredientFilterBuilder;
+import com.tonywww.jeioptimize.index.TooltipSearchShadow;
 import com.tonywww.jeioptimize.runtime.JeiOptExecutors;
+import com.tonywww.jeioptimize.runtime.JeiOptFilterBootstrap;
 import com.tonywww.jeioptimize.runtime.JeiOptRuntimeState;
 import com.tonywww.jeioptimize.runtime.JeiOptStartupProgressState;
 import mezz.jei.api.helpers.IColorHelper;
@@ -24,6 +26,7 @@ import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.gen.Invoker;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
@@ -57,6 +60,12 @@ public abstract class IngredientFilterMixin {
     @Shadow
     public abstract void invalidateCache();
 
+    @Shadow
+    public abstract void rebuildItemFilter();
+
+    @Invoker("notifyListenersOfChange")
+    protected abstract void jeiopt$notifyTooltipReady();
+
     @Redirect(
         method = "<init>",
         at = @At(
@@ -65,7 +74,7 @@ public abstract class IngredientFilterMixin {
         )
     )
     private void jeiopt$skipIndividualAddDuringConstruction(IngredientFilter instance, IListElementInfo<?> ingredientInfo) {
-        boolean deferToStartupThread = JeiOptExecutors.isJeiStartThread()
+        boolean deferToStartupThread = JeiOptFilterBootstrap.canDeferFilter() || JeiOptExecutors.isJeiStartThread()
             && (JeiOptFeatureFlags.deferredIngredientFilter() || JeiOptFeatureFlags.asyncIngredientFilter());
         if (this.clientConfig.isLowMemorySlowSearchEnabled()
             || (!JeiOptFeatureFlags.batchIngredientFilterInit() && !deferToStartupThread)) {
@@ -89,6 +98,24 @@ public abstract class IngredientFilterMixin {
     ) {
         if (this.clientConfig.isLowMemorySlowSearchEnabled()) {
             JeiOptimize.LOGGER.info("JEI Optimize retained JEI's low-memory ingredient search");
+        } else if (JeiOptFilterBootstrap.canDeferTooltip()) {
+            JeiOptFilterBootstrap.scheduleTooltip(ingredients, ingredientManager, ingredientVisibility,
+                this.elementPrefixParser, this.elementSearch,
+                () -> new mezz.jei.gui.search.ElementSearch(this.elementPrefixParser),
+                () -> {
+                    for (IListElementInfo<?> ingredient : ingredients) {
+                        updateHiddenStateEquivalent(ingredient.getElement(), ingredientVisibility);
+                    }
+                    this.elementSearch.addAll(ingredients, ingredientManager);
+                    return this.elementSearch;
+                },
+                search -> this.elementSearch = search,
+                this::rebuildItemFilter,
+                () -> { invalidateCache(); jeiopt$notifyTooltipReady(); });
+        } else if (JeiOptFilterBootstrap.canDeferFilter()) {
+            JeiOptFilterBootstrap.scheduleNative(ingredients, ingredientManager, ingredientVisibility,
+                this.elementPrefixParser, this.elementSearch, search -> this.elementSearch = search,
+                this::rebuildItemFilter, () -> { invalidateCache(); jeiopt$notifyTooltipReady(); });
         } else if (JeiOptExecutors.isJeiStartThread()
             && (JeiOptFeatureFlags.asyncIngredientFilter() || JeiOptFeatureFlags.deferredIngredientFilter())) {
             jeiopt$scheduleAsyncBuild(ingredients, ingredientVisibility);
@@ -96,7 +123,10 @@ public abstract class IngredientFilterMixin {
             for (IListElementInfo<?> ingredient : ingredients) {
                 updateHiddenStateEquivalent(ingredient.getElement(), ingredientVisibility);
             }
-            elementSearch.addAll(ingredients, this.ingredientManager);
+            TooltipSearchShadow.observeNativeBuild(ingredients, this.elementPrefixParser, () -> {
+                elementSearch.addAll(ingredients, this.ingredientManager);
+                return elementSearch;
+            });
             invalidateCache();
         }
 
@@ -117,7 +147,8 @@ public abstract class IngredientFilterMixin {
             targetSearch,
             (search, element) -> jeiopt$addElement(search, element, this.ingredientManager),
             chunkSize,
-            generation
+            generation,
+            this.elementPrefixParser
         );
         long startNanos = System.nanoTime();
         JeiOptimize.LOGGER.info(

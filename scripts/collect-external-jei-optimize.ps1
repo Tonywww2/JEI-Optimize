@@ -18,7 +18,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
-$CollectorVersion = "1"
+$CollectorVersion = "2"
 
 function Write-TextNoBom($Path, $Text) {
     $parent = Split-Path -Parent $Path
@@ -130,16 +130,14 @@ snapshotBudgetMs = 2
 function Convert-DurationToMs($Value, $Unit) {
     $number = [double]::Parse($Value, [System.Globalization.CultureInfo]::InvariantCulture)
     $normalized = $Unit.ToLowerInvariant()
-    if ($normalized -eq "s") {
-        return $number * 1000.0
+    switch -Regex ($normalized) {
+        '^(m|min|minute|minutes)$' { return $number * 60000.0 }
+        '^(s|sec|second|seconds)$' { return $number * 1000.0 }
+        '^(ms|millisecond|milliseconds)$' { return $number }
+        '^(us|\u00b5s|\u03bcs|microsecond|microseconds)$' { return $number / 1000.0 }
+        '^(ns|nanosecond|nanoseconds)$' { return $number / 1000000.0 }
+        default { throw "Unknown JEI duration unit: $Unit" }
     }
-    if ($normalized -eq "ms") {
-        return $number
-    }
-    if ($normalized -eq "ns") {
-        return $number / 1000000.0
-    }
-    return $number / 1000.0
 }
 
 function Match-LastDurationMs($Text, $Pattern) {
@@ -161,7 +159,7 @@ function Match-LastInteger($Text, $Pattern) {
 
 function Get-JeiMetrics($Text) {
     return [pscustomobject]@{
-        JeiStarted = [bool]($Text -match "JEI StartEventObserver transitioning state from ENABLED to JEI_STARTED")
+        JeiStarted = [bool]($Text -match "Starting JEI took\s+[0-9.]+\s*\S+|JEI StartEventObserver transitioning state from ENABLED to JEI_STARTED")
         JeiTotalMs = Match-LastDurationMs $Text "Starting JEI took\s+([0-9.]+)\s*(\S+)"
         RegisteringIngredientsMs = Match-LastDurationMs $Text "Registering ingredients took\s+([0-9.]+)\s*(\S+)"
         RegisteringCategoriesMs = Match-LastDurationMs $Text "Registering categories took\s+([0-9.]+)\s*(\S+)"
@@ -278,7 +276,11 @@ try {
     $metricWallMs = $null
     $metrics = Get-JeiMetrics $captured.ToString()
 
-    while ($stopwatch.Elapsed -lt $timeout) {
+    if ($ReadExistingLog) {
+        $status = if ($metrics.JeiStarted -and $null -ne $metrics.JeiTotalMs) { "metrics-captured" } else { "existing-log-incomplete" }
+    }
+
+    while (!$ReadExistingLog -and $stopwatch.Elapsed -lt $timeout) {
         $newText = Read-LogSince $LatestLogPath ([ref] $offset)
         if ($newText.Length -gt 0) {
             [void] $captured.Append($newText)

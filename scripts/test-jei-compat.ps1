@@ -14,8 +14,23 @@
 .PARAMETER JeiVersion
     JEI build to resolve at runtime, e.g. 15.48.0.179. Omit to use the version from gradle.properties.
 
+.PARAMETER NeoForgeVersion
+    NeoForge build to resolve for a NeoForge compatibility run. Omit to use the configured version.
+
+.PARAMETER MezzConfigVersion
+    MezzConfig build to add for a NeoForge compatibility run when the selected JEI requires it.
+
 .PARAMETER KeepConfig
     Do not overwrite run/config/justenoughthreads-client.toml. Use this to test a hand-written config.
+
+.PARAMETER RunDirectory
+    Workspace-relative isolated run directory with prepared config and a test world copy.
+
+.PARAMETER RequireTooltipShadow
+    Require a successful tooltip shadow comparison as well as JEI startup; fail on skipped diagnostics.
+
+.PARAMETER RequireTooltipIndex
+    Require optimized tooltip query validation and client publication; reject native bypass/fallback.
 
 .PARAMETER RuntimeModJars
     Local mod jars to remap and add only to this compatibility run. They are never packaged.
@@ -28,6 +43,9 @@
 
 .EXAMPLE
     .\scripts\test-jei-compat.ps1 -Loader neoforge -KeepConfig
+
+.EXAMPLE
+    .\scripts\test-jei-compat.ps1 -Loader neoforge -JeiVersion 19.56.0.441 -NeoForgeVersion 21.1.238 -MezzConfigVersion 0.5.6
 #>
 [CmdletBinding()]
 param(
@@ -36,8 +54,13 @@ param(
     [string] $Loader = "forge",
     [string] $World = "",
     [switch] $KeepConfig,
+    [string] $RunDirectory = "",
+    [switch] $RequireTooltipShadow,
+    [switch] $RequireTooltipIndex,
     [string[]] $RuntimeModJars = @(),
     [string] $Label = "",
+    [string] $NeoForgeVersion = "",
+    [string] $MezzConfigVersion = "",
     [int] $TimeoutSeconds = 300,
     [int] $PostJeiWaitSeconds = 12,
     [string] $JavaHome = "C:\Program Files\Java\jdk-21"
@@ -62,6 +85,13 @@ if ($Loader -eq "forge") {
     $ClientLaunchTarget = "forgeclientdev"
     $RunDir = Join-Path $RepoRoot "versions\1.21.1-neoforge\run"
     if (-not $World) { $World = "v121" }
+}
+
+if ($RunDirectory) {
+    $RunDir = [System.IO.Path]::GetFullPath((Join-Path $RepoRoot $RunDirectory))
+    if (!$RunDir.StartsWith($RepoRoot + [System.IO.Path]::DirectorySeparatorChar, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw 'Compatibility test run directory must stay inside the workspace'
+    }
 }
 
 $ConfigPath = Join-Path $RunDir "config\justenoughthreads-client.toml"
@@ -144,7 +174,16 @@ try {
     $env:Path = "$JavaHome\bin;$oldPath"
 
     $gradleArgs = "--no-daemon $GradleProject`:runClient --args=`"--quickPlaySingleplayer $World`""
+    if ($RunDirectory) {
+        $gradleArgs += " `"-PcompatTest.runDirectory.$McVersion=$RunDir`""
+    }
     if ($JeiVersion) { $gradleArgs += " -Pjei.runtime.$McVersion=$JeiVersion" }
+    if ($Loader -eq "neoforge" -and $NeoForgeVersion) {
+        $gradleArgs += " -Pneoforge.runtime.$McVersion=$NeoForgeVersion"
+    }
+    if ($Loader -eq "neoforge" -and $MezzConfigVersion) {
+        $gradleArgs += " -PmezzConfig.runtime.$McVersion=$MezzConfigVersion"
+    }
     if ($RuntimeModJars.Count -gt 0) {
         $resolvedModJars = $RuntimeModJars | ForEach-Object { (Resolve-Path $_).Path }
         $gradleArgs += " `"-PcompatTest.runtimeModJars.$McVersion=$($resolvedModJars -join ',')`""
@@ -165,7 +204,21 @@ try {
             $status = "invalid-jei-runtime"
             break
         }
-        if ($text -match "Starting JEI took") {
+        if ($RequireTooltipShadow -and $text -match 'JEI tooltip shadow (stopped|skipped|disabled)') {
+            $status = "tooltip-shadow-failed"
+            break
+        }
+        if ($RequireTooltipIndex -and $text -match 'JEI tooltip index bypass|JEI tooltip indexing fell back|JEI tooltip shadow disabled') {
+            $status = "tooltip-index-failed"
+            break
+        }
+        if ($RequireTooltipIndex -and $text -match 'Starting JEI took' -and
+            $text -notmatch 'JEI tooltip filter published on client thread:') {
+            $status = "tooltip-index-not-built"
+            break
+        }
+        if ($text -match "Starting JEI took" -and (!$RequireTooltipShadow -or $text -match 'JEI tooltip shadow passed:') -and
+            (!$RequireTooltipIndex -or ($text -match 'JEI tooltip optimized validation passed:' -and $text -match 'JEI tooltip filter published on client thread:'))) {
             $status = "jei-started"
             $wait = [DateTime]::UtcNow.AddSeconds($PostJeiWaitSeconds)
             if ($wait -gt $hardDeadline) { $wait = $hardDeadline }
@@ -208,8 +261,12 @@ $capturedDebugLog = Read-LogShared $CapturedDebugLogPath
 $runtimeJarName = Get-JeiRuntimeJarName $capturedLog
 $runtimeJarPath = Get-JeiRuntimeJarPath $capturedDebugLog
 $runtimeValidationError = ""
+$runtimeFailurePattern = 'Caught an error from mod plugin:|JEI failed to start|Mixin apply failed|MixinApplyError|InvalidInjectionException|InjectionError|NoSuchMethodError|NoClassDefFoundError|ClassMetadataNotFoundException'
 
-if ($runtimeJarName -match '-unshaded\.jar$') {
+if ($status -eq "jei-started" -and $capturedLog -match $runtimeFailurePattern) {
+    $status = "runtime-error"
+    $runtimeValidationError = "JEI reported completion after a plugin, Mixin, or linkage failure; inspect $CapturedLogPath"
+} elseif ($runtimeJarName -match '-unshaded\.jar$') {
     $status = "invalid-jei-runtime"
     $runtimeValidationError = "Standalone compatibility run resolved incomplete JEI artifact: $runtimeJarName"
 } elseif ($status -eq "jei-started" -and $JeiVersion) {
@@ -237,6 +294,8 @@ if ($runtimeJarPath -and (Test-Path $runtimeJarPath)) {
         "loader=$Loader"
         "minecraft=$McVersion"
         "requestedJei=$(if ($JeiVersion) { $JeiVersion } else { 'default' })"
+        "requestedNeoForge=$(if ($NeoForgeVersion) { $NeoForgeVersion } else { 'default' })"
+        "requestedMezzConfig=$(if ($MezzConfigVersion) { $MezzConfigVersion } else { 'default' })"
         "runtimeJar=$runtimeJarName"
         "runtimePath=$runtimeJarPath"
         "runtimeSha256=$artifactSha256"

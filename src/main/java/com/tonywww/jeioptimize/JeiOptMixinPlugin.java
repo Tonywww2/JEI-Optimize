@@ -3,9 +3,13 @@ package com.tonywww.jeioptimize;
 import com.tonywww.jeioptimize.runtime.JeiOptCompatibilityState;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.objectweb.asm.Handle;
+import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.FieldNode;
+import org.objectweb.asm.tree.IntInsnNode;
+import org.objectweb.asm.tree.InvokeDynamicInsnNode;
 import org.objectweb.asm.tree.LdcInsnNode;
 import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.MethodNode;
@@ -49,6 +53,12 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
         MIXIN_PACKAGE + "compat.IronFurnacesJeiPluginMixin";
     private static final String IRON_FURNACES_CATEGORY_MIXIN =
         MIXIN_PACKAGE + "compat.IronFurnacesGeneratorCategoryMixin";
+    private static final String IRONS_SPELLS_MAKER_MIXIN =
+        MIXIN_PACKAGE + "compat.IronsSpellsArcaneAnvilMakerMixin";
+    private static final String IRONS_SPELLS_RECIPE_MIXIN =
+        MIXIN_PACKAGE + "compat.IronsSpellsArcaneAnvilRecipeMixin";
+    private static final String IRONS_SPELLS_RECIPE_CLASS =
+        "io.redspace.ironsspellbooks.jei.ArcaneAnvilJeiRecipe";
     private static final String GENERATOR_GALORE_PLUGIN_MIXIN =
         MIXIN_PACKAGE + "compat.GeneratorGaloreJeiPluginMixin";
     private static final String MEKANISM_RECIPE_REGISTRY_MIXIN =
@@ -57,6 +67,26 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
         MIXIN_PACKAGE + "compat.GtceuRecipeRegistrationMixin";
     private static final String GTCEU_RECIPE_CATEGORY_CLASS =
         "com.gregtechceu.gtceu.integration.jei.recipe.GTRecipeJEICategory";
+    private static final String MINECOLONIES_JEI_PLUGIN_MIXIN =
+        MIXIN_PACKAGE + "compat.MineColoniesJeiPluginMixin";
+    private static final String MINECOLONIES_EQUIPMENT_TYPE_MIXIN =
+        MIXIN_PACKAGE + "compat.MineColoniesEquipmentTypeEntryMixin";
+    private static final String MINECOLONIES_ATTRIBUTE_MODIFIERS_MIXIN =
+        MIXIN_PACKAGE + "compat.MineColoniesAttributeModifiersMixin";
+    private static final String MINECOLONIES_TWEAKS_EXTENSION_MIXIN =
+        MIXIN_PACKAGE + "compat.MineColoniesTweaksToolTypeExtensionMixin";
+    private static final String MINECOLONIES_TWEAKS_TAGS_MIXIN =
+        MIXIN_PACKAGE + "compat.MineColoniesTweaksToolTypeTagsMixin";
+    private static final String MINECOLONIES_JEI_PLUGIN_CLASS =
+        "com.minecolonies.core.compatibility.jei.JEIPlugin";
+    private static final String MINECOLONIES_TOOLS_ANALYZER_CLASS =
+        "com.minecolonies.core.colony.crafting.ToolsAnalyzer";
+    private static final String MINECOLONIES_EQUIPMENT_TYPE_CLASS =
+        "com.minecolonies.api.equipment.registry.EquipmentTypeEntry";
+    private static final String MINECOLONIES_TWEAKS_EXTENSION_CLASS =
+        "steve_gall.minecolonies_tweaks.api.common.tool.ToolTypeExtension";
+    private static final String MINECOLONIES_TWEAKS_TAGS_CLASS =
+        "steve_gall.minecolonies_tweaks.api.common.tool.ToolTypeTags";
     private static final String THERMAL_EXPANSION_PLUGIN_MIXIN =
         MIXIN_PACKAGE + "compat.ThermalExpansionJeiPluginMixin";
     private static final String TINKERS_PLUGIN_MIXIN = MIXIN_PACKAGE + "compat.TinkersJeiPluginMixin";
@@ -215,6 +245,77 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
         "mezz/jei/api/registration/IRecipeRegistration",
         "addRecipes",
         "(Lmezz/jei/api/recipe/RecipeType;Ljava/util/List;)V"
+    );
+    private static final Requirement MINECOLONIES_REGISTER_RECIPES = Requirement.method(
+        "MineColonies JEI tool scan caching",
+        "registerRecipes",
+        "(Lmezz/jei/api/registration/IRecipeRegistration;)V"
+    );
+    private static final InvocationRequirement MINECOLONIES_FIND_TOOLS_INVOCATION = new InvocationRequirement(
+        MINECOLONIES_REGISTER_RECIPES.memberName(),
+        MINECOLONIES_REGISTER_RECIPES.descriptor(),
+        "com/minecolonies/core/compatibility/jei/ToolRecipeCategory",
+        "findRecipes",
+        "()Ljava/util/List;"
+    );
+    private static final Requirement MINECOLONIES_FIND_TOOLS = Requirement.method(
+        "MineColonies JEI tool scan caching",
+        "findTools",
+        "()Ljava/util/List;"
+    );
+    private static final Requirement MINECOLONIES_TRY_ADDING_TOOL = Requirement.method(
+        "MineColonies JEI tool scan caching",
+        "tryAddingToolWithLevel",
+        "(Ljava/util/Map;Lcom/minecolonies/api/equipment/registry/EquipmentTypeEntry;"
+            + "Lnet/minecraft/world/item/ItemStack;)V"
+    );
+    private static final Requirement MINECOLONIES_CHECK_IS_EQUIPMENT = Requirement.method(
+        "MineColonies JEI tool scan caching",
+        "checkIsEquipment",
+        "(Lnet/minecraft/world/item/ItemStack;)Z"
+    );
+    private static final Requirement MINECOLONIES_GET_MINING_LEVEL = Requirement.method(
+        "MineColonies JEI tool scan caching",
+        "getMiningLevel",
+        "(Lnet/minecraft/world/item/ItemStack;)I"
+    );
+    private static final InvocationRequirement MINECOLONIES_CHECK_IS_EQUIPMENT_INVOCATION =
+        new InvocationRequirement(
+            MINECOLONIES_FIND_TOOLS.memberName(),
+            MINECOLONIES_FIND_TOOLS.descriptor(),
+            "com/minecolonies/api/equipment/registry/EquipmentTypeEntry",
+            MINECOLONIES_CHECK_IS_EQUIPMENT.memberName(),
+            MINECOLONIES_CHECK_IS_EQUIPMENT.descriptor()
+        );
+    private static final InvocationRequirement MINECOLONIES_GET_MINING_LEVEL_INVOCATION =
+        new InvocationRequirement(
+            MINECOLONIES_TRY_ADDING_TOOL.memberName(),
+            MINECOLONIES_TRY_ADDING_TOOL.descriptor(),
+            "com/minecolonies/api/equipment/registry/EquipmentTypeEntry",
+            MINECOLONIES_GET_MINING_LEVEL.memberName(),
+            MINECOLONIES_GET_MINING_LEVEL.descriptor()
+        );
+    private static final List<Requirement> MINECOLONIES_TWEAKS_EXTENSION_REQUIREMENTS = List.of(
+        Requirement.method(
+            "MineColonies JEI tool scan caching",
+            "isCustomTool",
+            "(Lnet/minecraft/world/item/ItemStack;)Z"
+        ),
+        Requirement.method(
+            "MineColonies JEI tool scan caching",
+            "getTagLevel",
+            "(Lnet/minecraft/world/item/ItemStack;)I"
+        ),
+        Requirement.method(
+            "MineColonies JEI tool scan caching",
+            "getCustomLevel",
+            "(Lnet/minecraft/world/item/ItemStack;)I"
+        )
+    );
+    private static final Requirement MINECOLONIES_TWEAKS_BLACKLIST = Requirement.method(
+        "MineColonies JEI tool scan caching",
+        "isInBlacklist",
+        "(Lnet/minecraft/world/item/ItemStack;Lnet/minecraft/resources/ResourceLocation;)Z"
     );
     private static final Requirement TINKERS_REGISTER_RECIPES = Requirement.method(
         "Tinkers casting compaction",
@@ -426,7 +527,16 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
             "startup JEI render guard",
             "onDrawScreenPost",
             "(Lnet/minecraft/client/gui/screens/Screen;"
-                + "Lnet/minecraft/client/gui/GuiGraphics;II)V"))
+                + "Lnet/minecraft/client/gui/GuiGraphics;II)V")),
+        Map.entry(MIXIN_PACKAGE + "JeiGuiBackgroundRenderGuardLegacyMixin", Requirement.method(
+            "startup JEI background render guard",
+            "onDrawBackgroundPost",
+            "(Lnet/minecraft/client/gui/screens/Screen;"
+                + "Lnet/minecraft/client/gui/GuiGraphics;)V")),
+        Map.entry(MIXIN_PACKAGE + "JeiGuiBackgroundRenderGuardModernMixin", Requirement.method(
+            "startup JEI background render guard",
+            "onDrawBackgroundPost",
+            "(Lnet/minecraft/client/gui/GuiGraphics;)V"))
     );
     private static final Map<String, ConfigGate> CONFIG_GATES = Map.ofEntries(
         Map.entry(BREWING_INDEX_FORGE_MIXIN, new ConfigGate("indexedBrewingLookup", true)),
@@ -437,6 +547,13 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
         Map.entry(MENU_GRINDSTONE_GUARD_MIXIN, new ConfigGate("skipRedundantMenuUpdates", true)),
         Map.entry(LEGACY_RECIPE_LAYOUT_MIXIN, new ConfigGate("lazyRecipeLayouts", true)),
         Map.entry(GTCEU_RECIPE_REGISTRATION_MIXIN, new ConfigGate("batchGtceuRecipeRegistration", true)),
+        Map.entry(MINECOLONIES_JEI_PLUGIN_MIXIN, new ConfigGate("cacheMineColoniesToolScan", true)),
+        Map.entry(MINECOLONIES_EQUIPMENT_TYPE_MIXIN, new ConfigGate("cacheMineColoniesToolScan", true)),
+        Map.entry(MINECOLONIES_ATTRIBUTE_MODIFIERS_MIXIN, new ConfigGate("fixMineColoniesAttributeModifiers", true)),
+        Map.entry(MINECOLONIES_TWEAKS_EXTENSION_MIXIN, new ConfigGate("cacheMineColoniesToolScan", true)),
+        Map.entry(MINECOLONIES_TWEAKS_TAGS_MIXIN, new ConfigGate("cacheMineColoniesToolScan", true)),
+        Map.entry(IRONS_SPELLS_MAKER_MIXIN, new ConfigGate("compactIronsSpellsImbuing", true)),
+        Map.entry(IRONS_SPELLS_RECIPE_MIXIN, new ConfigGate("compactIronsSpellsImbuing", true)),
         Map.entry(MIXIN_PACKAGE + "VanillaRecipesMixin", new ConfigGate("parallelVanillaRecipes", false))
     );
     private static final Map<String, Boolean> EARLY_CONFIG_VALUES = new HashMap<>();
@@ -500,6 +617,38 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
                 "de.maxhenkel.car.integration.jei.CarRecipeCategory",
                 List.of(Requirement.method("", "setRecipe"))
             )
+        )
+    );
+    private static final AtomicFeature IRONS_SPELLS_FEATURE = new AtomicFeature(
+        "Iron's Spells Arcane Anvil compaction",
+        List.of(
+            new TargetRequirement("io.redspace.ironsspellbooks.jei.ArcaneAnvilRecipeMaker", List.of(
+                Requirement.method("", "getRecipes", "(Lmezz/jei/api/recipe/vanilla/IVanillaRecipeFactory;"
+                    + "Lio/redspace/ironsspellbooks/jei/JeiPlugin$ItemFinder;)Ljava/util/List;")
+            )),
+            new TargetRequirement(IRONS_SPELLS_RECIPE_CLASS, List.of(
+                Requirement.method("", "getRecipeItems", "()Lio/redspace/ironsspellbooks/jei/ArcaneAnvilJeiRecipe$Tuple;"),
+                Requirement.field("", "leftItem", "Lnet/minecraft/world/item/Item;"),
+                Requirement.field("", "rightItem", "Lnet/minecraft/world/item/Item;")
+            )),
+            new TargetRequirement(IRONS_SPELLS_RECIPE_CLASS + "$Tuple", List.of(
+                Requirement.method("", "<init>", "(Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;)V")
+            )),
+            new TargetRequirement("io.redspace.ironsspellbooks.api.registry.SpellRegistry", List.of(
+                Requirement.method("", "getEnabledSpells", "()Ljava/util/List;")
+            )),
+            new TargetRequirement("io.redspace.ironsspellbooks.api.spells.AbstractSpell", List.of(
+                Requirement.method("", "getSpellId", "()Ljava/lang/String;"),
+                Requirement.method("", "getMinLevel", "()I"),
+                Requirement.method("", "getMaxLevel", "()I")
+            )),
+            new TargetRequirement("io.redspace.ironsspellbooks.api.spells.ISpellContainer", List.of(
+                Requirement.method("", "createScrollContainer", "(Lio/redspace/ironsspellbooks/api/spells/AbstractSpell;"
+                    + "ILnet/minecraft/world/item/ItemStack;)Lio/redspace/ironsspellbooks/api/spells/ISpellContainer;")
+            )),
+            new TargetRequirement("io.redspace.ironsspellbooks.registries.ItemRegistry", List.of(
+                Requirement.field("", "SCROLL", null)
+            ))
         )
     );
     private static final AtomicFeature IRON_FURNACES_FEATURE = new AtomicFeature(
@@ -638,6 +787,51 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
                 1
             )
         )
+    );
+    private static final AtomicFeature MINECOLONIES_TOOL_SCAN_FEATURE = new AtomicFeature(
+        "MineColonies JEI tool scan caching",
+        List.of(
+            new TargetRequirement(
+                MINECOLONIES_JEI_PLUGIN_CLASS,
+                List.of(MINECOLONIES_REGISTER_RECIPES)
+            ),
+            new TargetRequirement(
+                MINECOLONIES_TOOLS_ANALYZER_CLASS,
+                List.of(MINECOLONIES_FIND_TOOLS, MINECOLONIES_TRY_ADDING_TOOL)
+            ),
+            new TargetRequirement(
+                MINECOLONIES_EQUIPMENT_TYPE_CLASS,
+                List.of(MINECOLONIES_CHECK_IS_EQUIPMENT, MINECOLONIES_GET_MINING_LEVEL)
+            )
+        ),
+        List.of(
+            new InvocationTargetRequirement(
+                MINECOLONIES_JEI_PLUGIN_CLASS,
+                MINECOLONIES_FIND_TOOLS_INVOCATION,
+                1
+            ),
+            new InvocationTargetRequirement(
+                MINECOLONIES_TOOLS_ANALYZER_CLASS,
+                MINECOLONIES_CHECK_IS_EQUIPMENT_INVOCATION,
+                1
+            ),
+            new InvocationTargetRequirement(
+                MINECOLONIES_TOOLS_ANALYZER_CLASS,
+                MINECOLONIES_GET_MINING_LEVEL_INVOCATION,
+                1
+            )
+        )
+    );
+    private static final AtomicFeature MINECOLONIES_TWEAKS_FEATURE = new AtomicFeature(
+        "MineColonies Tweaks empty tool rule bypass",
+        java.util.stream.Stream.concat(
+            MINECOLONIES_TOOL_SCAN_FEATURE.targets().stream(),
+            java.util.stream.Stream.of(
+                new TargetRequirement(MINECOLONIES_TWEAKS_EXTENSION_CLASS, MINECOLONIES_TWEAKS_EXTENSION_REQUIREMENTS),
+                new TargetRequirement(MINECOLONIES_TWEAKS_TAGS_CLASS, List.of(MINECOLONIES_TWEAKS_BLACKLIST))
+            )
+        ).toList(),
+        MINECOLONIES_TOOL_SCAN_FEATURE.invocations()
     );
     private static final AtomicFeature TINKERS_CASTING_FEATURE = new AtomicFeature(
         "Tinkers casting compaction",
@@ -824,6 +1018,23 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
             )
         )
     );
+    private static final AtomicFeature MODERN_INGREDIENT_FILTER_FEATURE = new AtomicFeature(
+        "async ingredient filter",
+        List.of(
+            new TargetRequirement(
+                "mezz.jei.gui.ingredients.IngredientFilter",
+                List.of(Requirement.method(
+                    "",
+                    "createElementSearch",
+                    "(Lmezz/jei/common/config/IClientConfig;"
+                        + "Lmezz/jei/gui/search/ElementPrefixParser;"
+                        + "Ljava/util/List;"
+                        + "Lmezz/jei/api/runtime/IIngredientManager;)"
+                        + "Lmezz/jei/gui/search/IElementSearch;"
+                ))
+            )
+        )
+    );
     private static final Map<String, AtomicFeature> ATOMIC_FEATURES = Map.ofEntries(
         Map.entry(ANVIL_REPRESENTATIVE_CONTEXT_MIXIN, ANVIL_REPRESENTATIVE_FEATURE),
         Map.entry(ANVIL_ENCHANTMENT_REPRESENTATIVE_MIXIN, ANVIL_REPRESENTATIVE_FEATURE),
@@ -833,8 +1044,14 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
         Map.entry(GENERATOR_GALORE_PLUGIN_MIXIN, GENERATOR_GALORE_FEATURE),
         Map.entry(IRON_FURNACES_PLUGIN_MIXIN, IRON_FURNACES_FEATURE),
         Map.entry(IRON_FURNACES_CATEGORY_MIXIN, IRON_FURNACES_FEATURE),
+        Map.entry(IRONS_SPELLS_MAKER_MIXIN, IRONS_SPELLS_FEATURE),
+        Map.entry(IRONS_SPELLS_RECIPE_MIXIN, IRONS_SPELLS_FEATURE),
         Map.entry(MEKANISM_RECIPE_REGISTRY_MIXIN, MEKANISM_NUTRITIONAL_FEATURE),
         Map.entry(GTCEU_RECIPE_REGISTRATION_MIXIN, GTCEU_RECIPE_REGISTRATION_FEATURE),
+        Map.entry(MINECOLONIES_JEI_PLUGIN_MIXIN, MINECOLONIES_TOOL_SCAN_FEATURE),
+        Map.entry(MINECOLONIES_EQUIPMENT_TYPE_MIXIN, MINECOLONIES_TOOL_SCAN_FEATURE),
+        Map.entry(MINECOLONIES_TWEAKS_EXTENSION_MIXIN, MINECOLONIES_TWEAKS_FEATURE),
+        Map.entry(MINECOLONIES_TWEAKS_TAGS_MIXIN, MINECOLONIES_TWEAKS_FEATURE),
         Map.entry(THERMAL_EXPANSION_PLUGIN_MIXIN, THERMAL_STIRLING_FEATURE),
         Map.entry(TINKERS_PLUGIN_MIXIN, TINKERS_CASTING_FEATURE),
         Map.entry(EMBERS_PLUGIN_MIXIN, EMBERS_DAWNSTONE_ANVIL_FEATURE),
@@ -847,7 +1064,8 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
         Map.entry(FORGE_ANVIL_BATCH_MIXIN, FORGE_MENU_BATCH_FEATURE),
         Map.entry(FORGE_GRINDSTONE_BATCH_MIXIN, FORGE_MENU_BATCH_FEATURE),
         Map.entry(MENU_COMBINER_GUARD_MIXIN, FORGE_MENU_BATCH_FEATURE),
-        Map.entry(MENU_GRINDSTONE_GUARD_MIXIN, FORGE_MENU_BATCH_FEATURE)
+        Map.entry(MENU_GRINDSTONE_GUARD_MIXIN, FORGE_MENU_BATCH_FEATURE),
+        Map.entry(MIXIN_PACKAGE + "IngredientFilterModernMixin", MODERN_INGREDIENT_FILTER_FEATURE)
     );
 
     private final Map<String, ClassNode> targetCache = new HashMap<>();
@@ -868,7 +1086,9 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
         MENU_COMBINER_GUARD_MIXIN,
         MENU_GRINDSTONE_GUARD_MIXIN,
         STARTER_PUBLISH_LEGACY_MIXIN,
-        STARTER_PUBLISH_MODERN_MIXIN
+        STARTER_PUBLISH_MODERN_MIXIN,
+        MIXIN_PACKAGE + "JeiGuiBackgroundRenderGuardLegacyMixin",
+        MIXIN_PACKAGE + "JeiGuiBackgroundRenderGuardModernMixin"
     );
 
     private static final Set<String> OPTIONAL_MIXINS = Set.of(
@@ -882,6 +1102,10 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
         MIXIN_PACKAGE + "compat.IronsSpellsArcaneAnvilRecipeMixin",
         JEED_EFFECT_CLICK_MIXIN,
         GTCEU_RECIPE_REGISTRATION_MIXIN,
+        MINECOLONIES_JEI_PLUGIN_MIXIN,
+        MINECOLONIES_EQUIPMENT_TYPE_MIXIN,
+        MINECOLONIES_TWEAKS_EXTENSION_MIXIN,
+        MINECOLONIES_TWEAKS_TAGS_MIXIN,
         MIXIN_PACKAGE + "compat.MekanismRecipeRegistryHelperMixin",
         MIXIN_PACKAGE + "compat.ProductiveTreesLogStrippingCategoryMixin",
         MIXIN_PACKAGE + "compat.SfmFallingAnvilCategoryMixin",
@@ -903,7 +1127,51 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
 
     @Override
     public boolean shouldApplyMixin(String targetClassName, String mixinClassName) {
+        if ((MIXIN_PACKAGE + "ClientTickHookMixin").equals(mixinClassName) && Boolean.getBoolean("jet.benchmark")) {
+            return true;
+        }
+        if ((MIXIN_PACKAGE + "TooltipBenchmarkOverlayMixin").equals(mixinClassName)) {
+            ClassNode overlay = readTarget(targetClassName);
+            return Boolean.getBoolean("jet.benchmark") && overlay != null
+                && Requirement.method("", "drawScreen", "(Lnet/minecraft/client/Minecraft;Lnet/minecraft/client/gui/GuiGraphics;IIF)V").isPresentIn(overlay);
+        }
         if (!readEarlyBoolean("enabled", true)) {
+            return false;
+        }
+        if (MINECOLONIES_ATTRIBUTE_MODIFIERS_MIXIN.equals(mixinClassName)) {
+            return readEarlyBoolean("fixMineColoniesAttributeModifiers", true)
+                && hasPluginCallbackRoutingContract(readTarget("mezz.jei.library.load.PluginCaller"))
+                && hasMineColoniesAttributeContract(readTarget(targetClassName));
+        }
+        if ((MIXIN_PACKAGE + "JeiStartupGridRefreshMixin").equals(mixinClassName)) {
+            return hasStartupGridRefreshContract(readTarget(targetClassName));
+        }
+        if ((MIXIN_PACKAGE + "JeiNativeSearchBuilderMixin").equals(mixinClassName)) {
+            return hasNativeSearchBuilderContract(readTarget(targetClassName));
+        }
+        if ((MIXIN_PACKAGE + "ListElementInfoTooltipCaptureMixin").equals(mixinClassName)) {
+            return shouldApplyTooltipCapture(targetClassName);
+        }
+        if ((MIXIN_PACKAGE + "TooltipResourceReloadMixin").equals(mixinClassName)) {
+            ClassNode reload = readTarget(targetClassName);
+            return readEarlyBoolean("tooltipSearchIndex", false) && hasTooltipReloadContract(reload);
+        }
+        if ((MIXIN_PACKAGE + "accessor.ElementSearchTooltipAccessor").equals(mixinClassName)) {
+            ClassNode search = readTarget(targetClassName);
+            return readEarlyBoolean("tooltipSearchIndex", false) && search != null
+                && Requirement.field("", "prefixedSearchables", "Ljava/util/Map;").isPresentIn(search);
+        }
+        if ((MIXIN_PACKAGE + "IngredientFilterMixin").equals(mixinClassName)
+            || (MIXIN_PACKAGE + "IngredientFilterModernMixin").equals(mixinClassName)) {
+            ClassNode filter = readTarget(targetClassName);
+            if (filter == null || !Requirement.method("", "notifyListenersOfChange", "()V").isPresentIn(filter)
+                || !Requirement.method("", "rebuildItemFilter", "()V").isPresentIn(filter)) {
+                return false;
+            }
+        }
+        if ((MIXIN_PACKAGE + "IngredientFilterModernMixin").equals(mixinClassName)
+            && !hasTooltipLowMemoryContract(readTarget("mezz.jei.common.config.IClientConfig"))) {
+            LOGGER.info("JEI tooltip index bypass: unrecognized low-memory setting ABI");
             return false;
         }
         if (CLIENT_TASK_PUMP_GUARD_MIXIN.equals(mixinClassName)) {
@@ -998,6 +1266,191 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
                 + "JEI keeps its normal behavior; the mod needs an update for this JEI version.",
             requirement.feature(), targetClassName, requirement.describe());
         return false;
+    }
+
+    private boolean shouldApplyTooltipCapture(String targetClassName) {
+        JeiOptCompatibilityState.setTooltipContract((char) 0, false);
+        if (!readEarlyBoolean("tooltipSearchMetrics", false) && !readEarlyBoolean("tooltipSearchIndex", false)) {
+            return false;
+        }
+        ClassNode target = readTarget(targetClassName);
+        ClassNode search = readTarget("mezz.jei.gui.search.ElementSearch");
+        ClassNode parser = readTarget("mezz.jei.gui.search.ElementPrefixParser");
+        if (target == null || search == null || parser == null) {
+            return false;
+        }
+        if (search.methods.stream().anyMatch(method -> method.name.equals("processDeferredTooltips"))
+            || search.fields.stream().anyMatch(field -> field.desc.contains("SearchStringCache"))) {
+            LOGGER.info("JEI tooltip shadow disabled: JEI-Async owns deferred tooltips");
+            return false;
+        }
+        char prefix = detectTooltipPrefix(parser);
+        boolean compatible = prefix != 0
+            && hasTooltipSettingsContract(readTarget("mezz.jei.common.config.IIngredientFilterConfig"))
+            && Requirement.method("", "getTooltipStrings", "(Lmezz/jei/common/config/IIngredientFilterConfig;"
+                + "Lmezz/jei/api/runtime/IIngredientManager;)Ljava/util/Set;").isPresentIn(target)
+            && Requirement.method("", "getSearchResults", "(Lmezz/jei/gui/search/ElementPrefixParser$TokenInfo;)"
+                + "Ljava/util/Set;").isPresentIn(search)
+            && Requirement.method("", "parseToken", "(Ljava/lang/String;)Ljava/util/Optional;").isPresentIn(parser);
+        if (readEarlyBoolean("tooltipSearchIndex", false)) {
+            ClassNode reload = readTarget("mezz.jei.gui.startup.ResourceReloadHandler");
+            compatible &= hasTooltipReloadContract(reload)
+                && Requirement.field("", "prefixedSearchables", "Ljava/util/Map;").isPresentIn(search)
+                && Requirement.method("", "add", "(Lmezz/jei/gui/ingredients/IListElementInfo;Lmezz/jei/api/runtime/IIngredientManager;)V").isPresentIn(search)
+                && Requirement.method("", "getAllIngredients", "()Ljava/util/Collection;").isPresentIn(search);
+        }
+        if (!compatible) {
+            LOGGER.warn("JEI tooltip shadow disabled: unrecognized getter/parser/query ABI");
+            return false;
+        }
+        boolean trimStrings = search.methods.stream().anyMatch(method -> method.name.equals("putIfNotBlank"));
+        JeiOptCompatibilityState.setTooltipContract(prefix, trimStrings);
+        LOGGER.info("JEI tooltip shadow ABI selected: prefix={}, trimStrings={}", prefix, trimStrings);
+        return true;
+    }
+
+    static boolean hasTooltipReloadContract(ClassNode reload) {
+        String descriptor = "(Lnet/minecraft/server/packs/resources/ResourceManager;)V";
+        return reload != null && (Requirement.method("", "onResourceManagerReload", descriptor).isPresentIn(reload)
+            || Requirement.method("", "m_6213_", descriptor).isPresentIn(reload));
+    }
+
+    static boolean hasStartupGridRefreshContract(ClassNode grid) {
+        if (grid == null) {
+            return false;
+        }
+        String owner = "mezz/jei/gui/overlay/ingredients/IngredientGridWithNavigation";
+        for (MethodNode method : grid.methods) {
+            if (!method.name.equals("lambda$new$0") || !method.desc.equals("()V")) {
+                continue;
+            }
+            boolean readsAnchor = false;
+            boolean updatesLayout = false;
+            for (AbstractInsnNode instruction : method.instructions) {
+                if (instruction instanceof MethodInsnNode invocation && invocation.owner.equals(owner)) {
+                    readsAnchor |= invocation.name.equals("getPageAnchorElement")
+                        && invocation.desc.equals("()Lmezz/jei/gui/overlay/elements/IElement;");
+                    updatesLayout |= invocation.name.equals("updateLayoutKeepingPageAnchorVisible")
+                        && invocation.desc.equals("(Lmezz/jei/gui/overlay/elements/IElement;)V");
+                }
+            }
+            return readsAnchor && updatesLayout;
+        }
+        return false;
+    }
+
+    static boolean hasNativeSearchBuilderContract(ClassNode search) {
+        if (search == null) { return false; }
+        for (MethodNode method : search.methods) {
+            if (!method.name.equals("<init>")) { continue; }
+            for (AbstractInsnNode instruction : method.instructions) {
+                if (instruction instanceof MethodInsnNode invocation
+                    && invocation.owner.equals("mezz/jei/api/search/ISearchStorageBuilder")
+                    && invocation.name.equals("build") && invocation.desc.equals("()Lmezz/jei/api/search/ISearchStorage;")) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    static boolean hasMineColoniesAttributeContract(ClassNode target) {
+        if (target == null) { return false; }
+        String descriptor = "(Lnet/minecraft/world/item/ItemStack;Lnet/minecraft/world/entity/ai/attributes/Attribute;)D";
+        for (MethodNode method : target.methods) {
+            if (!method.name.equals("getItemStackAttributeValue") || !method.desc.equals(descriptor)
+                || (method.access & Opcodes.ACC_STATIC) == 0) {
+                continue;
+            }
+            int modifierCollections = 0;
+            int iterations = 0;
+            int instances = 0;
+            boolean addsTransient = false;
+            boolean readsValue = false;
+            for (AbstractInsnNode instruction : method.instructions) {
+                if (instruction instanceof MethodInsnNode invocation) {
+                    if (invocation.owner.equals("net/minecraft/world/entity/ai/attributes/AttributeInstance")
+                        && invocation.name.equals("<init>")
+                        && invocation.desc.equals("(Lnet/minecraft/world/entity/ai/attributes/Attribute;Ljava/util/function/Consumer;)V")) {
+                        instances++;
+                    }
+                    if (invocation.owner.equals("com/google/common/collect/Multimap") && invocation.name.equals("get")
+                        && invocation.desc.equals("(Ljava/lang/Object;)Ljava/util/Collection;")) {
+                        modifierCollections++;
+                    }
+                    if (invocation.owner.equals("java/util/Collection") && invocation.name.equals("forEach")
+                        && invocation.desc.equals("(Ljava/util/function/Consumer;)V")) {
+                        iterations++;
+                    }
+                    readsValue |= invocation.owner.equals("net/minecraft/world/entity/ai/attributes/AttributeInstance")
+                        && (invocation.name.equals("getValue") || invocation.name.equals("m_22135_"))
+                        && invocation.desc.equals("()D");
+                } else if (instruction instanceof InvokeDynamicInsnNode dynamic) {
+                    for (Object argument : dynamic.bsmArgs) {
+                        if (argument instanceof Handle handle) {
+                            addsTransient |= handle.getOwner().equals("net/minecraft/world/entity/ai/attributes/AttributeInstance")
+                                && (handle.getName().equals("addTransientModifier") || handle.getName().equals("m_22118_"))
+                                && handle.getDesc().equals("(Lnet/minecraft/world/entity/ai/attributes/AttributeModifier;)V");
+                        }
+                    }
+                }
+            }
+            return instances == 1 && modifierCollections == 1 && iterations == 1 && addsTransient && readsValue;
+        }
+        return false;
+    }
+
+    static boolean hasTooltipSettingsContract(ClassNode config) {
+        return config != null && (Requirement.method("", "getSearchAdvancedTooltips", "()Z").isPresentIn(config)
+            || Requirement.method("", "searchAdvancedTooltips", "()Lnet/mezzdev/config/api/value/IConfigValue;").isPresentIn(config));
+    }
+
+    static boolean hasTooltipLowMemoryContract(ClassNode config) {
+        return config != null && (Requirement.method("", "isLowMemorySlowSearchEnabled", "()Z").isPresentIn(config)
+            || Requirement.method("", "lowMemorySlowSearchEnabled", "()Lnet/mezzdev/config/api/value/IConfigValue;").isPresentIn(config));
+    }
+
+    static char detectTooltipPrefix(ClassNode parser) {
+        char found = 0;
+        for (MethodNode method : parser.methods) {
+            if (!method.name.equals("<init>")) {
+                continue;
+            }
+            int candidate = -1;
+            boolean tooltipConfigValue = false;
+            for (AbstractInsnNode instruction : method.instructions) {
+                if (instruction instanceof IntInsnNode integer && integer.getOpcode() == Opcodes.BIPUSH) {
+                    candidate = integer.operand;
+                    tooltipConfigValue = false;
+                } else if (instruction instanceof InvokeDynamicInsnNode dynamic) {
+                    for (Object argument : dynamic.bsmArgs) {
+                        if (argument instanceof Handle handle
+                            && ((handle.getOwner().equals("mezz/jei/common/config/IIngredientFilterConfig")
+                                && handle.getName().equals("getTooltipSearchMode"))
+                                || (tooltipConfigValue && dynamic.name.equals("getMode")
+                                    && dynamic.desc.equals("(Lnet/mezzdev/config/api/value/IConfigValue;)Lmezz/jei/common/search/PrefixInfo$IModeGetter;")
+                                    && handle.getOwner().equals("net/mezzdev/config/api/value/IConfigValue")
+                                    && handle.getName().equals("get") && handle.getDesc().equals("()Ljava/lang/Object;")))) {
+                            if (found != 0 || candidate < 33 || candidate > 126) {
+                                return 0;
+                            }
+                            found = (char) candidate;
+                        }
+                    }
+                    tooltipConfigValue = false;
+                } else if (instruction instanceof MethodInsnNode invocation) {
+                    if (invocation.owner.equals("mezz/jei/common/config/IIngredientFilterConfig")) {
+                        tooltipConfigValue = invocation.name.equals("tooltipSearchMode")
+                            && invocation.desc.equals("()Lnet/mezzdev/config/api/value/IConfigValue;");
+                    }
+                    if (invocation.name.equals("addPrefix")) {
+                        candidate = -1;
+                        tooltipConfigValue = false;
+                    }
+                }
+            }
+        }
+        return found;
     }
 
     private boolean shouldApplyClientTaskPumpGuard(String targetClassName) {
@@ -1248,7 +1701,54 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
                         : " exactly " + invocationTarget.expectedCount() + " time(s)");
             }
         }
+        if (feature == IRONS_SPELLS_FEATURE && missing == null
+            && !hasIronsSpellsScrollHolder(targetResolver.apply("io.redspace.ironsspellbooks.registries.ItemRegistry"))) {
+            missing = "public static SCROLL with a supported Forge or NeoForge registry holder";
+        }
+        if (feature == IRONS_SPELLS_FEATURE && missing == null && !hasIronsSpellsAccess(targetResolver)) {
+            missing = "callable Iron's Spells factories, instance recipe fields and public accessors";
+        }
         return new AtomicFeatureCheck(missing == null, sawTarget, missing);
+    }
+
+    private static boolean hasIronsSpellsAccess(Function<String, ClassNode> targetResolver) {
+        for (TargetRequirement targetRequirement : IRONS_SPELLS_FEATURE.targets()) {
+            ClassNode target = targetResolver.apply(targetRequirement.className());
+            for (Requirement requirement : targetRequirement.requirements()) {
+                if (requirement.isField()) {
+                    if (!requirement.memberName().equals("SCROLL") && target.fields.stream().anyMatch(field ->
+                        field.name.equals(requirement.memberName()) && (field.access & Opcodes.ACC_STATIC) != 0)) {
+                        return false;
+                    }
+                    continue;
+                }
+                String name = requirement.memberName();
+                boolean staticMethod = name.equals("getRecipes") || name.equals("getEnabledSpells") || name.equals("createScrollContainer");
+                for (MethodNode method : target.methods) {
+                    if (!name.equals(method.name) || !requirement.descriptor().equals(method.desc)) {
+                        continue;
+                    }
+                    if (((method.access & Opcodes.ACC_STATIC) != 0) != staticMethod
+                        || (!name.equals("getRecipes") && (method.access & Opcodes.ACC_PUBLIC) == 0)) {
+                        return false;
+                    }
+                }
+            }
+        }
+        return true;
+    }
+
+    private static boolean hasIronsSpellsScrollHolder(ClassNode registry) {
+        int requiredAccess = Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC;
+        return registry != null && registry.fields.stream().anyMatch(field -> field.name.equals("SCROLL")
+            && (field.access & requiredAccess) == requiredAccess
+            && (field.desc.equals("Lnet/minecraftforge/registries/RegistryObject;")
+                || field.desc.equals("Lnet/neoforged/neoforge/registries/DeferredHolder;")));
+    }
+
+    static boolean hasCompatibilityContract(String mixinName, Function<String, ClassNode> targetResolver) {
+        AtomicFeature feature = ATOMIC_FEATURES.get(MIXIN_PACKAGE + mixinName);
+        return feature != null && checkAtomicFeature(feature, targetResolver).compatible();
     }
 
     private ClassNode readTarget(String targetClassName) {

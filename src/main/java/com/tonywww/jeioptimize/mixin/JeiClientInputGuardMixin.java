@@ -1,10 +1,10 @@
 package com.tonywww.jeioptimize.mixin;
 
 import com.tonywww.jeioptimize.runtime.JeiOptStartupProgressState;
-import mezz.jei.gui.input.UserInput;
 import net.minecraft.client.gui.screens.Screen;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
+import org.spongepowered.asm.mixin.injection.Coerce;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -16,16 +16,20 @@ public abstract class JeiClientInputGuardMixin {
     @Inject(
         method = {
             "onKeyboardKeyPressedPre(Lnet/minecraft/client/gui/screens/Screen;Lmezz/jei/gui/input/UserInput;)Z",
+            "onKeyboardKeyPressedPre(Lnet/minecraft/client/gui/screens/Screen;Lmezz/jei/common/input/UserInput;)Z",
             "onKeyboardKeyPressedPost(Lnet/minecraft/client/gui/screens/Screen;Lmezz/jei/gui/input/UserInput;)Z",
+            "onKeyboardKeyPressedPost(Lnet/minecraft/client/gui/screens/Screen;Lmezz/jei/common/input/UserInput;)Z",
             "onGuiMouseClicked(Lnet/minecraft/client/gui/screens/Screen;Lmezz/jei/gui/input/UserInput;)Z",
-            "onGuiMouseReleased(Lnet/minecraft/client/gui/screens/Screen;Lmezz/jei/gui/input/UserInput;)Z"
+            "onGuiMouseClicked(Lnet/minecraft/client/gui/screens/Screen;Lmezz/jei/common/input/UserInput;)Z",
+            "onGuiMouseReleased(Lnet/minecraft/client/gui/screens/Screen;Lmezz/jei/gui/input/UserInput;)Z",
+            "onGuiMouseReleased(Lnet/minecraft/client/gui/screens/Screen;Lmezz/jei/common/input/UserInput;)Z"
         },
         at = @At("HEAD"),
         cancellable = true
     )
     private void jeiOptimize$ignoreUserInputUntilRuntimeReady(
         Screen screen,
-        UserInput input,
+        @Coerce Object input,
         CallbackInfoReturnable<Boolean> callbackInfo
     ) {
         if (JeiOptStartupProgressState.blocksJeiInput()) {
