@@ -4,6 +4,30 @@ All notable changes to Just Enough Threads are documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.14.1
+
+### Fixed
+
+- **Opening the inventory during asynchronous JEI startup no longer constructs recipe
+  bookmark icons before the runtime exists.** JEI15.59's `updateForScreenRender` updates
+  bookmark layout before drawing and previously bypassed the render guards, causing
+  `IllegalStateException: Jei Runtime has not been created yet.` Render preparation,
+  screen initialization, and drawing now require both completed startup and an existing
+  runtime. A verified read-only accessor also supports older JEI versions without an
+  optional runtime getter; failed or cancelled startup cannot expose a missing runtime.
+- **Coalesced startup layout refreshes now run after runtime publication.** Plugin callbacks
+  retain their serial order, then the runtime is installed, then pending grid layouts are
+  refreshed on the same client-thread task. Failed/stale publication discards pending
+  refreshes. Bookmarks and ingredient data are not deleted or modified by the guard.
+
+### Validation
+
+- Both loader builds and regression suites passed, along with ABI checks against five
+  released JEI versions. An isolated Forge JEI `15.59.0.212` client-world test opened the
+  inventory during startup, verified saved recipe bookmarks were displayed after publication,
+  and completed 120 queries. The originally affected full modpack, manual resource reload,
+  and world switching have not been retested.
+
 ## 0.14.0
 
 ### JEI Compatibility

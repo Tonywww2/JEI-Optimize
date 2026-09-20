@@ -14,6 +14,7 @@ $sources = @(
     'src/main/java/com/tonywww/jeioptimize/runtime/TooltipCaptureContext.java'
     'src/main/java/com/tonywww/jeioptimize/runtime/JeiOptFilterBuildGate.java'
     'src/main/java/com/tonywww/jeioptimize/runtime/JeiOptUiRefreshBatch.java'
+    'src/main/java/com/tonywww/jeioptimize/runtime/JeiOptStartupProgressState.java'
     'src/test/java/com/tonywww/jeioptimize/runtime/TooltipUiRefreshBatchTest.java'
     'src/main/java/com/tonywww/jeioptimize/runtime/JeiOptTooltipCache.java'
     'src/main/java/com/tonywww/jeioptimize/index/TooltipSearchIndex.java'

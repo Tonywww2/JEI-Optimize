@@ -19,6 +19,7 @@ import java.util.zip.ZipFile;
 
 public final class TooltipAbiTest {
     public static void main(String[] arguments) throws IOException {
+        verifyRenderPreparationGuard();
         verifyMineColoniesContracts();
         verifyMineColoniesAttributeContract();
         verifyIronsSpellsContracts();
@@ -77,6 +78,19 @@ public final class TooltipAbiTest {
                 continue;
             }
             try (ZipFile archive = new ZipFile(argument)) {
+                try (InputStream source = archive.getInputStream(archive.getEntry("mezz/jei/common/Internal.class"))) {
+                    ClassNode internal = new ClassNode();
+                    new ClassReader(source).accept(internal, 0);
+                    check(JeiOptMixinPlugin.hasRuntimeAccessContract(internal), "released nullable runtime field " + argument);
+                }
+                if (argument.contains("15.59.") || argument.contains("19.56.")) {
+                    try (InputStream source = archive.getInputStream(archive.getEntry("mezz/jei/gui/events/GuiEventHandler.class"))) {
+                        ClassNode handler = new ClassNode();
+                        new ClassReader(source).accept(handler, 0);
+                        check(handler.methods.stream().anyMatch(method -> method.name.equals("updateForScreenRender")
+                            && method.desc.equals("(Lnet/minecraft/client/gui/screens/Screen;II)V")), "released render preparation entry point");
+                    }
+                }
                 var gridEntry = archive.getEntry("mezz/jei/gui/overlay/ingredients/IngredientGridWithNavigation.class");
                 if (gridEntry != null) {
                     try (InputStream source = archive.getInputStream(gridEntry)) {
@@ -114,6 +128,56 @@ public final class TooltipAbiTest {
             }
         }
         System.out.println("TooltipAbiTest passed");
+    }
+
+    private static void verifyRenderPreparationGuard() throws IOException {
+        ClassNode internal = new ClassNode();
+        check(!JeiOptMixinPlugin.hasRuntimeAccessContract(internal), "missing nullable runtime field rejected");
+        FieldNode field = new FieldNode(Opcodes.ACC_PRIVATE | Opcodes.ACC_STATIC,
+            "jeiRuntime", "Lmezz/jei/api/runtime/IJeiRuntime;", null, null);
+        internal.fields.add(field);
+        check(JeiOptMixinPlugin.hasRuntimeAccessContract(internal), "nullable runtime field accepted");
+        field.access = Opcodes.ACC_PRIVATE;
+        check(!JeiOptMixinPlugin.hasRuntimeAccessContract(internal), "instance runtime field rejected");
+        field.access |= Opcodes.ACC_STATIC;
+        field.desc = "Ljava/lang/Object;";
+        check(!JeiOptMixinPlugin.hasRuntimeAccessContract(internal), "changed field type rejected");
+        try (InputStream source = TooltipAbiTest.class.getResourceAsStream("/com/tonywww/jeioptimize/mixin/JeiGuiRenderGuardMixin.class")) {
+            check(source != null, "render guard class exists");
+            ClassNode guard = new ClassNode();
+            new ClassReader(source).accept(guard, 0);
+            MethodNode preparation = guard.methods.stream()
+                .filter(method -> method.name.equals("jeiOptimize$skipJeiRenderPreparationUntilRuntimeReady")).findFirst().orElseThrow();
+            boolean targetsPreparation = false;
+            boolean cancellable = false;
+            boolean atHead = false;
+            for (var annotation : preparation.visibleAnnotations) {
+                if (!annotation.desc.equals("Lorg/spongepowered/asm/mixin/injection/Inject;")) { continue; }
+                for (int index = 0; index < annotation.values.size(); index += 2) {
+                    String key = (String) annotation.values.get(index);
+                    Object value = annotation.values.get(index + 1);
+                    if (key.equals("method")) {
+                        targetsPreparation = ((java.util.List<?>) value).contains("updateForScreenRender(Lnet/minecraft/client/gui/screens/Screen;II)V");
+                    } else if (key.equals("cancellable")) {
+                        cancellable = Boolean.TRUE.equals(value);
+                    } else if (key.equals("at")) {
+                        var at = (org.objectweb.asm.tree.AnnotationNode) ((java.util.List<?>) value).get(0);
+                        atHead = at.values.contains("HEAD");
+                    }
+                }
+            }
+            check(targetsPreparation && cancellable && atHead, "render preparation must be guarded before layout construction");
+            boolean checksRuntime = false;
+            boolean checksLifecycle = false;
+            for (var instruction : preparation.instructions) {
+                if (instruction instanceof MethodInsnNode call) {
+                    checksRuntime |= call.owner.equals("com/tonywww/jeioptimize/mixin/accessor/JeiRuntimeAccessor")
+                        && call.name.equals("jeiopt$getNullableRuntime");
+                    checksLifecycle |= call.name.equals("blocksJeiRendering") && call.desc.equals("(Z)Z");
+                }
+            }
+            check(checksRuntime && checksLifecycle, "render preparation checks actual runtime and startup lifecycle");
+        }
     }
 
     private static boolean verifyCompatibilityArchive(String argument) throws IOException {

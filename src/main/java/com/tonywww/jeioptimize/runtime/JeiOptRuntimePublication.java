@@ -26,13 +26,14 @@ public final class JeiOptRuntimePublication {
         PENDING_CALLBACKS.remove();
         JeiOptExecutors.runOnMainThreadAndWait(() -> {
             if (pending != null) {
-                int refreshed = JeiOptUiRefreshBatch.run(pending.callbacks(),
+                int refreshed = JeiOptUiRefreshBatch.runAndPublish(pending.callbacks(), publication,
                     () -> JeiOptRuntimeState.isCurrent(pending.generation()));
                 JeiOptExecutors.checkJeiStartGeneration(pending.generation());
                 com.tonywww.jeioptimize.JeiOptimize.LOGGER.info(
                     "JEI startup layout notifications coalesced: generation={}, refreshedGrids={}", pending.generation(), refreshed);
+            } else {
+                publication.run();
             }
-            publication.run();
             JeiOptFilterBootstrap.runtimePublished();
         });
     }

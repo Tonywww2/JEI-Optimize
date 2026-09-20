@@ -1,6 +1,7 @@
 package com.tonywww.jeioptimize.mixin;
 
 import com.tonywww.jeioptimize.runtime.JeiOptStartupProgressState;
+import com.tonywww.jeioptimize.mixin.accessor.JeiRuntimeAccessor;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
@@ -25,7 +26,23 @@ public abstract class JeiGuiRenderGuardMixin {
         Screen screen,
         CallbackInfo callbackInfo
     ) {
-        if (JeiOptStartupProgressState.blocksJeiInput()) {
+        if (JeiOptStartupProgressState.blocksJeiRendering(JeiRuntimeAccessor.jeiopt$getNullableRuntime() != null)) {
+            callbackInfo.cancel();
+        }
+    }
+
+    @Inject(
+        method = "updateForScreenRender(Lnet/minecraft/client/gui/screens/Screen;II)V",
+        at = @At("HEAD"),
+        cancellable = true
+    )
+    private void jeiOptimize$skipJeiRenderPreparationUntilRuntimeReady(
+        Screen screen,
+        int mouseX,
+        int mouseY,
+        CallbackInfo callbackInfo
+    ) {
+        if (JeiOptStartupProgressState.blocksJeiRendering(JeiRuntimeAccessor.jeiopt$getNullableRuntime() != null)) {
             callbackInfo.cancel();
         }
     }
@@ -42,7 +59,7 @@ public abstract class JeiGuiRenderGuardMixin {
         int mouseY,
         CallbackInfo callbackInfo
     ) {
-        if (JeiOptStartupProgressState.blocksJeiInput()) {
+        if (JeiOptStartupProgressState.blocksJeiRendering(JeiRuntimeAccessor.jeiopt$getNullableRuntime() != null)) {
             callbackInfo.cancel();
         }
     }
@@ -59,7 +76,7 @@ public abstract class JeiGuiRenderGuardMixin {
         int mouseY,
         CallbackInfo callbackInfo
     ) {
-        if (JeiOptStartupProgressState.blocksJeiInput()) {
+        if (JeiOptStartupProgressState.blocksJeiRendering(JeiRuntimeAccessor.jeiopt$getNullableRuntime() != null)) {
             callbackInfo.cancel();
         }
     }

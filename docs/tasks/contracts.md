@@ -295,6 +295,12 @@ pool and does not run plugin callbacks concurrently. The exception requires all 
     JEI registers them before its runtime exists. The guard must not cancel vanilla screen input and
     must become inert immediately after runtime publication completes.
 - The runtime is published on the client thread only when its generation is still current.
+- Rendering and render-preparation layout updates must also verify that JEI's runtime exists,
+    including after failed/cancelled startup when the progress overlay is no longer visible.
+    Coalesced JEI grid layout notifications flush after runtime installation, not before it:
+    recipe bookmark icons consult `Internal` during layout creation. Plugin callbacks retain
+    their original order before installation; installation and flush share one client task.
+    This supersedes CR-5's pre-publication layout flush (see CR-8).
 - Packs containing another registration callback that requires the client thread can add its JEI
     plugin ID or mod ID to `async.mainThreadPlugins`; disabling `asyncStartup` remains the full
     compatibility fallback.

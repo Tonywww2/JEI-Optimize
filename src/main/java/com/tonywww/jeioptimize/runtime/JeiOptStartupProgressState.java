@@ -156,6 +156,10 @@ public final class JeiOptStartupProgressState {
         }
     }
 
+    public static boolean blocksJeiRendering(boolean runtimeAvailable) {
+        return !runtimeAvailable || blocksJeiInput();
+    }
+
     public enum Stage {
         HIDDEN,
         PREPARING,

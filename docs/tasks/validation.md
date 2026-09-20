@@ -2,6 +2,54 @@
 
 > Owner: agent3. Maps to: T2.3. Scope: baseline runClient and measurement procedure before optimization implementation.
 
+## Recipe Bookmark Startup Crash (2026-09-20)
+
+The reported JET0.14.0/JEI15.59.0.212 crash occurs on Render thread while rendering an
+InventoryScreen: updateForScreenRender -> bookmark bounds/layout -> RecipeBookmarkIcon
+-> Internal.getJeiRuntime, before runtime installation. Guarding only drawing was too late.
+
+The render guard now covers the exact pre-render `(Screen,int,int):void` entry point and
+checks both startup progress and JEI's nullable runtime field. The same missing-runtime
+check applies to init/open and foreground/background/post rendering. The read-only
+accessor and guards share a static-field type gate; old JEI15.20/19.27 do not have the
+new optional getter, so that getter is not hard-linked. No runtime getter exception is
+caught or hidden. A completed/hidden progress overlay alone does not prove runtime exists.
+
+Pending grid layouts now flush after runtime installation in the same client-thread task.
+The callback batch still precedes installation; no plugin callback order changes. Unit
+coverage checks callback -> publication -> bookmark-refresh order, cancellation during
+callbacks, publication failure, stale generation, lifecycle failure/cancel/reload rendering
+states, nested refresh scopes and cleanup. ABI tests inspect the actual guard annotation
+and readiness calls, not only a detached policy. Five released JEI JARs confirm the field
+contract;15.59 and19.56 also confirm the pre-render method signature.
+
+Forge15.59 client regression uses an independent world with a saved recipe bookmark:
+
+```json
+[
+	{"version": 1},
+	{"type": "recipe", "value": "minecraft:crafting#minecraft:crafting_table#item_stack&minecraft:crafting_table"}
+]
+```
+
+The opt-in benchmark opens InventoryScreen before startup completes. Run with
+`-Djet.benchmark=true -Djet.benchmark.autoExit=true -Djet.benchmark.requireBookmarks=true`
+to require the loaded bookmark overlay to be displayed after publication. Do not run
+this probe in a user's regular instance; it opens the inventory and exits after queries.
+The normal application does not enable this probe.
+
+Accepted evidence: `forge-15.59.0.212.bookmark-runtime-guard-final` in the workspace
+jei-compat benchmark directory records `inventory opened: ... startupBlocked=true`,
+`saved bookmark overlay verified after publication`, and `complete: queries=120`.
+No bookmark parse error, runtime-missing exception or Mixin failure was logged. The
+earlier `bookmark-runtime-guard` run had an invalid fixture missing its version header
+and is not accepted as a saved-bookmark regression; `bookmark-runtime-guard-valid`
+corrected the fixture and the final run added the positive display assertion.
+
+The reported user's full modpack, manual resource reload and world switching were not
+rerun; those remain outside this focused client-world and lifecycle-unit verification.
+The fix does not modify or delete actual user bookmarks, worlds, or Prism configuration.
+
 ## MineColonies / Tweaks Tool Scan Stall
 
 ### Attribute Modifier Repair (2026-09-17)

@@ -10,7 +10,7 @@ spend 97% of watchdog samples in IngredientFilter.getElements.
 
 ## Plan
 
-- [x] Coalesce only JEI grid layout notifications during unpublished startup runtime callbacks. Keep visibility mutations, cache invalidation, third-party listeners and explicit queries synchronous. Flush before publication; discard on failure/cancellation.
+- [x] Coalesce only JEI grid layout notifications during unpublished startup runtime callbacks. Keep visibility mutations, cache invalidation, third-party listeners and explicit queries synchronous. As corrected by CR-8 on2026-09-20, flush after runtime installation on the same client task; discard on failure/cancellation.
 - [x] Route Blue Skies and Delightful plugin callbacks to the client thread. Never retry partially executed registrations or suppress thread assertions. ATM9 debug log confirms both recipe callbacks on Render thread; their previous thread assertion failures did not recur.
 - [x] Use the existing client-budgeted index and completion gate when tooltip indexing is disabled. Preserve low-memory and feature-off behavior; never wait on the client thread. Forge15.59 native smoke published2670 entries through the budgeted path.
 - [x] Correct frame interval attribution across phase boundaries. Reject benchmark runs with plugin/linkage errors; separate JET-off from tooltip-off. Crossing frames appear in every overlapping window, so window sample counts must not be summed.

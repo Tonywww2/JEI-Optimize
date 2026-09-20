@@ -71,12 +71,25 @@ public final class JeiOptBenchmark {
         if (!opened && minecraft.screen == null) {
             minecraft.setScreen(new InventoryScreen(minecraft.player));
             opened = true;
+            JeiOptimize.LOGGER.info("JET benchmark inventory opened: generation={}, startupBlocked={}",
+                JeiOptRuntimeState.currentGeneration(), JeiOptStartupProgressState.blocksJeiInput());
         }
         if (runtime == null || JeiOptStartupProgressState.blocksJeiInput() || sidebarStarted == 0) {
             return;
         }
         if (++readyTicks <= 60) {
             return;
+        }
+        if (readyTicks == 61 && Boolean.getBoolean("jet.benchmark.requireBookmarks")) {
+            Object bookmarks = runtime.getBookmarkOverlay();
+            try {
+                if (!Boolean.TRUE.equals(bookmarks.getClass().getMethod("isListDisplayed").invoke(bookmarks))) {
+                    throw new IllegalStateException("Saved bookmark overlay is not displayed");
+                }
+            } catch (ReflectiveOperationException failure) {
+                throw new IllegalStateException("Could not verify saved bookmark overlay", failure);
+            }
+            JeiOptimize.LOGGER.info("JET benchmark saved bookmark overlay verified after publication");
         }
         var filter = runtime.getIngredientFilter();
         if (previousFilter == null) {

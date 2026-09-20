@@ -71,6 +71,7 @@
     "accessor.SophisticatedStorageShulkerRecipeAccessor"
   ],
   "client": [
+    "accessor.JeiRuntimeAccessor",
     "JeiNativeSearchBuilderMixin",
     "JeiStartupGridRefreshMixin",
     "TooltipBenchmarkOverlayMixin",

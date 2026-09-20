@@ -1138,6 +1138,16 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
         if (!readEarlyBoolean("enabled", true)) {
             return false;
         }
+        if (mixinClassName.equals(MIXIN_PACKAGE + "accessor.JeiRuntimeAccessor")) {
+            return hasRuntimeAccessContract(readTarget(targetClassName));
+        }
+        if ((mixinClassName.equals(MIXIN_PACKAGE + "JeiGuiRenderGuardMixin")
+            || mixinClassName.equals(MIXIN_PACKAGE + "JeiGuiBackgroundRenderGuardLegacyMixin")
+            || mixinClassName.equals(MIXIN_PACKAGE + "JeiGuiBackgroundRenderGuardModernMixin"))
+            && !hasRuntimeAccessContract(readTarget("mezz.jei.common.Internal"))) {
+            LOGGER.warn("JEI startup render guard disabled: nullable runtime field ABI is unavailable");
+            return false;
+        }
         if (MINECOLONIES_ATTRIBUTE_MODIFIERS_MIXIN.equals(mixinClassName)) {
             return readEarlyBoolean("fixMineColoniesAttributeModifiers", true)
                 && hasPluginCallbackRoutingContract(readTarget("mezz.jei.library.load.PluginCaller"))
@@ -1307,6 +1317,12 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
         JeiOptCompatibilityState.setTooltipContract(prefix, trimStrings);
         LOGGER.info("JEI tooltip shadow ABI selected: prefix={}, trimStrings={}", prefix, trimStrings);
         return true;
+    }
+
+    static boolean hasRuntimeAccessContract(ClassNode internal) {
+        return internal != null && internal.fields.stream().anyMatch(field ->
+            field.name.equals("jeiRuntime") && field.desc.equals("Lmezz/jei/api/runtime/IJeiRuntime;")
+                && (field.access & Opcodes.ACC_STATIC) != 0);
     }
 
     static boolean hasTooltipReloadContract(ClassNode reload) {

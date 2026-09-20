@@ -1,6 +1,7 @@
 package com.tonywww.jeioptimize.mixin;
 
 import com.tonywww.jeioptimize.runtime.JeiOptStartupProgressState;
+import com.tonywww.jeioptimize.mixin.accessor.JeiRuntimeAccessor;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import org.spongepowered.asm.mixin.Mixin;
@@ -22,7 +23,7 @@ public abstract class JeiGuiBackgroundRenderGuardLegacyMixin {
         GuiGraphics guiGraphics,
         CallbackInfo callbackInfo
     ) {
-        if (JeiOptStartupProgressState.blocksJeiInput()) {
+        if (JeiOptStartupProgressState.blocksJeiRendering(JeiRuntimeAccessor.jeiopt$getNullableRuntime() != null)) {
             callbackInfo.cancel();
         }
     }

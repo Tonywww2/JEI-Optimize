@@ -24,6 +24,19 @@ public final class JeiOptUiRefreshBatch {
         return true;
     }
 
+    public static int runAndPublish(Runnable callbacks, Runnable publication, BooleanSupplier currentGeneration) {
+        return run(() -> {
+            if (!currentGeneration.getAsBoolean()) {
+                throw new CancellationException("Stale JEI runtime callbacks");
+            }
+            callbacks.run();
+            if (!currentGeneration.getAsBoolean()) {
+                throw new CancellationException("Stale JEI runtime publication");
+            }
+            publication.run();
+        }, currentGeneration);
+    }
+
     public static int run(Runnable action, BooleanSupplier currentGeneration) {
         if (CURRENT.get() != null) {
             action.run();
