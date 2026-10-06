@@ -12,7 +12,7 @@ import org.spongepowered.asm.mixin.injection.Coerce;
 @Mixin(targets = "mezz.jei.gui.search.ElementSearch", remap = false)
 public abstract class JeiNativeSearchBuilderMixin {
     @Coerce
-    @WrapOperation(method = "<init>", at = @At(value = "INVOKE",
+    @WrapOperation(method = "<init>(Lmezz/jei/gui/search/ElementPrefixParser;)V", at = @At(value = "INVOKE",
         target = "Lmezz/jei/api/search/ISearchStorageBuilder;build()Lmezz/jei/api/search/ISearchStorage;"), require = 1)
     private Object jeiopt$retainBulkBuilder(@Coerce Object builder, Operation<Object> original) {
         Object deferred = DeferredNativeSearchStorage.defer(builder);

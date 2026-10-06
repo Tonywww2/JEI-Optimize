@@ -153,13 +153,8 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
     );
     private static final String UNHANDLED_RECIPE_DEBUG_MESSAGE =
         "Recipe not added because the recipe category cannot handle it: {}";
-    private static final InvocationRequirement PLUGIN_CALLBACK_INVOCATION = new InvocationRequirement(
-        "callOnPlugins",
-        "(Ljava/lang/String;Ljava/util/List;Ljava/util/function/Consumer;)V",
-        "java/util/function/Consumer",
-        "accept",
-        "(Ljava/lang/Object;)V"
-    );
+    private static final String PLUGIN_CALLBACK_DESCRIPTOR =
+        "(Ljava/lang/String;Ljava/util/List;Ljava/util/function/Consumer;)V";
     private static final List<Requirement> CLIENT_TASK_PUMP_GUARD_REQUIREMENTS = List.of(
         Requirement.method("off-main client task-pump guard", "pollTask", "()Z"),
         Requirement.method("off-main client task-pump guard", "m_7245_", "()Z")
@@ -396,7 +391,7 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
         Map.entry(PLUGIN_CALLER_MIXIN, Requirement.method(
             "client-thread plugin callbacks",
             "callOnPlugins",
-            "(Ljava/lang/String;Ljava/util/List;Ljava/util/function/Consumer;)V")),
+            PLUGIN_CALLBACK_DESCRIPTOR)),
         Map.entry(MIXIN_PACKAGE + "IngredientFilterMixin", Requirement.method(
             "async ingredient filter",
             "<init>",
@@ -1157,7 +1152,11 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
             return hasStartupGridRefreshContract(readTarget(targetClassName));
         }
         if ((MIXIN_PACKAGE + "JeiNativeSearchBuilderMixin").equals(mixinClassName)) {
-            return hasNativeSearchBuilderContract(readTarget(targetClassName));
+            boolean compatible = hasNativeSearchBuilderContract(readTarget(targetClassName));
+            if (!compatible) {
+                LOGGER.info("JEI native bulk builder disabled: ElementSearch has no verified single-argument constructor build call; retaining native storage");
+            }
+            return compatible;
         }
         if ((MIXIN_PACKAGE + "ListElementInfoTooltipCaptureMixin").equals(mixinClassName)) {
             return shouldApplyTooltipCapture(targetClassName);
@@ -1178,6 +1177,11 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
                 || !Requirement.method("", "rebuildItemFilter", "()V").isPresentIn(filter)) {
                 return false;
             }
+        }
+        if ((MIXIN_PACKAGE + "IngredientFilterModernMixin").equals(mixinClassName)
+            && !hasModernIngredientFilterConstructorContract(readTarget(targetClassName))) {
+            LOGGER.info("JEI budgeted ingredient filter disabled: the verified constructor is unavailable; retaining native construction");
+            return false;
         }
         if ((MIXIN_PACKAGE + "IngredientFilterModernMixin").equals(mixinClassName)
             && !hasTooltipLowMemoryContract(readTarget("mezz.jei.common.config.IClientConfig"))) {
@@ -1358,7 +1362,10 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
     static boolean hasNativeSearchBuilderContract(ClassNode search) {
         if (search == null) { return false; }
         for (MethodNode method : search.methods) {
-            if (!method.name.equals("<init>")) { continue; }
+            // The packaged injector names this exact constructor. A build call in another
+            // overload does not make that injection target available (GitHub issue #10).
+            if (!method.name.equals("<init>")
+                || !method.desc.equals("(Lmezz/jei/gui/search/ElementPrefixParser;)V")) { continue; }
             for (AbstractInsnNode instruction : method.instructions) {
                 if (instruction instanceof MethodInsnNode invocation
                     && invocation.owner.equals("mezz/jei/api/search/ISearchStorageBuilder")
@@ -1368,6 +1375,15 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
             }
         }
         return false;
+    }
+
+    static boolean hasModernIngredientFilterConstructorContract(ClassNode filter) {
+        return filter != null && Requirement.method("", "<init>",
+            "(Lmezz/jei/gui/filter/IFilterTextSource;Lmezz/jei/common/config/IClientConfig;"
+                + "Lmezz/jei/common/config/IIngredientFilterConfig;Lmezz/jei/api/runtime/IIngredientManager;"
+                + "Ljava/util/Comparator;Ljava/util/List;Lmezz/jei/api/helpers/IModIdHelper;"
+                + "Lmezz/jei/api/runtime/IIngredientVisibility;Lmezz/jei/api/helpers/IColorHelper;"
+                + "Lmezz/jei/common/config/IClientToggleState;)V").isPresentIn(filter);
     }
 
     static boolean hasMineColoniesAttributeContract(ClassNode target) {
@@ -1504,7 +1520,16 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
     }
 
     static boolean hasPluginCallbackRoutingContract(ClassNode pluginCaller) {
-        return pluginCaller != null && PLUGIN_CALLBACK_INVOCATION.countIn(pluginCaller) == 1;
+        if (pluginCaller == null) { return false; }
+        for (MethodNode method : pluginCaller.methods) {
+            if (method.name.equals("callOnPlugins") && method.desc.equals(PLUGIN_CALLBACK_DESCRIPTOR)) {
+                // The callback argument is wrapped at HEAD; another mod may redirect its uses.
+                return (method.access & Opcodes.ACC_STATIC) != 0
+                    && (method.access & (Opcodes.ACC_ABSTRACT | Opcodes.ACC_NATIVE)) == 0
+                    && method.instructions.size() > 0;
+            }
+        }
+        return false;
     }
 
     private static boolean isGrindstoneRepresentativeMixin(String mixinClassName) {

@@ -4,6 +4,56 @@ All notable changes to Just Enough Threads are documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.14.3
+
+### Fixed
+
+- **Changing dimensions during asynchronous indexing no longer leaves the sidebar stuck publishing.**
+  Native filter publication checks the client connection and startup generation instead of the
+  dimension's `ClientLevel` instance. Tooltip builds refresh their world/player context through
+  the existing native fallback. Failed or cancelled filter publication also completes the runtime
+  publication wait, and late progress callbacks cannot revive a finished or failed startup.
+- **Plugin callback routing now wraps the `PluginCaller` callback argument.**
+  Timing and thread routing run when the callback is invoked. Skipped callbacks do not enter
+  these operations, while invoked callbacks retain their client-thread policy, plugin context,
+  and cleanup. The compatibility check verifies the concrete static callback method and its
+  descriptor.
+
+### Validation
+
+- Both loader builds and regression suites passed with the affected instance's JEI
+  `15.21.0.148`; final remapped JARs also passed its ABI checks. An isolated test executing
+  the actual publication code reproduced the unfinished wait with the original bootstrap,
+  then passed with the fix for dimension changes, disconnects, build cancellation, indexing,
+  sealing, installation and refresh failures, resource changes, and stale generations.
+  Client session objects and index production were fixtures; client-world validation is pending.
+- Both loader builds and regression suites passed. Final remapped JARs passed callback ABI
+  checks against JEI `15.20.0.120` and `19.57.0.450`.
+- Headless callback composition checks passed in both configuration orders, covering skipped
+  callbacks, single execution, and phase-title preservation. Game routing services were isolated
+  for this check; full client-world validation is pending.
+
+## 0.14.2
+
+### Fixed
+
+- **JEI 19.56/19.57 no longer enables an incompatible native search builder Mixin.**
+  The packaged injection targets `ElementSearch(ElementPrefixParser)`, while newer JEI
+  versions use a three-argument constructor. The compatibility check now requires the
+  builder call inside the exact injection constructor, instead of accepting any constructor.
+  Unsupported versions log the skipped optimization and retain native storage. This fixes
+  the `JeiNativeSearchBuilderMixin` injection failure reported in GitHub issue #10.
+- **Budgeted ingredient-filter construction also verifies its exact constructor target.**
+  A retained `createElementSearch` factory no longer enables injections into a removed
+  constructor. Newer constructor shapes use JEI's native filter construction.
+
+### Validation
+
+- Both loader builds and all regression suites passed. The final remapped JARs passed
+  constructor/tooltip ABI checks against released JEI `15.20.0.120`, `19.57.0.449`, and
+  `19.57.0.450`. The constructor regression fails against the original JET `0.14.1` JAR.
+  The affected user's complete modpack has not been tested in a client world.
+
 ## 0.14.1
 
 ### Fixed

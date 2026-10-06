@@ -116,7 +116,8 @@ public final class JeiOptFilterBootstrap {
         long generation = JeiOptRuntimeState.currentGeneration();
         long initialResources = resourceRevision();
         String initialLanguage = Minecraft.getInstance().getLanguageManager().getSelected();
-        Object initialLevel = Minecraft.getInstance().level;
+        // A dimension change replaces ClientLevel while retaining the same JEI runtime.
+        Object initialConnection = Minecraft.getInstance().getConnection();
         long started = System.nanoTime();
         int total = infos.size();
         CompletableFuture<IElementSearch> build = AsyncIngredientFilterBuilder.buildBudgetedAsync(infos,
@@ -128,8 +129,8 @@ public final class JeiOptFilterBootstrap {
                 throw new IllegalStateException("Filter publication requires client thread");
             }
             JeiOptExecutors.checkJeiStartGeneration(generation);
-            if (Minecraft.getInstance().level != initialLevel) {
-                throw new java.util.concurrent.CancellationException("World changed during native filter build");
+            if (Minecraft.getInstance().getConnection() != initialConnection) {
+                throw new java.util.concurrent.CancellationException("Connection changed during native filter build");
             }
             publish.accept(search);
             if (initialResources != resourceRevision()
@@ -137,10 +138,10 @@ public final class JeiOptFilterBootstrap {
                 rebuild.run();
             }
             refresh.run();
-            JeiOptStartupProgressState.markPublished(generation);
             JeiOptimize.LOGGER.info("JEI native budgeted filter published: generation={}, ingredients={}, totalMs={}, retainedBuilders={}",
                 generation, total, (System.nanoTime() - started) / 1_000_000L, storages.size());
         });
+        JeiOptStartupProgressState.trackPublication(generation, published);
         published.whenComplete((ignored, failure) -> {
             if (failure != null) {
                 build.cancel(false);
@@ -224,9 +225,9 @@ public final class JeiOptFilterBootstrap {
             }
             refresh.run();
             JeiOptStartupProgressState.markReady(generation);
-            JeiOptStartupProgressState.markPublished(generation);
             JeiOptimize.LOGGER.info("JEI tooltip filter published on client thread: generation={}", generation);
         });
+        JeiOptStartupProgressState.trackPublication(generation, published);
         GATE.register(generation, published);
         JeiOptRuntimeState.track(published);
     }

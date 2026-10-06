@@ -38,6 +38,7 @@ public final class TooltipFilterBuild {
     private Supplier<IElementSearch> nativeFactory;
     private TooltipSearchAdapter adapter;
     private String mode;
+    private Object connection = Minecraft.getInstance().getConnection();
     private Object level = Minecraft.getInstance().level;
     private Object player = Minecraft.getInstance().player;
     private String language = Minecraft.getInstance().getLanguageManager().getSelected();
@@ -125,7 +126,7 @@ public final class TooltipFilterBuild {
             if (!Minecraft.getInstance().isSameThread()) {
                 throw new IllegalStateException("Tooltip extraction requires client thread");
             }
-            if (Minecraft.getInstance().level != level) {
+            if (Minecraft.getInstance().getConnection() != connection) {
                 cancel();
                 return true;
             }
@@ -139,10 +140,11 @@ public final class TooltipFilterBuild {
                 cache.clear();
                 beginFallback(new IllegalStateException("Tooltip resources changed during build"));
             }
-            if (Minecraft.getInstance().player != player) {
+            if (Minecraft.getInstance().level != level || Minecraft.getInstance().player != player) {
+                level = Minecraft.getInstance().level;
                 player = Minecraft.getInstance().player;
                 cache.clear();
-                beginFallback(new IllegalStateException("Tooltip player context changed during build"));
+                beginFallback(new IllegalStateException("Tooltip world or player context changed during build"));
             }
             if (!mode.equals(adapter.mode())) {
                 mode = adapter.mode();
@@ -399,6 +401,7 @@ public final class TooltipFilterBuild {
         parser = null;
         nativeFactory = null;
         adapter = null;
+        connection = null;
         level = null;
         player = null;
         advancedSetting = null;

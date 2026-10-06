@@ -14,9 +14,8 @@ import mezz.jei.api.IModPlugin;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Redirect;
+import org.spongepowered.asm.mixin.injection.ModifyVariable;
 
-import java.util.List;
 import java.util.function.Consumer;
 
 @Pseudo
@@ -30,23 +29,27 @@ public abstract class PluginCallerMixin {
     private static final String REGISTERING_RUNTIME = "Registering Runtime";
     private static final String REGISTERING_RECIPES = "Registering recipes";
 
-    @Redirect(
-        method = "callOnPlugins",
-        at = @At(
-            value = "INVOKE",
-            target = "Ljava/util/function/Consumer;accept(Ljava/lang/Object;)V"
-        ),
+    // EMI/JEMI filters the call site before invoking this wrapped callback.
+    @ModifyVariable(
+        method = "callOnPlugins(Ljava/lang/String;Ljava/util/List;Ljava/util/function/Consumer;)V",
+        at = @At("HEAD"),
+        argsOnly = true,
+        ordinal = 0,
         require = 1
     )
+    private static Consumer<IModPlugin> jeiOptimize$wrapPluginCall(
+        Consumer<IModPlugin> callback,
+        String title
+    ) {
+        return plugin -> jeiOptimize$timePluginCall(callback, plugin, title);
+    }
+
     private static void jeiOptimize$timePluginCall(
         Consumer<IModPlugin> consumer,
-        Object plugin,
-        String title,
-        List<IModPlugin> plugins,
-        Consumer<IModPlugin> func
+        IModPlugin modPlugin,
+        String title
     ) {
         JeiOptExecutors.checkJeiStartActive();
-        IModPlugin modPlugin = (IModPlugin) plugin;
         boolean isAliPlugin = ALI_PLUGIN_CLASS.equals(modPlugin.getClass().getName());
         String pluginUid = jeiOptimize$safePluginUid(modPlugin);
         boolean requiresMainThread = isAliPlugin

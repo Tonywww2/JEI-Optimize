@@ -1,6 +1,7 @@
 package com.tonywww.jeioptimize.runtime;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 
 public final class JeiOptStartupProgressState {
     private static final Object LOCK = new Object();
@@ -61,7 +62,8 @@ public final class JeiOptStartupProgressState {
 
     public static void markReady(long expectedGeneration) {
         synchronized (LOCK) {
-            if (generation != expectedGeneration || !buildRegistered || stage == Stage.CANCELLED) {
+            if (generation != expectedGeneration || !buildRegistered
+                || (stage != Stage.INDEXING && stage != Stage.READY)) {
                 return;
             }
             completedChunks = totalChunks;
@@ -78,10 +80,26 @@ public final class JeiOptStartupProgressState {
         }
     }
 
+    /** Releases runtime publication waiters even if building, sealing, or installing the filter fails. */
+    public static void trackPublication(long expectedGeneration, CompletableFuture<?> filterPublication) {
+        filterPublication.whenComplete((ignored, failure) -> {
+            if (failure == null) {
+                markPublished(expectedGeneration);
+            } else {
+                Throwable cause = failure;
+                while (cause instanceof CompletionException && cause.getCause() != null) {
+                    cause = cause.getCause();
+                }
+                fail(expectedGeneration, cause);
+            }
+        });
+    }
+
     public static void markPublished(long expectedGeneration) {
         CompletableFuture<Void> toComplete;
         synchronized (LOCK) {
-            if (generation != expectedGeneration || !buildRegistered || stage == Stage.CANCELLED) {
+            if (generation != expectedGeneration || !buildRegistered
+                || stage == Stage.CANCELLED || stage == Stage.HIDDEN) {
                 return;
             }
             completedChunks = totalChunks;
@@ -94,7 +112,7 @@ public final class JeiOptStartupProgressState {
     public static void markRuntimeComplete(long expectedGeneration) {
         CompletableFuture<Void> toComplete = null;
         synchronized (LOCK) {
-            if (generation != expectedGeneration || stage == Stage.CANCELLED) {
+            if (generation != expectedGeneration || stage == Stage.CANCELLED || stage == Stage.HIDDEN) {
                 return;
             }
             runtimeComplete = true;
@@ -113,7 +131,7 @@ public final class JeiOptStartupProgressState {
     public static void fail(long expectedGeneration, Throwable error) {
         CompletableFuture<Void> toFail;
         synchronized (LOCK) {
-            if (generation != expectedGeneration) {
+            if (generation != expectedGeneration || stage == Stage.CANCELLED || stage == Stage.HIDDEN) {
                 return;
             }
             stage = Stage.HIDDEN;

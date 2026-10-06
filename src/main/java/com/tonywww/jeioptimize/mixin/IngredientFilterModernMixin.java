@@ -36,7 +36,7 @@ import java.util.concurrent.CompletableFuture;
  *
  * <p>{@link IngredientFilterMixin} handles the older shape; {@code JeiOptMixinPlugin} applies
  * exactly one of the two based on what the installed JEI actually declares. Nothing here captures
- * constructor arguments, so it survives further changes to the constructor signature.
+ * constructor arguments. The mixin plugin verifies the exact constructor before applying it.
  */
 @Pseudo
 @Mixin(targets = "mezz.jei.gui.ingredients.IngredientFilter", remap = false)
@@ -76,7 +76,11 @@ public abstract class IngredientFilterModernMixin {
     }
 
     @Redirect(
-        method = "<init>",
+        method = "<init>(Lmezz/jei/gui/filter/IFilterTextSource;Lmezz/jei/common/config/IClientConfig;"
+            + "Lmezz/jei/common/config/IIngredientFilterConfig;Lmezz/jei/api/runtime/IIngredientManager;"
+            + "Ljava/util/Comparator;Ljava/util/List;Lmezz/jei/api/helpers/IModIdHelper;"
+            + "Lmezz/jei/api/runtime/IIngredientVisibility;Lmezz/jei/api/helpers/IColorHelper;"
+            + "Lmezz/jei/common/config/IClientToggleState;)V",
         at = @At(
             value = "INVOKE",
             target = "Lmezz/jei/gui/ingredients/IngredientFilter;createElementSearch("
@@ -119,7 +123,11 @@ public abstract class IngredientFilterModernMixin {
         return emptySearch;
     }
 
-    @Inject(method = "<init>", at = @At("RETURN"))
+    @Inject(method = "<init>(Lmezz/jei/gui/filter/IFilterTextSource;Lmezz/jei/common/config/IClientConfig;"
+        + "Lmezz/jei/common/config/IIngredientFilterConfig;Lmezz/jei/api/runtime/IIngredientManager;"
+        + "Ljava/util/Comparator;Ljava/util/List;Lmezz/jei/api/helpers/IModIdHelper;"
+        + "Lmezz/jei/api/runtime/IIngredientVisibility;Lmezz/jei/api/helpers/IColorHelper;"
+        + "Lmezz/jei/common/config/IClientToggleState;)V", at = @At("RETURN"))
     private void jeiopt$scheduleAsyncBuild(CallbackInfo callbackInfo) {
         JeiOptFilterBootstrap.Pending pending = JeiOptFilterBootstrap.take();
         if (pending == null) {

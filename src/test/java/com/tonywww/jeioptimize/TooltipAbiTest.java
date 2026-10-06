@@ -6,6 +6,7 @@ import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.FieldNode;
 import org.objectweb.asm.tree.IntInsnNode;
+import org.objectweb.asm.tree.InsnNode;
 import org.objectweb.asm.tree.InvokeDynamicInsnNode;
 import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.MethodNode;
@@ -19,7 +20,10 @@ import java.util.zip.ZipFile;
 
 public final class TooltipAbiTest {
     public static void main(String[] arguments) throws IOException {
+        verifyPluginCallbackRoutingContract();
         verifyRenderPreparationGuard();
+        verifyNativeSearchBuilderContract();
+        verifyModernIngredientFilterConstructorContract();
         verifyMineColoniesContracts();
         verifyMineColoniesAttributeContract();
         verifyIronsSpellsContracts();
@@ -78,10 +82,43 @@ public final class TooltipAbiTest {
                 continue;
             }
             try (ZipFile archive = new ZipFile(argument)) {
+                var callerEntry = archive.getEntry("mezz/jei/library/load/PluginCaller.class");
+                if (callerEntry != null) {
+                    try (InputStream source = archive.getInputStream(callerEntry)) {
+                        ClassNode caller = new ClassNode();
+                        new ClassReader(source).accept(caller, 0);
+                        check(JeiOptMixinPlugin.hasPluginCallbackRoutingContract(caller),
+                            "released callback argument routing " + argument);
+                    }
+                }
+                var searchEntry = archive.getEntry("mezz/jei/gui/search/ElementSearch.class");
+                if (searchEntry != null) {
+                    try (InputStream source = archive.getInputStream(searchEntry)) {
+                        ClassNode search = new ClassNode();
+                        new ClassReader(source).accept(search, 0);
+                        boolean supported = JeiOptMixinPlugin.hasNativeSearchBuilderContract(search);
+                        boolean hasTargetConstructor = search.methods.stream().anyMatch(method -> method.name.equals("<init>")
+                            && method.desc.equals("(Lmezz/jei/gui/search/ElementPrefixParser;)V"));
+                        check(!supported || hasTargetConstructor, "released native builder requires its injection constructor");
+                        if (argument.contains("19.56.") || argument.contains("19.57.")) {
+                            check(!supported, "changed ElementSearch constructor disables native builder " + argument);
+                        }
+                        System.out.println("Native builder ABI: " + Path.of(argument).getFileName() + " supported=" + supported);
+                    }
+                }
                 try (InputStream source = archive.getInputStream(archive.getEntry("mezz/jei/common/Internal.class"))) {
                     ClassNode internal = new ClassNode();
                     new ClassReader(source).accept(internal, 0);
                     check(JeiOptMixinPlugin.hasRuntimeAccessContract(internal), "released nullable runtime field " + argument);
+                }
+                try (InputStream source = archive.getInputStream(archive.getEntry("mezz/jei/gui/ingredients/IngredientFilter.class"))) {
+                    ClassNode filter = new ClassNode();
+                    new ClassReader(source).accept(filter, 0);
+                    boolean supported = JeiOptMixinPlugin.hasModernIngredientFilterConstructorContract(filter);
+                    if (argument.contains("19.56.") || argument.contains("19.57.")) {
+                        check(!supported, "changed ingredient filter constructor retains native construction " + argument);
+                    }
+                    System.out.println("Ingredient filter constructor ABI: " + Path.of(argument).getFileName() + " supported=" + supported);
                 }
                 if (argument.contains("15.59.") || argument.contains("19.56.")) {
                     try (InputStream source = archive.getInputStream(archive.getEntry("mezz/jei/gui/events/GuiEventHandler.class"))) {
@@ -116,7 +153,7 @@ public final class TooltipAbiTest {
                 try (InputStream source = archive.getInputStream(archive.getEntry("mezz/jei/gui/search/ElementPrefixParser.class"))) {
                     ClassNode realParser = new ClassNode();
                     new ClassReader(source).accept(realParser, 0);
-                    char expected = argument.contains("15.20.") ? '#' : '$';
+                    char expected = argument.contains("15.20.") || argument.contains("15.21.") ? '#' : '$';
                     check(JeiOptMixinPlugin.detectTooltipPrefix(realParser) == expected, "released parser " + Path.of(argument).getFileName());
                     System.out.println("Tooltip ABI verified: " + Path.of(argument).getFileName() + " prefix=" + expected);
                 }
@@ -128,6 +165,124 @@ public final class TooltipAbiTest {
             }
         }
         System.out.println("TooltipAbiTest passed");
+    }
+
+    private static void verifyPluginCallbackRoutingContract() throws IOException {
+        String descriptor = "(Ljava/lang/String;Ljava/util/List;Ljava/util/function/Consumer;)V";
+        check(!JeiOptMixinPlugin.hasPluginCallbackRoutingContract(null), "missing plugin caller rejected");
+        ClassNode caller = new ClassNode();
+        check(!JeiOptMixinPlugin.hasPluginCallbackRoutingContract(caller), "missing callback method rejected");
+        MethodNode callback = new MethodNode(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC,
+            "callOnPlugins", descriptor, null, null);
+        caller.methods.add(callback);
+        check(!JeiOptMixinPlugin.hasPluginCallbackRoutingContract(caller), "callback without code rejected");
+        callback.instructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "PluginCaller",
+            "emi$callOnPlugins", "(Ljava/util/function/Consumer;Ljava/lang/Object;Ljava/lang/String;"
+                + "Ljava/util/List;Ljava/util/function/Consumer;)V", false));
+        callback.instructions.add(new InsnNode(Opcodes.RETURN));
+        check(JeiOptMixinPlugin.hasPluginCallbackRoutingContract(caller),
+            "an EMI Redirect must not disable callback argument routing");
+        callback.access = Opcodes.ACC_PUBLIC;
+        check(!JeiOptMixinPlugin.hasPluginCallbackRoutingContract(caller), "instance callback rejected");
+        callback.access |= Opcodes.ACC_STATIC | Opcodes.ACC_ABSTRACT;
+        check(!JeiOptMixinPlugin.hasPluginCallbackRoutingContract(caller), "abstract callback rejected");
+        callback.access = Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC | Opcodes.ACC_NATIVE;
+        check(!JeiOptMixinPlugin.hasPluginCallbackRoutingContract(caller), "native callback rejected");
+        callback.access = Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC;
+        callback.desc = "(Ljava/lang/String;Ljava/util/List;Ljava/util/function/Consumer;)Z";
+        check(!JeiOptMixinPlugin.hasPluginCallbackRoutingContract(caller), "changed callback descriptor rejected");
+
+        try (InputStream source = TooltipAbiTest.class.getResourceAsStream(
+            "/com/tonywww/jeioptimize/mixin/PluginCallerMixin.class")) {
+            check(source != null, "plugin caller mixin exists");
+            ClassNode mixin = new ClassNode();
+            new ClassReader(source).accept(mixin, 0);
+            var handler = mixin.methods.stream().filter(method -> method.name.equals("jeiOptimize$wrapPluginCall"))
+                .findFirst().orElseThrow();
+            var modifier = handler.visibleAnnotations.stream().filter(annotation -> annotation.desc.equals(
+                "Lorg/spongepowered/asm/mixin/injection/ModifyVariable;")).findFirst().orElseThrow();
+            check(modifier.values.get(modifier.values.indexOf("method") + 1)
+                .equals(java.util.List.of("callOnPlugins" + descriptor)), "callback selector matches its ABI gate");
+            check(Boolean.TRUE.equals(modifier.values.get(modifier.values.indexOf("argsOnly") + 1)),
+                "route the callback argument without relying on local variable debug data");
+            check(Integer.valueOf(0).equals(modifier.values.get(modifier.values.indexOf("ordinal") + 1)),
+                "wrap the sole Consumer argument");
+            var at = (org.objectweb.asm.tree.AnnotationNode) modifier.values.get(modifier.values.indexOf("at") + 1);
+            check("HEAD".equals(at.values.get(at.values.indexOf("value") + 1)), "wrap before plugin filtering");
+            check(mixin.methods.stream().filter(method -> method.visibleAnnotations != null)
+                .flatMap(method -> method.visibleAnnotations.stream()).noneMatch(annotation -> annotation.desc.equals(
+                    "Lorg/spongepowered/asm/mixin/injection/Redirect;")), "do not compete with EMI's Redirect");
+        }
+    }
+
+    private static void verifyNativeSearchBuilderContract() throws IOException {
+        String constructor = "(Lmezz/jei/gui/search/ElementPrefixParser;)V";
+        check(!JeiOptMixinPlugin.hasNativeSearchBuilderContract(null), "missing native search class rejected");
+        ClassNode search = new ClassNode();
+        MethodNode oldConstructor = new MethodNode(Opcodes.ACC_PUBLIC, "<init>", constructor, null, null);
+        search.methods.add(oldConstructor);
+        check(!JeiOptMixinPlugin.hasNativeSearchBuilderContract(search), "constructor without builder rejected");
+        MethodNode newConstructor = new MethodNode(Opcodes.ACC_PUBLIC, "<init>",
+            "(Lmezz/jei/gui/search/ElementPrefixParser;Ljava/util/Collection;Lmezz/jei/api/runtime/IIngredientManager;)V", null, null);
+        search.methods.add(newConstructor);
+        newConstructor.instructions.add(new MethodInsnNode(Opcodes.INVOKEINTERFACE,
+            "mezz/jei/api/search/ISearchStorageBuilder", "build", "()Lmezz/jei/api/search/ISearchStorage;", true));
+        check(!JeiOptMixinPlugin.hasNativeSearchBuilderContract(search), "builder in different constructor rejected (issue #10)");
+        oldConstructor.instructions.add(new MethodInsnNode(Opcodes.INVOKEINTERFACE,
+            "mezz/jei/api/search/ISearchStorageBuilder", "build", "()Lmezz/jei/api/search/ISearchStorage;", true));
+        check(JeiOptMixinPlugin.hasNativeSearchBuilderContract(search), "builder in exact injection constructor accepted");
+        search.methods.remove(oldConstructor);
+        check(!JeiOptMixinPlugin.hasNativeSearchBuilderContract(search), "new constructor alone rejected");
+
+        try (InputStream source = TooltipAbiTest.class.getResourceAsStream("/com/tonywww/jeioptimize/mixin/JeiNativeSearchBuilderMixin.class")) {
+            check(source != null, "native search builder mixin exists");
+            ClassNode mixin = new ClassNode();
+            new ClassReader(source).accept(mixin, 0);
+            MethodNode handler = mixin.methods.stream().filter(method -> method.name.equals("jeiopt$retainBulkBuilder"))
+                .findFirst().orElseThrow();
+            var wrap = handler.visibleAnnotations.stream()
+                .filter(annotation -> annotation.desc.equals("Lcom/llamalad7/mixinextras/injector/wrapoperation/WrapOperation;"))
+                .findFirst().orElseThrow();
+            int methodIndex = wrap.values.indexOf("method");
+            check(methodIndex >= 0 && wrap.values.get(methodIndex + 1).equals(java.util.List.of("<init>" + constructor)),
+                "compiled injector and compatibility gate must use the same exact constructor");
+        }
+    }
+
+    private static void verifyModernIngredientFilterConstructorContract() throws IOException {
+        check(!JeiOptMixinPlugin.hasModernIngredientFilterConstructorContract(null), "missing filter class rejected");
+        ClassNode filter = new ClassNode();
+        filter.methods.add(new MethodNode(Opcodes.ACC_PRIVATE | Opcodes.ACC_STATIC, "createElementSearch",
+            "(Lmezz/jei/common/config/IClientConfig;Lmezz/jei/gui/search/ElementPrefixParser;Ljava/util/List;"
+                + "Lmezz/jei/api/runtime/IIngredientManager;)Lmezz/jei/gui/search/IElementSearch;", null, null));
+        check(!JeiOptMixinPlugin.hasModernIngredientFilterConstructorContract(filter), "factory alone cannot validate a constructor injection");
+        try (InputStream source = TooltipAbiTest.class.getResourceAsStream("/com/tonywww/jeioptimize/mixin/IngredientFilterModernMixin.class")) {
+            check(source != null, "modern ingredient filter mixin exists");
+            ClassNode mixin = new ClassNode();
+            new ClassReader(source).accept(mixin, 0);
+            int handlers = 0;
+            for (MethodNode handler : mixin.methods) {
+                if (!handler.name.equals("jeiopt$deferElementSearch") && !handler.name.equals("jeiopt$scheduleAsyncBuild")) {
+                    continue;
+                }
+                for (var annotation : handler.visibleAnnotations) {
+                    int methodIndex = annotation.values == null ? -1 : annotation.values.indexOf("method");
+                    if (methodIndex < 0) { continue; }
+                    var selectors = (java.util.List<?>) annotation.values.get(methodIndex + 1);
+                    check(selectors.size() == 1, "one exact filter constructor target");
+                    String selector = (String) selectors.get(0);
+                    check(selector.startsWith("<init>("), "filter injector must name a constructor descriptor explicitly");
+                    ClassNode target = new ClassNode();
+                    MethodNode constructor = new MethodNode(Opcodes.ACC_PUBLIC, "<init>", selector.substring(6), null, null);
+                    target.methods.add(constructor);
+                    check(JeiOptMixinPlugin.hasModernIngredientFilterConstructorContract(target), "compiled filter injector matches its gate");
+                    constructor.desc = "(Ljava/lang/Object;)V";
+                    check(!JeiOptMixinPlugin.hasModernIngredientFilterConstructorContract(target), "changed filter constructor rejected");
+                    handlers++;
+                }
+            }
+            check(handlers == 2, "both filter constructor injections verified");
+        }
     }
 
     private static void verifyRenderPreparationGuard() throws IOException {
