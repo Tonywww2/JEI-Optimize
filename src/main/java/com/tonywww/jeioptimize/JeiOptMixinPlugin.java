@@ -1224,10 +1224,22 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
                 return false;
             }
         }
-        if ((MIXIN_PACKAGE + "IngredientFilterModernMixin").equals(mixinClassName)
-            && !hasModernIngredientFilterConstructorContract(readTarget(targetClassName))) {
-            LOGGER.info("JEI budgeted ingredient filter disabled: the verified constructor is unavailable; retaining native construction");
-            return false;
+        if ((MIXIN_PACKAGE + "RecipeManagerInternalPrepMixin").equals(mixinClassName)) {
+            boolean compatible = hasCategoryVisibilityPrepContract(readTarget(targetClassName));
+            if (!compatible) {
+                LOGGER.info(
+                    "JEI category prep disabled: RecipeManagerInternal has no verified visibility cache; RecipesGui keeps JEI's own lookup"
+                );
+            }
+            return compatible;
+        }
+        if ((MIXIN_PACKAGE + "IngredientFilterModernMixin").equals(mixinClassName)) {
+            String branch = modernIngredientFilterConstructorBranch(readTarget(targetClassName));
+            if (branch == null) {
+                LOGGER.info("JEI budgeted ingredient filter disabled: the verified constructor is unavailable; retaining native construction");
+                return false;
+            }
+            LOGGER.info("JEI budgeted ingredient filter verified constructor: {} (contract check only)", branch);
         }
         if ((MIXIN_PACKAGE + "IngredientFilterModernMixin").equals(mixinClassName)
             && !hasTooltipLowMemoryContract(readTarget("mezz.jei.common.config.IClientConfig"))) {
@@ -1472,13 +1484,68 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
         return false;
     }
 
+    /** Comparator constructor verified by JET 0.14.3. The legacy filter mixin keeps this selector. */
+    public static final String COMPARATOR_INGREDIENT_FILTER_DESCRIPTOR =
+        "(Lmezz/jei/gui/filter/IFilterTextSource;Lmezz/jei/common/config/IClientConfig;"
+            + "Lmezz/jei/common/config/IIngredientFilterConfig;Lmezz/jei/api/runtime/IIngredientManager;"
+            + "Ljava/util/Comparator;Ljava/util/List;Lmezz/jei/api/helpers/IModIdHelper;"
+            + "Lmezz/jei/api/runtime/IIngredientVisibility;Lmezz/jei/api/helpers/IColorHelper;"
+            + "Lmezz/jei/common/config/IClientToggleState;)V";
+
+    /**
+     * JEI 15.62.0.219 constructor. Parameter 5 is an erased {@code Function} (sortIndexUpdater),
+     * and {@code IngredientTypeSortingConfig} plus {@code ISearchStorageBuilderFactory} are inserted
+     * before the toggle state. Unknown shapes stay rejected.
+     */
+    public static final String SORTING_CONFIG_INGREDIENT_FILTER_DESCRIPTOR =
+        "(Lmezz/jei/gui/filter/IFilterTextSource;Lmezz/jei/common/config/IClientConfig;"
+            + "Lmezz/jei/common/config/IIngredientFilterConfig;Lmezz/jei/api/runtime/IIngredientManager;"
+            + "Ljava/util/function/Function;Ljava/util/List;Lmezz/jei/api/helpers/IModIdHelper;"
+            + "Lmezz/jei/api/runtime/IIngredientVisibility;"
+            + "Lmezz/jei/gui/config/IngredientTypeSortingConfig;Lmezz/jei/api/helpers/IColorHelper;"
+            + "Lmezz/jei/api/search/ISearchStorageBuilderFactory;"
+            + "Lmezz/jei/common/config/IClientToggleState;)V";
+
+    public static final String COMPARATOR_INGREDIENT_FILTER_CONSTRUCTOR =
+        "<init>" + COMPARATOR_INGREDIENT_FILTER_DESCRIPTOR;
+    public static final String SORTING_CONFIG_INGREDIENT_FILTER_CONSTRUCTOR =
+        "<init>" + SORTING_CONFIG_INGREDIENT_FILTER_DESCRIPTOR;
+
     static boolean hasModernIngredientFilterConstructorContract(ClassNode filter) {
-        return filter != null && Requirement.method("", "<init>",
-            "(Lmezz/jei/gui/filter/IFilterTextSource;Lmezz/jei/common/config/IClientConfig;"
-                + "Lmezz/jei/common/config/IIngredientFilterConfig;Lmezz/jei/api/runtime/IIngredientManager;"
-                + "Ljava/util/Comparator;Ljava/util/List;Lmezz/jei/api/helpers/IModIdHelper;"
-                + "Lmezz/jei/api/runtime/IIngredientVisibility;Lmezz/jei/api/helpers/IColorHelper;"
-                + "Lmezz/jei/common/config/IClientToggleState;)V").isPresentIn(filter);
+        return modernIngredientFilterConstructorBranch(filter) != null;
+    }
+
+    /**
+     * Fields and {@code isCategoryHidden} used by category preparation.
+     * Constructor parameters differ between JEI 15.62 and 19.27, so the check accepts any {@code <init>}.
+     */
+    static boolean hasCategoryVisibilityPrepContract(ClassNode manager) {
+        if (manager == null) {
+            return false;
+        }
+        return Requirement.field("", "recipeCategories", "Ljava/util/List;").isPresentIn(manager)
+            && Requirement.field("", "recipeCategoriesVisibleCache", "Ljava/util/List;").isPresentIn(manager)
+            && Requirement.method(
+                "",
+                "isCategoryHidden",
+                "(Lmezz/jei/api/recipe/category/IRecipeCategory;Lmezz/jei/api/recipe/IFocusGroup;)Z"
+            ).isPresentIn(manager)
+            && Requirement.method("", "<init>").isPresentIn(manager);
+    }
+
+    /** {@code sorting-config}, {@code comparator}, or null when neither verified constructor exists. */
+    static String modernIngredientFilterConstructorBranch(ClassNode filter) {
+        if (hasExactConstructor(filter, SORTING_CONFIG_INGREDIENT_FILTER_DESCRIPTOR)) {
+            return "sorting-config";
+        }
+        if (hasExactConstructor(filter, COMPARATOR_INGREDIENT_FILTER_DESCRIPTOR)) {
+            return "comparator";
+        }
+        return null;
+    }
+
+    private static boolean hasExactConstructor(ClassNode filter, String descriptor) {
+        return filter != null && Requirement.method("", "<init>", descriptor).isPresentIn(filter);
     }
 
     static boolean hasIngredientFilter26Contract(ClassNode filter) {

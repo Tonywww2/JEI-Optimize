@@ -62,6 +62,9 @@ public abstract class JeiStarterPublishModernMixin {
         JeiOptRuntimePublication.runCallbacksAndPublish(() -> {
             Internal.setRuntime(runtime);
             running = true;
+            com.tonywww.jeioptimize.runtime.ForgeGuiRegistrationTracker.markPublished(
+                com.tonywww.jeioptimize.runtime.JeiOptRuntimeState.currentGeneration()
+            );
         });
     }
 

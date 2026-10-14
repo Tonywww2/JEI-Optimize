@@ -87,6 +87,7 @@
     "JeiGuiBackgroundRenderGuardModernMixin",
     "JeiGuiRenderGuardMixin",
     "JeiLoadingOverlayMixin",
+    "RecipeManagerInternalPrepMixin",
     "JeiRecipesGuiGuardMixin",
     "compat.JeedEffectClickGuardMixin",
     "MinecraftProfilerGuardMixin"

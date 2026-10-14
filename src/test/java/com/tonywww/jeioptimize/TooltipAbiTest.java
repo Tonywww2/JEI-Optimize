@@ -25,6 +25,7 @@ public final class TooltipAbiTest {
         verifyRenderPreparationGuard();
         verifyNativeSearchBuilderContract();
         verifyModernIngredientFilterConstructorContract();
+        com.tonywww.jeioptimize.index.TooltipBudgetedPublicationTest.verify();
         verifyMineColoniesContracts();
         verifyMineColoniesAttributeContract();
         verifyIronsSpellsContracts();
@@ -307,33 +308,61 @@ public final class TooltipAbiTest {
             "(Lmezz/jei/common/config/IClientConfig;Lmezz/jei/gui/search/ElementPrefixParser;Ljava/util/List;"
                 + "Lmezz/jei/api/runtime/IIngredientManager;)Lmezz/jei/gui/search/IElementSearch;", null, null));
         check(!JeiOptMixinPlugin.hasModernIngredientFilterConstructorContract(filter), "factory alone cannot validate a constructor injection");
+        check(acceptsOnly(JeiOptMixinPlugin.COMPARATOR_INGREDIENT_FILTER_DESCRIPTOR), "comparator constructor accepted");
+        check(acceptsOnly(JeiOptMixinPlugin.SORTING_CONFIG_INGREDIENT_FILTER_DESCRIPTOR), "sorting-config constructor accepted");
+        check(!acceptsOnly("(Ljava/lang/Object;)V"), "changed filter constructor rejected");
         try (InputStream source = TooltipAbiTest.class.getResourceAsStream("/com/tonywww/jeioptimize/mixin/IngredientFilterModernMixin.class")) {
             check(source != null, "modern ingredient filter mixin exists");
             ClassNode mixin = new ClassNode();
             new ClassReader(source).accept(mixin, 0);
-            int handlers = 0;
-            for (MethodNode handler : mixin.methods) {
-                if (!handler.name.equals("jeiopt$deferElementSearch") && !handler.name.equals("jeiopt$scheduleAsyncBuild")) {
-                    continue;
-                }
-                for (var annotation : handler.visibleAnnotations) {
-                    int methodIndex = annotation.values == null ? -1 : annotation.values.indexOf("method");
-                    if (methodIndex < 0) { continue; }
-                    var selectors = (java.util.List<?>) annotation.values.get(methodIndex + 1);
-                    check(selectors.size() == 1, "one exact filter constructor target");
-                    String selector = (String) selectors.get(0);
+            check(java.util.Set.copyOf(constructorSelectors(mixin, "jeiopt$deferElementSearch")).equals(java.util.Set.of(
+                JeiOptMixinPlugin.COMPARATOR_INGREDIENT_FILTER_CONSTRUCTOR,
+                JeiOptMixinPlugin.SORTING_CONFIG_INGREDIENT_FILTER_CONSTRUCTOR
+            )), "defer redirect names both verified constructors");
+            check(constructorSelectors(mixin, "jeiopt$scheduleAsyncBuild").equals(java.util.List.of(
+                JeiOptMixinPlugin.COMPARATOR_INGREDIENT_FILTER_CONSTRUCTOR
+            )), "comparator inject keeps the original constructor");
+            check(constructorSelectors(mixin, "jeiopt$scheduleSortingConfigBuild").equals(java.util.List.of(
+                JeiOptMixinPlugin.SORTING_CONFIG_INGREDIENT_FILTER_CONSTRUCTOR
+            )), "sorting-config inject names only that constructor");
+            for (String handlerName : java.util.List.of(
+                "jeiopt$deferElementSearch",
+                "jeiopt$scheduleAsyncBuild",
+                "jeiopt$scheduleSortingConfigBuild"
+            )) {
+                for (String selector : constructorSelectors(mixin, handlerName)) {
                     check(selector.startsWith("<init>("), "filter injector must name a constructor descriptor explicitly");
-                    ClassNode target = new ClassNode();
-                    MethodNode constructor = new MethodNode(Opcodes.ACC_PUBLIC, "<init>", selector.substring(6), null, null);
-                    target.methods.add(constructor);
-                    check(JeiOptMixinPlugin.hasModernIngredientFilterConstructorContract(target), "compiled filter injector matches its gate");
-                    constructor.desc = "(Ljava/lang/Object;)V";
-                    check(!JeiOptMixinPlugin.hasModernIngredientFilterConstructorContract(target), "changed filter constructor rejected");
-                    handlers++;
+                    check(acceptsOnly(selector.substring(6)), "compiled filter injector matches its gate");
                 }
             }
-            check(handlers == 2, "both filter constructor injections verified");
         }
+    }
+
+    private static boolean acceptsOnly(String descriptor) {
+        ClassNode target = new ClassNode();
+        target.methods.add(new MethodNode(Opcodes.ACC_PUBLIC, "<init>", descriptor, null, null));
+        return JeiOptMixinPlugin.hasModernIngredientFilterConstructorContract(target);
+    }
+
+    private static java.util.List<String> constructorSelectors(ClassNode mixin, String handlerName) {
+        MethodNode handler = mixin.methods.stream().filter(method -> method.name.equals(handlerName)).findFirst().orElseThrow();
+        java.util.List<String> selectors = new java.util.ArrayList<>();
+        for (var annotation : handler.visibleAnnotations) {
+            int methodIndex = annotation.values == null ? -1 : annotation.values.indexOf("method");
+            if (methodIndex < 0) {
+                continue;
+            }
+            Object value = annotation.values.get(methodIndex + 1);
+            if (value instanceof java.util.List<?> listed) {
+                for (Object item : listed) {
+                    selectors.add((String) item);
+                }
+            } else {
+                selectors.add((String) value);
+            }
+        }
+        check(!selectors.isEmpty(), "filter injector declares a constructor");
+        return selectors;
     }
 
     private static void verifyRenderPreparationGuard() throws IOException {
