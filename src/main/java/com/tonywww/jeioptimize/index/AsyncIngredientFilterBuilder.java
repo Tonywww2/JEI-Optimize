@@ -1,5 +1,6 @@
 package com.tonywww.jeioptimize.index;
 
+import com.tonywww.jeioptimize.JeiOptimize;
 import com.tonywww.jeioptimize.runtime.JeiOptClientTickQueue;
 import com.tonywww.jeioptimize.runtime.JeiOptRuntimeState;
 import com.tonywww.jeioptimize.runtime.JeiOptStartupProgressState;
@@ -13,6 +14,7 @@ import mezz.jei.gui.search.IElementSearch;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -35,7 +37,7 @@ public final class AsyncIngredientFilterBuilder {
         int requestedChunkSize,
         long generation
     ) {
-        return buildBudgetedAsync(elements, ingredientVisibility, search, elementAppender, requestedChunkSize, generation, null);
+        return buildBudgetedAsync(elements, ingredientVisibility, search, elementAppender, requestedChunkSize, generation, null, false);
     }
 
     public static CompletableFuture<IElementSearch> buildBudgetedAsync(
@@ -47,6 +49,19 @@ public final class AsyncIngredientFilterBuilder {
         long generation,
         ElementPrefixParser parser
     ) {
+        return buildBudgetedAsync(elements, ingredientVisibility, search, elementAppender, requestedChunkSize, generation, parser, false);
+    }
+
+    public static CompletableFuture<IElementSearch> buildBudgetedAsync(
+        List<? extends IListElementInfo<?>> elements,
+        IIngredientVisibility ingredientVisibility,
+        IElementSearch search,
+        ElementAppender elementAppender,
+        int requestedChunkSize,
+        long generation,
+        ElementPrefixParser parser,
+        boolean preserveHidden
+    ) {
         int chunkSize = Math.max(1, requestedChunkSize);
         int chunkCount = (elements.size() + chunkSize - 1) / chunkSize;
         JeiOptStartupProgressState.registerBuild(generation, chunkCount, elements.size());
@@ -54,6 +69,8 @@ public final class AsyncIngredientFilterBuilder {
         CompletableFuture<IElementSearch> future = new CompletableFuture<>();
         TooltipSearchShadow shadow = TooltipSearchShadow.create(generation, parser, elements.size());
         AtomicInteger nextIndex = new AtomicInteger();
+        AtomicInteger sliceCount = new AtomicInteger();
+        AtomicLong longestSliceNanos = new AtomicLong();
         CompletableFuture<IElementSearch> previous = IN_FLIGHT.getAndSet(future);
         if (previous != null) {
             previous.cancel(true);
@@ -69,13 +86,15 @@ public final class AsyncIngredientFilterBuilder {
             }
 
             try {
+                int indexBeforeSlice = nextIndex.get();
+                long sliceStarted = System.nanoTime();
                 boolean processed = false;
                 while (nextIndex.get() < elements.size()
                     && (shadow == null || shadow.canCapture())
                     && (!processed || JeiOptClientTickQueue.hasTimeRemaining())) {
                     int index = nextIndex.getAndIncrement();
                     IListElementInfo<?> info = elements.get(index);
-                    updateHiddenState(info.getElement(), ingredientVisibility);
+                    updateHiddenState(info.getElement(), ingredientVisibility, preserveHidden);
                     if (shadow == null) {
                         elementAppender.add(search, info);
                     } else {
@@ -87,6 +106,9 @@ public final class AsyncIngredientFilterBuilder {
                     }
                     processed = true;
                 }
+                if (nextIndex.get() != indexBeforeSlice) {
+                    recordSlice(sliceCount, longestSliceNanos, sliceStarted);
+                }
 
                 if (nextIndex.get() < elements.size()) {
                     return false;
@@ -95,6 +117,11 @@ public final class AsyncIngredientFilterBuilder {
                     return false;
                 }
                 JeiOptStartupProgressState.markReady(generation);
+                JeiOptimize.LOGGER.info(
+                    "JEI Optimize budgeted ingredient filter tick slices: count={}, longestSliceMs={}",
+                    sliceCount.get(),
+                    longestSliceNanos.get() / 1_000_000L
+                );
                 future.complete(search);
                 IN_FLIGHT.compareAndSet(future, null);
                 return true;
@@ -118,7 +145,24 @@ public final class AsyncIngredientFilterBuilder {
         }
     }
 
-    private static void updateHiddenState(IListElement<?> element, IIngredientVisibility ingredientVisibility) {
+    private static void recordSlice(AtomicInteger sliceCount, AtomicLong longestSliceNanos, long sliceStarted) {
+        sliceCount.incrementAndGet();
+        long elapsed = System.nanoTime() - sliceStarted;
+        longestSliceNanos.accumulateAndGet(elapsed, Math::max);
+    }
+
+    /**
+     * @param preserveHidden when the native constructor already applied type visibility, do not
+     *     show an element it hid. A visible element can still be hidden by the ingredient check.
+     */
+    private static void updateHiddenState(
+        IListElement<?> element,
+        IIngredientVisibility ingredientVisibility,
+        boolean preserveHidden
+    ) {
+        if (preserveHidden && !element.isVisible()) {
+            return;
+        }
         ITypedIngredient<?> typedIngredient = element.getTypedIngredient();
         boolean visible = ingredientVisibility.isIngredientVisible(typedIngredient);
         if (element.isVisible() != visible) {

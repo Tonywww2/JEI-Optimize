@@ -77,6 +77,10 @@ public abstract class PluginCallerMixin {
                     JeiOptClientTickQueue.awaitNextClientTick();
                 }
                 if (requiresMainThread) {
+                    if ((JEI_FORGE_GUI_PLUGIN.equals(pluginUid) || JEI_NEOFORGE_GUI_PLUGIN.equals(pluginUid))
+                        && REGISTERING_RUNTIME.equals(title)) {
+                        com.tonywww.jeioptimize.runtime.CategoryVisibilityPrep.finishBeforeGuiRegistration();
+                    }
                     JeiOptExecutors.runOnMainThreadAndWait(() -> {
                         JeiOptimize.LOGGER.debug(
                             "JEI Optimize running plugin {} phase '{}' on the client thread",
@@ -85,7 +89,15 @@ public abstract class PluginCallerMixin {
                         );
                         if ((JEI_FORGE_GUI_PLUGIN.equals(pluginUid) || JEI_NEOFORGE_GUI_PLUGIN.equals(pluginUid))
                             && REGISTERING_RUNTIME.equals(title)) {
-                            JeiOptFilterBootstrap.runGuiRegistration(pluginCall);
+                            JeiOptFilterBootstrap.runGuiRegistration(() -> {
+                                pluginCall.run();
+                                if (JEI_FORGE_GUI_PLUGIN.equals(pluginUid)) {
+                                    com.tonywww.jeioptimize.runtime.ForgeGuiRegistrationTracker.markRegistered(
+                                        com.tonywww.jeioptimize.runtime.JeiOptRuntimeState.currentGeneration(),
+                                        modPlugin::onRuntimeUnavailable
+                                    );
+                                }
+                            });
                         } else {
                             pluginCall.run();
                         }
