@@ -41,6 +41,8 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
     private static final String PLUGIN_CALLER_MIXIN = MIXIN_PACKAGE + "PluginCallerMixin";
     private static final String STARTER_PUBLISH_LEGACY_MIXIN = MIXIN_PACKAGE + "JeiStarterPublishLegacyMixin";
     private static final String STARTER_PUBLISH_MODERN_MIXIN = MIXIN_PACKAGE + "JeiStarterPublishModernMixin";
+    private static final String GUI_RENDER_GUARD_MIXIN = MIXIN_PACKAGE + "JeiGuiRenderGuardMixin";
+    private static final String GUI_RENDER_GUARD_MODERN_MIXIN = MIXIN_PACKAGE + "JeiGuiRenderGuardModernMixin";
     private static final String CLIENT_TASK_PUMP_GUARD_MIXIN =
         MIXIN_PACKAGE + "ClientTaskPumpGuardMixin";
     private static final String CELESTIAL_REINFORCE_MIXIN =
@@ -538,11 +540,6 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
             "startup recipe GUI guard",
             "show",
             "(Ljava/util/List;)V")),
-        Map.entry(MIXIN_PACKAGE + "JeiGuiRenderGuardMixin", Requirement.method(
-            "startup JEI render guard",
-            "onDrawScreenPost",
-            "(Lnet/minecraft/client/gui/screens/Screen;"
-                + "Lnet/minecraft/client/gui/GuiGraphics;II)V")),
         Map.entry(MIXIN_PACKAGE + "JeiGuiBackgroundRenderGuardLegacyMixin", Requirement.method(
             "startup JEI background render guard",
             "onDrawBackgroundPost",
@@ -1086,6 +1083,7 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
     private final Map<String, ClassNode> targetCache = new HashMap<>();
     private final Map<AtomicFeature, Boolean> atomicFeatureCompatibility = new HashMap<>();
     private Boolean sophisticatedShulkerCompatibility;
+    private boolean loggedMissingGuiRenderGuard;
 
     /** One of these covers each JEI generation, so the one that does not match is not a problem. */
     private static final Set<String> VARIANTS = Set.of(
@@ -1162,15 +1160,20 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
         if (mixinClassName.equals(MIXIN_PACKAGE + "accessor.JeiRuntimeAccessor")) {
             return hasRuntimeAccessContract(readTarget(targetClassName));
         }
-        if ((mixinClassName.equals(MIXIN_PACKAGE + "JeiGuiRenderGuardMixin")
-            || mixinClassName.equals(MIXIN_PACKAGE + "JeiGuiRenderGuard26Mixin")
-            || mixinClassName.equals(MIXIN_PACKAGE + "JeiGuiBackgroundRenderGuardLegacyMixin")
+        if (GUI_RENDER_GUARD_MIXIN.equals(mixinClassName) || GUI_RENDER_GUARD_MODERN_MIXIN.equals(mixinClassName)) {
+            return shouldApplyGuiRenderGuardMixin(mixinClassName);
+        }
+        if ((mixinClassName.equals(MIXIN_PACKAGE + "JeiGuiBackgroundRenderGuardLegacyMixin")
             || mixinClassName.equals(MIXIN_PACKAGE + "JeiGuiBackgroundRenderGuardModernMixin"))
             && !hasRuntimeAccessContract(readTarget("mezz.jei.common.Internal"))) {
             LOGGER.warn("JEI startup render guard disabled: nullable runtime field ABI is unavailable");
             return false;
         }
         if (mixinClassName.equals(MIXIN_PACKAGE + "JeiGuiRenderGuard26Mixin")) {
+            if (!hasRuntimeAccessContract(readTarget("mezz.jei.common.Internal"))) {
+                LOGGER.warn("JEI startup render guard disabled: nullable runtime field ABI is unavailable");
+                return false;
+            }
             ClassNode handler = readTarget(targetClassName);
             return handler != null
                 && Requirement.method("", "onGuiInit", "(Lnet/minecraft/client/gui/screens/Screen;)V").isPresentIn(handler)
@@ -1373,6 +1376,66 @@ public final class JeiOptMixinPlugin implements IMixinConfigPlugin {
         return internal != null && internal.fields.stream().anyMatch(field ->
             field.name.equals("jeiRuntime") && field.desc.equals("Lmezz/jei/api/runtime/IJeiRuntime;")
                 && (field.access & Opcodes.ACC_STATIC) != 0);
+    }
+
+    /**
+     * JEI 15.x / 19.27 screen-post ABI. Every listed method is a live overlay-layout entry point
+     * on those builds; {@code updateForScreenRender} is injected only when present.
+     */
+    static boolean hasLegacyGuiRenderGuardContract(ClassNode handler) {
+        return handler != null
+            && Requirement.method("", "onDrawScreenPost",
+                "(Lnet/minecraft/client/gui/screens/Screen;Lnet/minecraft/client/gui/GuiGraphics;II)V")
+                .isPresentIn(handler)
+            && Requirement.method("", "onGuiInit",
+                "(Lnet/minecraft/client/gui/screens/Screen;)V").isPresentIn(handler)
+            && Requirement.method("", "onGuiOpen",
+                "(Lnet/minecraft/client/gui/screens/Screen;)V").isPresentIn(handler);
+    }
+
+    /**
+     * JEI 19.57 screen-render ABI. All five methods must exist so layout, background and
+     * foreground overlay paths are guarded together rather than applying a partial mixin.
+     */
+    static boolean hasModernGuiRenderGuardContract(ClassNode handler) {
+        return handler != null
+            && Requirement.method("", "updateForScreenRender",
+                "(Lnet/minecraft/client/gui/screens/Screen;II)V").isPresentIn(handler)
+            && Requirement.method("", "drawForScreenBackground",
+                "(Lnet/minecraft/client/gui/screens/Screen;Lnet/minecraft/client/gui/GuiGraphics;)V")
+                .isPresentIn(handler)
+            && Requirement.method("", "drawForScreenForeground",
+                "(Lnet/minecraft/client/gui/screens/Screen;Lnet/minecraft/client/gui/GuiGraphics;II)V")
+                .isPresentIn(handler)
+            && Requirement.method("", "onGuiInit",
+                "(Lnet/minecraft/client/gui/screens/Screen;)V").isPresentIn(handler)
+            && Requirement.method("", "onGuiOpen",
+                "(Lnet/minecraft/client/gui/screens/Screen;)V").isPresentIn(handler);
+    }
+
+    private boolean shouldApplyGuiRenderGuardMixin(String mixinClassName) {
+        if (!hasRuntimeAccessContract(readTarget("mezz.jei.common.Internal"))) {
+            LOGGER.warn("JEI startup render guard disabled: nullable runtime field ABI is unavailable");
+            return false;
+        }
+        //? if >=26.1 {
+        /*return false;
+        *///?} else {
+        ClassNode handler = readTarget("mezz.jei.gui.events.GuiEventHandler");
+        boolean legacy = hasLegacyGuiRenderGuardContract(handler);
+        boolean modern = hasModernGuiRenderGuardContract(handler);
+        if (!legacy && !modern && !loggedMissingGuiRenderGuard) {
+            loggedMissingGuiRenderGuard = true;
+            LOGGER.warn(
+                "JEI Optimize turned off its startup JEI render guard: this JEI build's "
+                    + "GuiEventHandler has no verified screen-render ABI. JEI keeps its normal behavior."
+            );
+        }
+        if (GUI_RENDER_GUARD_MIXIN.equals(mixinClassName)) {
+            return legacy && !modern;
+        }
+        return modern && !legacy;
+        //?}
     }
 
     static boolean hasTooltipReloadContract(ClassNode reload) {

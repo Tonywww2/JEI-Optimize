@@ -15,14 +15,27 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(targets = "mezz.jei.gui.events.GuiEventHandler", remap = false)
 public abstract class JeiGuiRenderGuardMixin {
     @Inject(
-        method = {
-            "onGuiInit(Lnet/minecraft/client/gui/screens/Screen;)V",
-            "onGuiOpen(Lnet/minecraft/client/gui/screens/Screen;)V"
-        },
+        method = "onGuiInit(Lnet/minecraft/client/gui/screens/Screen;)V",
         at = @At("HEAD"),
-        cancellable = true
+        cancellable = true,
+        require = 1
     )
-    private void jeiOptimize$skipJeiLayoutUntilRuntimeReady(
+    private void jeiOptimize$skipJeiInitUntilRuntimeReady(
+        Screen screen,
+        CallbackInfo callbackInfo
+    ) {
+        if (JeiOptStartupProgressState.blocksJeiRendering(JeiRuntimeAccessor.jeiopt$getNullableRuntime() != null)) {
+            callbackInfo.cancel();
+        }
+    }
+
+    @Inject(
+        method = "onGuiOpen(Lnet/minecraft/client/gui/screens/Screen;)V",
+        at = @At("HEAD"),
+        cancellable = true,
+        require = 1
+    )
+    private void jeiOptimize$skipJeiOpenUntilRuntimeReady(
         Screen screen,
         CallbackInfo callbackInfo
     ) {
@@ -67,7 +80,8 @@ public abstract class JeiGuiRenderGuardMixin {
     @Inject(
         method = "onDrawScreenPost(Lnet/minecraft/client/gui/screens/Screen;Lnet/minecraft/client/gui/GuiGraphics;II)V",
         at = @At("HEAD"),
-        cancellable = true
+        cancellable = true,
+        require = 1
     )
     private void jeiOptimize$skipJeiRenderingUntilRuntimeReady(
         Screen screen,

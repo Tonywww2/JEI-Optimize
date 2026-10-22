@@ -99,7 +99,9 @@ tasks.processResources {
     filesMatching("$modId.mixins.json") {
         // Stonecutter preprocesses Java; select the new ABI's injectors in the JSON separately.
         filter { line ->
-            if (line.trim() == "\"IngredientFilterModernMixin\"," || line.trim().startsWith("\"refmap\"")) ""
+            if (line.trim() == "\"IngredientFilterModernMixin\","
+                || line.trim() == "\"JeiGuiRenderGuardModernMixin\","
+                || line.trim().startsWith("\"refmap\"")) ""
             else line.replace("\"IngredientFilterMixin\"", "\"IngredientFilter26Mixin\"")
                 .replace("\"JeiNativeSearchBuilderMixin\"", "\"JeiNativeSearchBuilder26Mixin\"")
                 .replace("\"JeiGuiRenderGuardMixin\"", "\"JeiGuiRenderGuard26Mixin\"")

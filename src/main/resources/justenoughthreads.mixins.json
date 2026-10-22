@@ -86,6 +86,7 @@
     "JeiGuiBackgroundRenderGuardLegacyMixin",
     "JeiGuiBackgroundRenderGuardModernMixin",
     "JeiGuiRenderGuardMixin",
+    "JeiGuiRenderGuardModernMixin",
     "JeiLoadingOverlayMixin",
     "JeiRecipesGuiGuardMixin",
     "compat.JeedEffectClickGuardMixin",
